@@ -48,6 +48,10 @@ const intentLexicon = {
     "por que te derivaron",
     "por que te mandaron",
     "que te preocupa",
+    "que sucede",
+    "que te sucede",
+    "que esta pasando",
+    "que te esta pasando",
     "quien te derivo",
     "que paso para que llegaras"
   ],
@@ -71,7 +75,8 @@ const intentLexicon = {
     "que haces en tu tiempo libre",
     "que valoras",
     "que seria util",
-    "que te ayudaria"
+    "que te ayudaria",
+    "quieres que te ayude"
   ],
   pregunta_escolar: ["vas al colegio", "vas a clases", "estas en el colegio", "sigues en el colegio", "colegio", "curso"],
   pregunta_academica: ["estudias", "universidad", "carrera", "ramos", "que estudias", "clases", "rendimiento"],
@@ -80,10 +85,35 @@ const intentLexicon = {
   pregunta_social: ["tienes amigos", "tienes amigas", "amigos", "companeros", "sales", "te juntas", "hablas con alguien"],
   pregunta_videojuegos: ["juegas videojuegos", "videojuegos", "juegas mucho", "juegas harto", "computador", "que juegos", "redes sociales", "redes", "celular", "instagram", "tiktok"],
   pregunta_habitos: ["duermes", "comes", "descansas", "audifonos", "rutina", "que haces cuando", "como duermes"],
-  validacion_emocional: ["entiendo", "tiene sentido", "comprendo", "no debe ser facil", "debe ser dificil", "no quiero juzgar", "gracias por contar", "suena importante"],
+  validacion_emocional: [
+    "entiendo",
+    "tiene sentido",
+    "comprendo",
+    "no debe ser facil",
+    "debe ser dificil",
+    "no quiero juzgar",
+    "no estoy para juzgarte",
+    "te escucho",
+    "puedes tomarte tu tiempo",
+    "lo que sientes es importante",
+    "si para ti es importante",
+    "podemos comprenderlo juntos",
+    "no suena tonto",
+    "no es tonto",
+    "este es un lugar seguro",
+    "gracias por contar",
+    "gracias por contarlo",
+    "suena importante",
+    "podemos trabajarlo juntos",
+    "quiero acompanarte",
+    "puedes contarme lo que quieras",
+    "puedes contarme con calma",
+    "sin juzgarte",
+    "no voy a juzgarte"
+  ],
   juicio_o_critica: ["flojo", "adict", "exageras", "eso te hace mal", "tienes que cambiar", "estas mal", "eres el problema", "deberias dejar"],
   consejo_apresurado: ["deberias", "tienes que", "te recomiendo", "deja de", "lo mejor seria", "haz ejercicio", "organizate", "pon limites y listo"],
-  exploracion_emocional: ["que sientes", "como te sientes", "que te pasa", "como lo vives", "que te cuesta mas", "que parte te duele", "te da miedo", "te da culpa", "te da rabia", "te da pena"],
+  exploracion_emocional: ["que sientes", "como te sientes", "que te pasa", "que te sucede", "que es lo que sientes", "como lo vives", "que te cuesta mas", "que te cuesta contar", "que parte te duele", "te da miedo", "te da culpa", "te da rabia", "te da pena"],
   exploracion_contextual: ["como es en tu casa", "como es en tu trabajo", "como es en la universidad", "como es con tu familia", "como es con tus amigos", "que pasa ahi", "desde cuando pasa"],
   cierre: ["cerrar", "terminar", "finalizar", "antes de terminar", "gracias por conversar", "como quedas", "como te vas"]
 };
@@ -135,7 +165,7 @@ const contextualTopics = {
   pertenencia: ["pertenecer", "encajar", "comparar", "primera generacion"],
   migracion: ["migrar", "migracion", "pais", "cero", "lejos"],
   decisiones: ["decidir", "decision", "cambio", "estancado", "rutina"],
-  comparacion: ["comparacion", "compararme", "comparar"],
+  comparacion: ["comparacion", "compararme", "comparar", "comparas", "con que te comparas"],
   control: ["control", "controladora", "autoridad"],
   miedo: ["miedo", "asusta", "temor"],
   hija: ["hija", "adolescente"],
@@ -156,8 +186,11 @@ const followUpCues = [
   "cuentame mas",
   "que parte",
   "que cosa",
+  "que tema",
   "que te cuesta",
+  "que te cuesta contar",
   "que pasa con eso",
+  "explicame",
   "y despues que haces",
   "como lo vives",
   "cuando te pasa",
@@ -207,6 +240,7 @@ function detectContextualTopic(text, history) {
     if (topic === "default") continue;
     const asksTopic = terms.some((term) => text.includes(normalizeText(term)));
     const lastHadTopic = terms.some((term) => lastPatientMessage.includes(normalizeText(term)));
+    if (asksTopic && isBrief) return topic;
     if ((asksTopic && lastHadTopic) || (hasFollowUpCue && lastHadTopic)) return topic;
   }
 

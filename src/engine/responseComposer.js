@@ -7,6 +7,7 @@ const forbiddenClinicalTerms = [
   "redes de apoyo",
   "regulación emocional",
   "regulacion emocional",
+  "tema central",
   "motivo oculto",
   "apertura",
   "problemática",
@@ -16,6 +17,11 @@ const forbiddenClinicalTerms = [
   "dificultad para relacionarse presencialmente",
   "duelo migratorio",
   "autoestima afectada",
+  "autoimagen afectada",
+  "validación externa",
+  "validacion externa",
+  "red de apoyo deficiente",
+  "redes de apoyo deficientes",
   "presento",
   "experimento"
 ];
@@ -45,8 +51,12 @@ function cleanTechnicalLanguage(response) {
 }
 
 function limitSentences(response, opennessLevel, responseType) {
+  const isConcreteEngineResponse =
+    responseType?.includes(":concreto") ||
+    responseType === "apertura_progresiva:forzada" ||
+    responseType?.startsWith("seguimiento_contextual:");
   const maxSentences =
-    responseType === "presentacion_personal_abierta" || responseType === "motivo_de_consulta" || responseType === "ocupacion_actividad"
+    isConcreteEngineResponse || responseType === "presentacion_personal_abierta" || responseType === "motivo_de_consulta" || responseType === "ocupacion_actividad"
       ? 4
       : opennessLevel === "apertura_alta"
         ? 4
@@ -83,8 +93,9 @@ function avoidExactRepetition(response, lastPatientMessage, caseId) {
 
 function ensurePunctuation(response) {
   if (!response) return "No sé bien cómo responder eso.";
-  const trimmed = response.charAt(0).toUpperCase() + response.slice(1).trim();
-  return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+  const clean = response.trim();
+  const withInitialCapital = clean.charAt(0).toUpperCase() + clean.slice(1);
+  return /[.!?…]$/.test(withInitialCapital) ? withInitialCapital : `${withInitialCapital}.`;
 }
 
 function normalizeForCompare(text) {

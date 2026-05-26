@@ -225,3 +225,190 @@ export const patientFacts = {
     expectation: "Quisiera entender qué me frena, sin hacer cambios impulsivos."
   }
 };
+
+const concreteProgressionByCase = {
+  tomas: {
+    temaCentral: "videojuegos, encierro, conflicto familiar y dificultad para estar con otros en persona",
+    concreteDisclosures: [
+      "Mis papás dicen que juego mucho y que casi no salgo. Yo siento que ven solo esa parte.",
+      "En persona me cuesta saber qué decir. A veces prefiero quedarme callado antes de quedar raro.",
+      "En el computador siento que tengo un lugar más claro. Afuera me cuesta más saber cómo actuar.",
+      "En mi casa todo termina en discusión por el computador, entonces me cierro más."
+    ],
+    validationBridge: "Gracias por decirlo así. Me ayuda que no partas pensando que todo es culpa del computador.",
+    followUpBridge: "Creo que lo que trato de decir es que no juego solo por jugar.",
+    concreteConcern: "Me preocupa que todos crean que el problema soy yo o el computador, cuando también me cuesta estar con gente."
+  },
+  valentina: {
+    temaCentral: "sobrecarga universitaria, autoexigencia, culpa al descansar y miedo a decepcionar",
+    concreteDisclosures: [
+      "Me cuesta parar. Si descanso, siento culpa, como si estuviera perdiendo tiempo.",
+      "Siento que debería poder con todo, aunque por dentro esté agotada.",
+      "Mi cabeza sigue haciendo listas incluso cuando trato de descansar.",
+      "Me da miedo decepcionar a mi familia o que se note que no soy tan capaz."
+    ],
+    validationBridge: "Gracias. Me ayuda que no lo pongas como simple falta de organización.",
+    followUpBridge: "Creo que lo que me cuesta decir es que no puedo apagar la cabeza.",
+    concreteConcern: "Me preocupa bajar el ritmo y sentir que estoy fallando."
+  },
+  marcos: {
+    temaCentral: "estres laboral, cansancio, irritabilidad y perdida de sentido",
+    concreteDisclosures: [
+      "Llego a la casa sin energía y a veces respondo más corto de lo que quisiera.",
+      "Sigo cumpliendo en la pega, pero por dentro me siento apagado.",
+      "Me irrito con cosas pequeñas y después me da culpa.",
+      "Antes mi trabajo tenía más sentido. Ahora muchas veces solo hago lo que toca."
+    ],
+    validationBridge: "Gracias. Me sirve que no lo tomes como falta de ganas.",
+    followUpBridge: "Lo que me preocupa es que sigo funcionando, pero cada vez con menos paciencia.",
+    concreteConcern: "Me preocupa llegar a la casa sin paciencia y que mi familia reciba lo peor de mí."
+  },
+  elena: {
+    temaCentral: "soledad, dificultad para pedir ayuda, rol de cuidadora y miedo a ser carga",
+    concreteDisclosures: [
+      "Me cuesta pedir ayuda. Siento que molesto, aunque nadie me lo diga así.",
+      "No quiero preocupar a mis hijos, entonces guardo más de lo que cuento.",
+      "Siempre he sido yo la que sostiene a todos, y ahora no sé bien cómo pedir compañía.",
+      "A veces me pregunto qué queda para mí cuando ya no todos me necesitan igual."
+    ],
+    validationBridge: "Gracias. Me alivia que no suene como que estoy culpando a nadie.",
+    followUpBridge: "Creo que me cuesta hablar de mí sin pensar primero en los demás.",
+    concreteConcern: "Me preocupa ser una carga o necesitar más compañía de la que me atrevo a pedir."
+  },
+  nicolas: {
+    temaCentral: "derivacion escolar, baja participacion, silencio y sensacion de no ser escuchado",
+    concreteDisclosures: [
+      "Me mandaron del colegio. Dicen que estoy más callado y que bajé las notas.",
+      "Siento que ya tienen una idea hecha de mí antes de preguntarme.",
+      "Prefiero quedarme piola, así no tengo que explicar todo ni meterme en problemas.",
+      "No es que no tenga nada que decir. A veces siento que igual no vale la pena."
+    ],
+    validationBridge: "Ya... gracias. Me ayuda que no suene como otro reto.",
+    followUpBridge: "Creo que lo que pasa es que me cuesta hablar cuando siento que ya decidieron por mí.",
+    concreteConcern: "Me preocupa que los adultos crean que soy flojo o raro sin escuchar mucho más."
+  },
+  camila: {
+    temaCentral: "limites, culpa, cansancio emocional y disponibilidad para otros",
+    concreteDisclosures: [
+      "Me cuesta decir que no. A veces digo que sí antes de pensar si realmente puedo.",
+      "Siento culpa cuando no estoy disponible para mi familia o para alguien que me necesita.",
+      "Termino cansada porque resuelvo cosas de otros incluso después del trabajo.",
+      "Me da miedo que si pongo límites piensen que soy egoísta o que ya no pueden contar conmigo."
+    ],
+    validationBridge: "Gracias. Me ayuda que no lo mires como si fuera solo falta de carácter.",
+    followUpBridge: "Creo que me cuesta reconocer que ayudar también me está agotando.",
+    concreteConcern: "Me preocupa empezar a decir que no y que los demás se molesten conmigo."
+  },
+  rodrigo: {
+    temaCentral: "separacion reciente, reorganizacion familiar, rol de padre y tristeza contenida",
+    concreteDisclosures: [
+      "Desde la separación trato de mantener todo funcionando, sobre todo por mis hijos.",
+      "Me hago el fuerte, pero hay días en que la casa se siente distinta y me pesa.",
+      "Me preocupa que mis hijos me vean mal o que sientan que fallé.",
+      "No hablo mucho de tristeza. Prefiero resolver cosas, aunque por dentro esté revuelto."
+    ],
+    validationBridge: "Gracias. Me sirve que lo puedas mirar sin exigirme estar fuerte todo el rato.",
+    followUpBridge: "Creo que me cuesta admitir cuánto me movió la separación.",
+    concreteConcern: "Me preocupa fallar como papá o no saber cómo ordenar esta nueva vida familiar."
+  },
+  fernanda: {
+    temaCentral: "retorno laboral, inseguridad, temor a ser observada y confianza dañada",
+    concreteDisclosures: [
+      "Estoy volviendo al trabajo después de una licencia larga y me da miedo no rendir como antes.",
+      "Siento que todos van a mirar si ya estoy bien o si sigo distinta.",
+      "Me importa trabajar, pero me asusta confirmar que no puedo con el mismo ritmo.",
+      "A veces anticipo críticas antes de que pasen, y llego tensa incluso antes de empezar."
+    ],
+    validationBridge: "Gracias. Me ayuda que no suene como que simplemente no quiero trabajar.",
+    followUpBridge: "Creo que lo difícil es volver sintiendo que todos podrían estar evaluándome.",
+    concreteConcern: "Me preocupa sentirme observada y no poder confiar en mí como antes."
+  },
+  hector: {
+    temaCentral: "jubilacion, perdida de rutina, identidad y necesidad de sentirse util",
+    concreteDisclosures: [
+      "Jubilé hace poco y pensé que iba a ser más simple, pero a veces el día se siente vacío.",
+      "Me levanto temprano igual, solo que ahora no siempre sé para qué.",
+      "Gran parte de mis vínculos estaban en el trabajo y eso cambió de golpe.",
+      "Me cuesta aceptar que ya no me necesiten de la misma forma."
+    ],
+    validationBridge: "Gracias. Me ayuda que no lo trates como si fuera solo tener más tiempo libre.",
+    followUpBridge: "Creo que lo que se me movió fue sentirme útil.",
+    concreteConcern: "Me preocupa perder el lugar que tenía o que me miren como alguien que ya no aporta."
+  },
+  daniela: {
+    temaCentral: "maternidad reciente, estudio, cansancio, culpa y autocuidado",
+    concreteDisclosures: [
+      "Amo a mi hijo, pero estoy cansada y me cuesta decirlo sin sentir culpa.",
+      "Entre estudiar y cuidar, el día se me va completo y casi no queda un rato para mí.",
+      "Cuando pienso en descansar o avanzar en mis cosas, aparece la sensación de estar fallando.",
+      "A veces siento que mi vida va a otro ritmo que la de mis amigas."
+    ],
+    validationBridge: "Gracias. Me ayuda que no suene como que soy mala mamá por estar cansada.",
+    followUpBridge: "Creo que lo que me cuesta decir es que también necesito un espacio para mí.",
+    concreteConcern: "Me preocupa ser egoísta cuando pienso en mis proyectos o en descansar."
+  },
+  andres: {
+    temaCentral: "ingreso universitario, pertenencia, comparacion y presion familiar",
+    concreteDisclosures: [
+      "Entré hace poco a la universidad y siento que todos se manejan mejor que yo.",
+      "Mi familia está orgullosa, y eso me alegra, pero también me pesa.",
+      "A veces trato de parecer tranquilo para que no se note que estoy perdido.",
+      "Me comparo mucho y termino pensando que quizá no estoy a la altura."
+    ],
+    validationBridge: "Gracias. Me ayuda que no lo tomes como si fuera solo inseguridad mía.",
+    followUpBridge: "Creo que lo que me cuesta es sentir que pertenezco ahí.",
+    concreteConcern: "Me preocupa decepcionar a mi familia o confirmar que estoy fuera de lugar."
+  },
+  patricia: {
+    temaCentral: "conflicto con hija adolescente, autoridad, miedo y vinculo familiar",
+    concreteDisclosures: [
+      "Tengo una hija adolescente y últimamente todo entre nosotras termina en pelea.",
+      "A veces salgo controladora, pero detrás hay miedo de perder el vínculo con ella.",
+      "Me preocupa que deje de confiar en mí o que le pase algo y yo no me entere.",
+      "Llego cansada del trabajo y aun así siento que tengo que estar encima de todo en la casa."
+    ],
+    validationBridge: "Gracias. Me ayuda que no lo veas solo como ganas de controlar.",
+    followUpBridge: "Creo que detrás de mi enojo hay mucho miedo.",
+    concreteConcern: "Me preocupa perder autoridad, pero también perder el vínculo con mi hija."
+  },
+  miguel: {
+    temaCentral: "migracion, adaptacion, identidad, distancia familiar y empezar de cero",
+    concreteDisclosures: [
+      "Migré hace poco y a veces siento que estoy empezando de cero.",
+      "Trabajo en algo distinto a lo que hacía antes, y eso me mueve más de lo que digo.",
+      "Parte de mi familia está lejos. Hablamos, pero no es lo mismo.",
+      "No quiero sonar ingrato, porque valoro estar acá, pero igual extraño quién era antes."
+    ],
+    validationBridge: "Gracias. Me ayuda poder decirlo sin sentir que parezco ingrato.",
+    followUpBridge: "Creo que lo difícil es armar vida acá sin perder lo que dejé atrás.",
+    concreteConcern: "Me preocupa quedarme solo o perder partes de quién era antes de migrar."
+  },
+  sofia: {
+    temaCentral: "redes sociales, comparacion, autoimagen y necesidad de reaccion externa",
+    concreteDisclosures: [
+      "Me comparo más de lo que me gustaría admitir, sobre todo cuando veo redes.",
+      "Quedo pendiente de si alguien reacciona o no a lo que subo.",
+      "Sé que no debería importarme tanto, pero igual me afecta.",
+      "Puedo estar bien, entro a redes y termino sintiendo que mi vida no alcanza."
+    ],
+    validationBridge: "Gracias. Me ayuda que no lo tomes como algo tonto.",
+    followUpBridge: "Creo que lo que me cuesta decir es que las redes me importan más de lo que aparento.",
+    concreteConcern: "Me preocupa depender tanto de algo que sé que no debería importarme así."
+  },
+  claudio: {
+    temaCentral: "estancamiento vital, rutina rigida, analisis excesivo y miedo al cambio",
+    concreteDisclosures: [
+      "Tengo una vida estable, pero siento que estoy en piloto automático.",
+      "Analizo tanto las decisiones que al final no hago nada.",
+      "La rutina me ordena, pero también me encierra un poco.",
+      "Me preocupa mirar atrás y darme cuenta de que no me moví por miedo."
+    ],
+    validationBridge: "Gracias. Me ayuda que no suene como que estoy inventando un problema donde todo se ve estable.",
+    followUpBridge: "Creo que lo que me pasa es que por fuera todo funciona, pero por dentro me siento detenido.",
+    concreteConcern: "Me preocupa quedarme en lo mismo solo porque cambiar me da miedo."
+  }
+};
+
+for (const [caseId, progression] of Object.entries(concreteProgressionByCase)) {
+  Object.assign(patientFacts[caseId], progression);
+}

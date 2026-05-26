@@ -29,8 +29,9 @@ export function generateLocalPatientResponse({
     caseId,
     selectedResponseType: selectedResponse.responseType,
     opennessLevel: workingMemory.opennessLevel,
+    evasiveCount: workingMemory.evasiveCount || 0,
     lastTopic: intentResult.contextualTopic || workingMemory.lastTopic,
-    responseId: selectedResponse.responseId,
+    selectedResponseId: selectedResponse.responseId,
     finalResponse: responseText,
     memory: memoryUpdate,
     fallbackUsed: selectedResponse.fallbackUsed

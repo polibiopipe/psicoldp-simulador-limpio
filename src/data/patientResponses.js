@@ -269,6 +269,8 @@ export const patientResponses = Object.fromEntries(
   Object.entries(kits).map(([caseId, kit]) => [caseId, buildResponses(caseId, kit)])
 );
 
+patientResponses.sofia = enhanceSofiaResponses(patientResponses.sofia);
+
 export const patientConversationUnits = kits;
 
 function makeAdvancedKit({ name, intro, motive, concern, expectation, voice, topics, lines }) {
@@ -405,4 +407,80 @@ function expand(seeds, target, tails = []) {
   }
 
   return responses;
+}
+
+function enhanceSofiaResponses(baseResponses) {
+  const motivo = [
+    "No sé si suena grave, pero me está afectando más de lo que quiero admitir. Tiene que ver con las redes.",
+    "Creo que vine porque me está afectando más de lo que quiero admitir. Tiene que ver con las redes y con compararme todo el tiempo.",
+    "No sé si suena grave, pero me cuesta desconectarme. A veces entro a redes y termino sintiéndome peor.",
+    "Me pasa que digo que no me importa, pero después quedo pendiente de cómo me ven o de si alguien reaccionó."
+  ];
+
+  const seguimiento = [
+    "Creo que tiene que ver con las redes. Me da vergüenza decirlo porque suena superficial, pero me comparo mucho.",
+    "Me pasa que puedo estar bien, pero entro a redes y empiezo a compararme. Con cómo se ven otros, con lo que hacen, con la vida que muestran.",
+    "Que me importa más de lo que digo. Hago como que me da lo mismo, pero a veces quedo pendiente de si alguien reaccionó o no.",
+    "Me comparo con gente que ni conozco. Sé que muchas cosas están editadas, pero igual me afecta.",
+    "A veces subo algo y después reviso más de la cuenta si alguien lo vio.",
+    "Me da vergüenza admitirlo, porque siento que debería ser más madura con esto.",
+    "No es solo la foto o el like. Es la sensación de que todos avanzan y yo no.",
+    "Puedo perder mucho rato mirando cosas y después quedo con una sensación fea, como de no estar haciendo suficiente."
+  ];
+
+  const apertura = [
+    "A veces digo que me da lo mismo, pero no es tan cierto. Me quedo pendiente de si alguien vio lo que subí.",
+    "Sé que suena superficial, pero igual me afecta. Me comparo más de lo que me gustaría admitir.",
+    "Me da rabia depender tanto de algo que sé que no debería importarme.",
+    "A veces puedo estar bien, veo algo en redes y se me cambia el ánimo.",
+    "Me comparo con gente que ni conozco, y aun así siento que estoy quedando atrás.",
+    "No es solo verme mejor o peor. Es sentir que mi vida no alcanza.",
+    "Me cuesta desconectarme porque cuando lo hago siento que me pierdo algo o que desaparezco.",
+    "Sí... creo que sí. Me gustaría entender por qué algo que sé que no debería importarme igual me afecta tanto."
+  ];
+
+  const validacion = [
+    "Gracias. Me ayuda que no lo tomes como algo tonto.",
+    "Gracias. Me ayuda que no suene como un reto.",
+    "Sí... creo que eso es lo que me cuesta, sentir que tiene sentido hablarlo.",
+    "Me alivia un poco que no suene como reto.",
+    "Quizás por eso me cuesta decirlo. Siento que alguien podría decirme 'simplemente deja el celular'.",
+    "Sí, creo que necesito poder hablarlo sin sentirme ridícula.",
+    "Sí... eso me alivia un poco. Me da vergüenza, pero me afecta más de lo que digo."
+  ];
+
+  const juicio = [
+    "Eso es justo lo que me da miedo, que piensen que es una tontera.",
+    "Ya... por eso a veces prefiero no decir nada.",
+    "Sé que suena superficial, pero decirlo así hace que me cierre más.",
+    "Si fuera tan fácil dejarlo, ya lo habría hecho.",
+    "No es solo 'usar menos el celular'. Ojalá fuera así."
+  ];
+
+  const baja = [
+    "No sé si lo puedo explicar bien... creo que tiene que ver con las redes. Me comparo más de lo que me gustaría admitir.",
+    "Quizás no es tan grave, pero igual me pasa que entro a redes y termino sintiéndome peor.",
+    "Me da vergüenza decirlo porque siento que va a sonar superficial, pero quedo pendiente de cómo me ven.",
+    "No quiero que suene como excusa. Sé que podría soltar el celular, pero igual vuelvo a mirar."
+  ];
+
+  return {
+    ...baseResponses,
+    motivo_de_consulta: expand(motivo, 15, commonTails),
+    seguimiento_contextual: {
+      ...baseResponses.seguimiento_contextual,
+      default: expand(seguimiento, 12, commonTails),
+      digital: expand(seguimiento, 12, commonTails),
+      comparacion: expand(seguimiento, 12, commonTails),
+      social: expand(seguimiento, 10, commonTails)
+    },
+    exploracion_emocional: expand([...seguimiento.slice(0, 3), ...apertura], 20, commonTails),
+    exploracion_contextual: expand(seguimiento, 20, commonTails),
+    validacion_emocional: expand(validacion, 20, commonTails),
+    juicio_o_critica: expand(juicio, 20, commonTails),
+    respuesta_general: expand([...baja, ...apertura], 12, commonTails),
+    desconocida: expand(baja, 8, commonTails),
+    resistencia_evasion: expand(baja, 10, commonTails),
+    apertura_progresiva: expand(apertura, 20, commonTails)
+  };
 }

@@ -1,5 +1,6 @@
 import { patientFacts } from "../data/patientFacts.js";
 import { patientResponses } from "../data/patientResponses.js";
+import { isEvasivePatientResponse } from "./patientMemory.js";
 
 const intentToFact = {
   nombre: "name",
@@ -114,6 +115,28 @@ export function selectResponse({ caseId, intentResult, memory }) {
     candidates = responses[intent] || [];
   }
 
+  const sofiaProgression = caseId === "sofia"
+    ? selectSofiaProgressiveCandidates({ intent, intentResult, memory, responses, currentCandidates: candidates })
+    : null;
+  if (sofiaProgression) {
+    candidates = sofiaProgression.candidates;
+    responseType = sofiaProgression.responseType;
+  }
+
+  const concreteDisclosure = forceConcreteDisclosure({
+    caseId,
+    intent,
+    intentResult,
+    memory,
+    facts,
+    responses,
+    currentCandidates: candidates
+  });
+  if (concreteDisclosure) {
+    candidates = concreteDisclosure.candidates;
+    responseType = concreteDisclosure.responseType;
+  }
+
   if (!candidates.length && intentToFact[intent]) {
     candidates = [factToResponse(intent, facts)];
     responseType = `fact:${intentToFact[intent]}`;
@@ -140,6 +163,136 @@ function factToResponse(intent, facts) {
   return facts[intentToFact[intent]] || "No sé bien cómo responder eso.";
 }
 
+function forceConcreteDisclosure({ intent, intentResult, memory, facts, responses, currentCandidates }) {
+  const forceableIntents = [
+    "motivo_de_consulta",
+    "seguimiento_contextual",
+    "exploracion_emocional",
+    "validacion_emocional",
+    "respuesta_general",
+    "desconocida"
+  ];
+  if (!forceableIntents.includes(intent)) return null;
+
+  const hasSupport = intent === "validacion_emocional" || memory.hadValidation || memory.trustLevel >= 42;
+  const hasRepeatedEvasion = (memory.evasiveCount || 0) >= 2;
+  const isMidOrHigh = memory.opennessLevel !== "apertura_baja";
+  const hasContext = Boolean(memory.lastTopic || intentResult.contextualTopic || memory.lastPatientMessage);
+  const currentLooksEvasive = (currentCandidates || []).some((candidate) => isEvasivePatientResponse(candidate));
+
+  if (intent === "motivo_de_consulta") {
+    return {
+      candidates: buildMotiveCandidates(facts),
+      responseType: "motivo_de_consulta:concreto"
+    };
+  }
+
+  if (intent === "validacion_emocional") {
+    return {
+      candidates: buildValidationCandidates(facts, responses, memory),
+      responseType: "validacion_emocional:concreto"
+    };
+  }
+
+  if (intent === "seguimiento_contextual") {
+    return {
+      candidates: buildFollowUpCandidates({ facts, responses, intentResult, memory }),
+      responseType: `seguimiento_contextual:${intentResult.contextualTopic || memory.lastTopic || "concreto"}`
+    };
+  }
+
+  if (intent === "exploracion_emocional" && (hasSupport || isMidOrHigh || hasRepeatedEvasion || currentLooksEvasive)) {
+    return {
+      candidates: buildExplorationCandidates(facts, responses),
+      responseType: "exploracion_emocional:concreto"
+    };
+  }
+
+  if ((intent === "respuesta_general" || intent === "desconocida") && (hasRepeatedEvasion || (hasSupport && hasContext) || (isMidOrHigh && currentLooksEvasive))) {
+    return {
+      candidates: buildConcreteCandidates(facts, responses),
+      responseType: "apertura_progresiva:forzada"
+    };
+  }
+
+  return null;
+}
+
+function buildMotiveCandidates(facts) {
+  return [
+    facts.motive,
+    withLead("Lo que me pasa es que", facts.concreteDisclosures?.[0]),
+    facts.concreteConcern || facts.concreteDisclosures?.[1],
+    joinNatural("Me cuesta explicarlo de una sola vez.", facts.concreteDisclosures?.[2] || facts.motive)
+  ].filter(Boolean);
+}
+
+function buildValidationCandidates(facts, responses, memory) {
+  const disclosure = selectConcreteLine(facts, memory, 0);
+  const nextDisclosure = selectConcreteLine(facts, memory, 1);
+  return [
+    joinNatural(facts.validationBridge || "Gracias. Me ayuda que lo digas así.", disclosure),
+    joinNatural("Sí, gracias. Me sirve que no suene como un reto.", nextDisclosure),
+    joinNatural(responses.validacion_emocional?.[0], disclosure),
+    joinNatural("Eso me ayuda a decirlo un poco más claro.", facts.concreteConcern || disclosure)
+  ].filter(Boolean);
+}
+
+function buildFollowUpCandidates({ facts, responses, intentResult, memory }) {
+  const topic = intentResult.contextualTopic || memory.lastTopic || "default";
+  const topicResponses = responses.seguimiento_contextual?.[topic] || [];
+  const concrete = selectConcreteLine(facts, memory, 0);
+  const nextConcrete = selectConcreteLine(facts, memory, 1);
+
+  return [
+    joinNatural(facts.followUpBridge || "Creo que lo que trato de decir es esto.", concrete),
+    nextConcrete,
+    facts.concreteConcern,
+    ...topicResponses.filter((response) => !isEvasivePatientResponse(response)).slice(0, 3)
+  ].filter(Boolean);
+}
+
+function buildExplorationCandidates(facts, responses) {
+  const concrete = facts.concreteDisclosures || [];
+  return [
+    ...concrete,
+    facts.concreteConcern,
+    ...(responses.apertura_progresiva || []).filter((response) => !isEvasivePatientResponse(response)).slice(0, 3),
+    ...(responses.exploracion_emocional || []).filter((response) => !isEvasivePatientResponse(response)).slice(0, 3)
+  ].filter(Boolean);
+}
+
+function buildConcreteCandidates(facts, responses) {
+  return [
+    facts.followUpBridge,
+    ...(facts.concreteDisclosures || []),
+    facts.concreteConcern,
+    ...(responses.apertura_progresiva || []).filter((response) => !isEvasivePatientResponse(response)).slice(0, 4)
+  ].filter(Boolean);
+}
+
+function selectConcreteLine(facts, memory, offset = 0) {
+  const lines = facts.concreteDisclosures || [facts.concreteConcern, facts.motive].filter(Boolean);
+  if (!lines.length) return facts.concreteConcern || facts.motive;
+  const index = Math.abs((memory.turnCount || 0) + offset) % lines.length;
+  return lines[index];
+}
+
+function joinNatural(first, second) {
+  if (!first) return second;
+  if (!second) return first;
+  const normalizedFirst = normalizeForCompare(first);
+  const normalizedSecond = normalizeForCompare(second);
+  if (normalizedFirst.includes(normalizedSecond) || normalizedSecond.includes(normalizedFirst)) return first;
+  return `${first} ${second}`;
+}
+
+function withLead(lead, text) {
+  if (!text) return lead;
+  const clean = text.trim();
+  return `${lead} ${clean.charAt(0).toLowerCase()}${clean.slice(1)}`;
+}
+
 function pickUnused(candidates, usedResponseIds, caseId, responseType, turnCount) {
   const normalized = candidates.map((text, index) => ({
     text,
@@ -159,6 +312,110 @@ function makeVariation(text) {
   if (/^no sé/i.test(text)) return text.replace(/^no sé/i, "Quizás no sé");
   if (/^sí/i.test(text)) return text.replace(/^sí/i, "Sí, más o menos");
   return `Lo diría de otra forma: ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+}
+
+function normalizeForCompare(text) {
+  return String(text)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function selectSofiaProgressiveCandidates({ intent, intentResult, memory, responses, currentCandidates }) {
+  const text = intentResult.normalizedText || "";
+  const recentEvasions = countRecentSofiaEvasions(memory.usedResponseIds || []);
+  const hasSupport = memory.hadValidation || memory.trustLevel >= 47 || memory.opennessLevel === "apertura_alta";
+  const asksForCentralFollowUp = detectsSofiaCentralFollowUp(text);
+  const specificFollowUp = getSofiaSpecificFollowUp(text);
+
+  if (specificFollowUp && (hasSupport || recentEvasions >= 1 || asksForCentralFollowUp || intent !== "desconocida")) {
+    return { candidates: specificFollowUp, responseType: "sofia_seguimiento_especifico" };
+  }
+
+  if (intent === "validacion_emocional") {
+    const validationCandidates = memory.hadValidation || memory.trustLevel >= 49
+      ? [
+          "Sí... eso me alivia un poco. Me da vergüenza, pero me afecta más de lo que digo.",
+          ...responses.validacion_emocional
+        ]
+      : responses.validacion_emocional;
+    return { candidates: validationCandidates, responseType: "validacion_emocional" };
+  }
+
+  if (intent === "motivo_de_consulta") {
+    return { candidates: responses.motivo_de_consulta, responseType: "motivo_de_consulta" };
+  }
+
+  if (intent === "preferencias_valoracion" && text.includes("ayude")) {
+    return { candidates: responses.apertura_progresiva, responseType: "apertura_progresiva" };
+  }
+
+  if (intent === "seguimiento_contextual") {
+    const topic = intentResult.contextualTopic || "default";
+    const concrete = responses.seguimiento_contextual?.[topic] || responses.seguimiento_contextual?.default;
+    if (hasSupport || recentEvasions >= 1 || asksForCentralFollowUp) {
+      return { candidates: concrete, responseType: `seguimiento_contextual:${topic}` };
+    }
+    return currentCandidates?.length ? null : { candidates: concrete, responseType: `seguimiento_contextual:${topic}` };
+  }
+
+  if (intent === "exploracion_emocional" && (hasSupport || recentEvasions >= 1 || asksForCentralFollowUp)) {
+    return { candidates: responses.exploracion_emocional, responseType: "exploracion_emocional" };
+  }
+
+  if ((intent === "desconocida" || intent === "respuesta_general") && (hasSupport || recentEvasions >= 2 || asksForCentralFollowUp)) {
+    return { candidates: responses.apertura_progresiva, responseType: "apertura_progresiva" };
+  }
+
+  return null;
+}
+
+function countRecentSofiaEvasions(usedResponseIds) {
+  let count = 0;
+  for (const id of [...usedResponseIds].reverse()) {
+    const isSofiaEvasion =
+      id.includes("sofia_desconocida") ||
+      id.includes("sofia_resistencia_evasion") ||
+      id.includes("sofia_respuesta_general_0_no_se") ||
+      id.includes("sofia_respuesta_general_1_quizas");
+    if (!isSofiaEvasion) break;
+    count += 1;
+  }
+  return count;
+}
+
+function detectsSofiaCentralFollowUp(text) {
+  return [
+    "que cosa",
+    "que te sucede",
+    "que tema",
+    "a que te refieres",
+    "que te cuesta contar",
+    "que es lo que sientes",
+    "que pasa con eso",
+    "con que te comparas"
+  ].some((cue) => text.includes(cue));
+}
+
+function getSofiaSpecificFollowUp(text) {
+  if (text.includes("que cosa") || text.includes("que tema") || text.includes("a que te refieres")) {
+    return ["Creo que tiene que ver con las redes. Me da vergüenza decirlo porque suena superficial, pero me comparo mucho."];
+  }
+  if (text.includes("que te sucede")) {
+    return ["Me pasa que puedo estar bien, pero entro a redes y empiezo a compararme. Con cómo se ven otros, con lo que hacen, con la vida que muestran."];
+  }
+  if (text.includes("que te cuesta contar")) {
+    return ["Que me importa más de lo que digo. Hago como que me da lo mismo, pero a veces quedo pendiente de si alguien reaccionó o no."];
+  }
+  if (text.includes("quieres que te ayude")) {
+    return ["Sí... creo que sí. Me gustaría entender por qué algo que sé que no debería importarme igual me afecta tanto."];
+  }
+  if (text.includes("con que te comparas")) {
+    return ["Con todo. Con cómo se ven otras personas, con lo que hacen, con la vida que muestran. Sé que no siempre es real, pero igual me pega."];
+  }
+  return null;
 }
 
 function makeResponseId(caseId, responseType, text, index) {

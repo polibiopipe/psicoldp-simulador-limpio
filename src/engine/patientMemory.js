@@ -9,6 +9,7 @@ const difficultyShift = {
 export function buildPatientMemory({ caseId, history = [], difficulty = "intermedio", memory }) {
   const voice = patientVoices[caseId] || patientVoices.tomas;
   const trustLevel = history.at(-1)?.patientState?.trustLevel ?? clamp((voice.initialTrust ?? 35) + (difficultyShift[difficulty] ?? 0));
+  const evasiveCount = countRecentEvasiveResponses(history);
   const exploredTopics = new Set();
   for (const turn of history) {
     const category = turn.responseCategory || turn.analysis?.detectedIntent;
@@ -22,6 +23,7 @@ export function buildPatientMemory({ caseId, history = [], difficulty = "interme
     opennessLevel: getOpennessLevel(trustLevel),
     voice,
     usedResponseIds: history.map((turn) => turn.responseId).filter(Boolean),
+    evasiveCount,
     lastPatientMessage: history.at(-1)?.answer || "",
     lastStudentMessage: history.at(-1)?.question || "",
     lastIntent: history.at(-1)?.responseCategory || null,
@@ -39,7 +41,8 @@ export function buildPatientMemory({ caseId, history = [], difficulty = "interme
 
 export function updatePatientMemory({ memory, intent, intentResult, responseId, responseText, studentMessage }) {
   let trustLevel = memory.trustLevel;
-  if (intent === "validacion_emocional" || intent === "cortesia_vinculo") trustLevel += 6;
+  if (intent === "validacion_emocional") trustLevel += 12;
+  if (intent === "cortesia_vinculo") trustLevel += 6;
   if (intent === "presentacion_personal_abierta" || intent === "motivo_de_consulta") trustLevel += 2;
   if (intent === "seguimiento_contextual") trustLevel += 4;
   if (intent === "exploracion_emocional" || intent === "exploracion_contextual") trustLevel += 5;
@@ -50,6 +53,7 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
   const nextTrust = clamp(trustLevel);
   const lastTopic = intentResult?.contextualTopic || topicFromIntent(intent) || memory.lastTopic;
   const exploredTopics = Array.from(new Set([...(memory.exploredTopics || []), intent, lastTopic].filter(Boolean)));
+  const evasiveCount = isEvasivePatientResponse(responseText) ? (memory.evasiveCount || 0) + 1 : 0;
 
   return {
     ...memory,
@@ -57,6 +61,7 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
     trustLevel: nextTrust,
     opennessLevel: getOpennessLevel(nextTrust),
     usedResponseIds: responseId ? [...memory.usedResponseIds, responseId] : memory.usedResponseIds,
+    evasiveCount,
     lastPatientMessage: responseText,
     lastStudentMessage: studentMessage,
     lastIntent: intent,
@@ -69,6 +74,26 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
     hadClosure: memory.hadClosure || intent === "cierre",
     hadFollowUp: memory.hadFollowUp || intent === "seguimiento_contextual"
   };
+}
+
+export function isEvasivePatientResponse(responseText = "") {
+  const normalized = normalizeForEvasion(responseText);
+  if (!normalized) return false;
+
+  const evasivePatterns = [
+    "no se si lo puedo explicar bien",
+    "quizas no es tan grave",
+    "me cuesta hablar de eso",
+    "no quiero que suene como excusa",
+    "no se bien como responder eso",
+    "me cuesta ordenarlo todavia",
+    "no se por donde partir",
+    "no se que decir",
+    "capaz estoy exagerando",
+    "siento que deberia poder resolverlo sola"
+  ];
+
+  return evasivePatterns.some((pattern) => normalized.includes(pattern));
 }
 
 export function getOpennessLevel(trustLevel) {
@@ -86,6 +111,24 @@ export function getTrustStage(trustLevel) {
 
 function clamp(value) {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function countRecentEvasiveResponses(history) {
+  let count = 0;
+  for (const turn of [...history].reverse()) {
+    if (!isEvasivePatientResponse(turn.answer || "")) break;
+    count += 1;
+  }
+  return count;
+}
+
+function normalizeForEvasion(text) {
+  return String(text)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function topicFromIntent(intent) {
