@@ -43,6 +43,8 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
   let trustLevel = memory.trustLevel;
   if (intent === "validacion_emocional") trustLevel += 12;
   if (intent === "cortesia_vinculo") trustLevel += 6;
+  if (intent === "presentacion_estudiante") trustLevel += 4;
+  if (intent === "encuadre_o_consentimiento") trustLevel += 6;
   if (intent === "presentacion_personal_abierta" || intent === "motivo_de_consulta") trustLevel += 2;
   if (intent === "seguimiento_contextual") trustLevel += 4;
   if (intent === "exploracion_emocional" || intent === "exploracion_contextual") trustLevel += 5;
@@ -70,7 +72,7 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
     hadValidation: memory.hadValidation || intent === "validacion_emocional",
     hadJudgment: memory.hadJudgment || intent === "juicio_o_critica",
     hadRushedAdvice: memory.hadRushedAdvice || intent === "consejo_apresurado",
-    hadFraming: memory.hadFraming || intent === "rol_entrevistador",
+    hadFraming: memory.hadFraming || intent === "rol_entrevistador" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento",
     hadClosure: memory.hadClosure || intent === "cierre",
     hadFollowUp: memory.hadFollowUp || intent === "seguimiento_contextual"
   };
@@ -143,5 +145,7 @@ function topicFromIntent(intent) {
   if (intent === "vivienda_residencia") return "vivienda";
   if (intent === "exploracion_emocional") return "emocion";
   if (intent === "preferencias_valoracion") return "preferencias";
+  if (intent === "presentacion_estudiante") return "presentacion";
+  if (intent === "encuadre_o_consentimiento") return "encuadre";
   return null;
 }

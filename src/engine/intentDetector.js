@@ -2,6 +2,19 @@ import { normalizeText } from "../utils/textUtils.js";
 
 const intentLexicon = {
   saludo: ["hola", "buenos dias", "buen dia", "buenas tardes", "buenas noches", "como estas", "como te encuentras"],
+  presentacion_estudiante: [
+    "antes quisiera presentarme",
+    "antes de comenzar quisiera presentarme",
+    "quiero presentarme primero",
+    "me presento",
+    "mi nombre es",
+    "soy el estudiante",
+    "soy quien va a conversar contigo",
+    "soy quien va a entrevistarte",
+    "voy a acompanarte",
+    "voy a acompañarte",
+    "quisiera presentarme"
+  ],
   cortesia_vinculo: [
     "un gusto conocerte",
     "un gusto estar contigo",
@@ -34,6 +47,20 @@ const intentLexicon = {
     "sabes por que estoy hablando contigo",
     "sabes que rol tengo",
     "sabes que vamos a hacer"
+  ],
+  encuadre_o_consentimiento: [
+    "quiero explicarte",
+    "antes de comenzar quisiera explicarte",
+    "este es un espacio",
+    "espacio de entrevista simulada",
+    "entrevista simulada",
+    "podemos conversar con calma",
+    "vamos a conversar con calma",
+    "puedes tomarte tu tiempo",
+    "si algo te incomoda",
+    "objetivo de esta entrevista",
+    "lo que conversemos",
+    "fines educativos"
   ],
   motivo_de_consulta: [
     "sabes por que estas aqui",
@@ -129,19 +156,21 @@ const intentLexicon = {
   consejo_apresurado: ["deberias", "tienes que", "te recomiendo", "deja de", "lo mejor seria", "haz ejercicio", "organizate", "pon limites y listo"],
   exploracion_emocional: ["que sientes", "como te sientes", "que te pasa", "que te sucede", "que es lo que sientes", "como lo vives", "que te cuesta mas", "que te cuesta contar", "que parte te duele", "te da miedo", "te da culpa", "te da rabia", "te da pena"],
   exploracion_contextual: ["como es en tu casa", "como es en tu trabajo", "como es en la universidad", "como es con tu familia", "como es con tus amigos", "que pasa ahi", "desde cuando pasa"],
-  cierre: ["cerrar", "terminar", "finalizar", "antes de terminar", "gracias por conversar", "como quedas", "como te vas"]
+  cierre: ["cerrar", "terminar", "finalizar", "antes de terminar", "gracias por conversar", "como quedas", "como te vas", "proxima sesion", "siguiente sesion", "seguir conversando", "retomar en otra sesion", "que podriamos seguir conversando"]
 };
 
 const priority = [
   "saludo",
+  "presentacion_estudiante",
   "cortesia_vinculo",
   "nombre",
   "edad",
-  "presentacion_personal_abierta",
   "rol_entrevistador",
+  "encuadre_o_consentimiento",
+  "presentacion_personal_abierta",
   "motivo_de_consulta",
-  "vivienda_residencia",
   "ocupacion_actividad",
+  "vivienda_residencia",
   "preferencias_valoracion",
   "pregunta_escolar",
   "pregunta_academica",
@@ -150,8 +179,8 @@ const priority = [
   "pregunta_social",
   "pregunta_videojuegos",
   "pregunta_habitos",
-  "seguimiento_contextual",
   "validacion_emocional",
+  "seguimiento_contextual",
   "juicio_o_critica",
   "consejo_apresurado",
   "exploracion_emocional",
@@ -232,9 +261,15 @@ export function detectIntent(studentMessage, history = []) {
     matches[intent] = terms.some((term) => text.includes(normalizeText(term)));
   }
 
+  matches.presentacion_estudiante = matches.presentacion_estudiante || detectsStudentPresentation(text);
+  matches.encuadre_o_consentimiento = matches.encuadre_o_consentimiento || detectsFraming(text);
   matches.ocupacion_actividad = matches.ocupacion_actividad || detectsOccupationActivity(text);
   matches.vivienda_residencia = matches.vivienda_residencia || detectsResidenceQuestion(text);
   matches.respuesta_general = isGeneralOpenPrompt(text);
+
+  if (matches.validacion_emocional && matches.motivo_de_consulta && !hasExplicitMotiveCue(text)) {
+    matches.motivo_de_consulta = false;
+  }
 
   const contextualTopic = detectContextualTopic(text, history);
   matches.seguimiento_contextual = Boolean(contextualTopic);
@@ -247,6 +282,7 @@ export function detectIntent(studentMessage, history = []) {
     confidence,
     normalizedText: text,
     contextualTopic,
+    studentName: extractStudentName(text),
     matches,
     categories: toLegacyCategories(intent, matches, text)
   };
@@ -255,6 +291,7 @@ export function detectIntent(studentMessage, history = []) {
 function detectContextualTopic(text, history) {
   if (intentLexicon.motivo_de_consulta.some((term) => text.includes(normalizeText(term)))) return null;
   if (intentLexicon.presentacion_personal_abierta.some((term) => text.includes(normalizeText(term)))) return null;
+  if (detectsStudentPresentation(text) || detectsFraming(text)) return null;
   if (detectsResidenceQuestion(text)) return null;
   if (detectsOccupationActivity(text)) return null;
   if (text.includes("que te cuesta mas")) return null;
@@ -286,6 +323,69 @@ function isGeneralOpenPrompt(text) {
     "como ha sido",
     "que ha pasado"
   ].some((term) => text.includes(term));
+}
+
+function detectsStudentPresentation(text) {
+  return (
+    /\bantes( de comenzar)? quisiera presentarme\b/.test(text) ||
+    /\bquiero presentarme( primero)?\b/.test(text) ||
+    /\bme presento\b/.test(text) ||
+    /\bmi nombre es\b/.test(text) ||
+    /\bsoy (el|la)? ?estudiante\b/.test(text) ||
+    /\bsoy quien va a (conversar|hablar|entrevistarse|entrevistarte) contigo\b/.test(text) ||
+    /\bsoy [a-z]+ y voy a (acompanarte|acompañarte|conversar contigo)\b/.test(text) ||
+    /\bpresentarme[, ]+[a-z]+\b/.test(text)
+  );
+}
+
+function detectsFraming(text) {
+  return (
+    /\bquiero explicarte\b/.test(text) ||
+    /\bantes de comenzar.*(objetivo|entrevista|espacio)\b/.test(text) ||
+    /\b(este|esto) es un espacio\b/.test(text) ||
+    /\bentrevista simulada\b/.test(text) ||
+    /\bfines educativos\b/.test(text) ||
+    /\bpodemos conversar con calma\b/.test(text) ||
+    /\bpuedes tomarte tu tiempo\b/.test(text) ||
+    /\bsi algo te incomoda\b/.test(text)
+  );
+}
+
+function hasExplicitMotiveCue(text) {
+  return (
+    /\bsabes por que estas (aqui|aca)\b/.test(text) ||
+    /\bpor que estas (aqui|aca)\b/.test(text) ||
+    /\bpor que viniste\b/.test(text) ||
+    /\bsabes por que viniste\b/.test(text) ||
+    /\bmotivo( de consulta)?\b/.test(text) ||
+    /\bque te trae\b/.test(text) ||
+    /\bpor que te (derivaron|mandaron)\b/.test(text) ||
+    /\bquien te derivo\b/.test(text) ||
+    /\bque paso para que llegaras\b/.test(text) ||
+    /\bque te preocupa\b/.test(text)
+  );
+}
+
+function extractStudentName(text) {
+  const patterns = [
+    /\bmi nombre es ([a-z]+)\b/,
+    /\bme llamo ([a-z]+)\b/,
+    /\bpresentarme[, ]+([a-z]+)\b/,
+    /\bsoy ([a-z]+) y voy\b/,
+    /\bsoy ([a-z]+),? (el|la)? ?estudiante\b/
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1] && !["quien", "estudiante"].includes(match[1])) {
+      return capitalizeName(match[1]);
+    }
+  }
+  return "";
+}
+
+function capitalizeName(name) {
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 function detectsOccupationActivity(text) {
@@ -320,7 +420,7 @@ function toLegacyCategories(intent, matches, text = "") {
   const continuityAgreement = continuityTerms.some((term) => text.includes(term));
   return {
     greeting: intent === "saludo",
-    framing: intent === "rol_entrevistador" || intent === "cortesia_vinculo",
+    framing: intent === "rol_entrevistador" || intent === "cortesia_vinculo" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento",
     openQuestion: /^(presentacion_personal_abierta|motivo_de_consulta|seguimiento_contextual|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
     closedQuestion: intent.startsWith("pregunta_") || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "nombre" || intent === "edad",
     validation: intent === "validacion_emocional",
@@ -338,7 +438,7 @@ function toLegacyCategories(intent, matches, text = "") {
     continuityAgreement,
     pressure: false,
     prematureInterpretation: false,
-    paceRespect: intent === "cortesia_vinculo" || intent === "rol_entrevistador",
+    paceRespect: intent === "cortesia_vinculo" || intent === "rol_entrevistador" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento",
     empathicSummary: intent === "seguimiento_contextual",
     followUp: intent === "seguimiento_contextual",
     preferencesExploration: intent === "preferencias_valoracion",

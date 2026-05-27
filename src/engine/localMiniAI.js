@@ -27,6 +27,7 @@ export function generateLocalPatientResponse({
     studentMessage,
     detectedIntent: intentResult.intent,
     caseId,
+    responseType: selectedResponse.responseType,
     selectedResponseType: selectedResponse.responseType,
     opennessLevel: workingMemory.opennessLevel,
     evasiveCount: workingMemory.evasiveCount || 0,

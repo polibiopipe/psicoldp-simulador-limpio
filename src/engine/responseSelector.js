@@ -178,6 +178,46 @@ const residenceResponses = {
   ]
 };
 
+const studentPresentationResponses = {
+  tomas: (name) => [`Hola${name ? `, ${name}` : ""}... está bien.`],
+  valentina: (name) => [`Hola${name ? `, ${name}` : ""}, gracias. Me parece bien.`],
+  marcos: (name) => [`Hola. Está bien${name ? `, ${name}` : ""}.`],
+  elena: (name) => [`Hola${name ? `, ${name}` : ""}. Muchas gracias.`],
+  nicolas: () => ["Ya... hola."],
+  camila: (name) => [`Hola${name ? `, ${name}` : ""}. Gracias, me ayuda partir así.`],
+  rodrigo: (name) => [`Hola${name ? `, ${name}` : ""}. Está bien, conversemos.`],
+  fernanda: (name) => [`Hola${name ? `, ${name}` : ""}. Gracias... me tranquiliza saber quién va a conversar conmigo.`],
+  hector: (name) => [`Hola${name ? `, ${name}` : ""}. Bueno, está bien.`],
+  daniela: (name) => [`Hola${name ? `, ${name}` : ""}. Gracias, podemos partir.`],
+  andres: (name) => [`Hola${name ? `, ${name}` : ""}. Ya, gracias.`],
+  patricia: (name) => [`Hola${name ? `, ${name}` : ""}. Gracias, me parece bien.`],
+  miguel: (name) => [`Hola${name ? `, ${name}` : ""}. Muchas gracias.`],
+  sofia: (name) => [`Hola${name ? `, ${name}` : ""}. Gracias.`],
+  claudio: (name) => [`Hola${name ? `, ${name}` : ""}. Está bien... no soy muy bueno para hablar de estas cosas, pero puedo intentarlo.`]
+};
+
+const defaultStudentPresentation = (facts, name) => [
+  `Hola${name ? `, ${name}` : ""}. Está bien, podemos conversar.`
+];
+
+const framingResponses = {
+  tomas: ["Ya... entiendo. Igual me cuesta un poco hablar, pero puedo intentarlo."],
+  valentina: ["Gracias. Me ayuda saber que podemos ir con calma."],
+  marcos: ["Bien. No tengo tan claro por dónde partir, pero puedo intentarlo."],
+  elena: ["Muchas gracias. Me tranquiliza que podamos conversar con calma."],
+  nicolas: ["Ya. Mientras no sea como un reto, está bien."],
+  camila: ["Gracias. Me ayuda que sea un espacio donde pueda ir de a poco."],
+  rodrigo: ["Entiendo. Me sirve saber cómo va a funcionar antes de partir."],
+  fernanda: ["Gracias. Me tranquiliza que podamos hacerlo con calma."],
+  hector: ["Bueno, entiendo. Me parece correcto partir aclarando eso."],
+  daniela: ["Gracias. Me ayuda saber que no tengo que resolver todo hoy."],
+  andres: ["Ya, gracias. Me sirve que lo expliques así."],
+  patricia: ["Entiendo. Me parece bien que partamos ordenadamente."],
+  miguel: ["Gracias. Me ayuda saber que es un espacio para conversar con calma."],
+  sofia: ["Gracias. Me ayuda que no suene como un reto."],
+  claudio: ["Entiendo. Me acomoda partir ordenadamente, así que está bien."]
+};
+
 export function selectResponse({ caseId, intentResult, memory }) {
   const intent = intentResult.intent;
   const facts = patientFacts[caseId] || patientFacts.tomas;
@@ -185,7 +225,17 @@ export function selectResponse({ caseId, intentResult, memory }) {
   let responseType = intent;
   let candidates = [];
 
-  if (intent === "seguimiento_contextual") {
+  if (intent === "presentacion_estudiante") {
+    const buildPresentation = studentPresentationResponses[caseId] || ((name) => defaultStudentPresentation(facts, name));
+    candidates = buildPresentation(intentResult.studentName || "");
+    responseType = "presentacion_estudiante";
+  } else if (intent === "encuadre_o_consentimiento") {
+    candidates = framingResponses[caseId] || ["Entiendo. Está bien, podemos conversar con calma."];
+    responseType = "encuadre_o_consentimiento";
+  } else if (intent === "desconocida") {
+    candidates = buildClarificationCandidates(facts, memory);
+    responseType = "clarificacion_desconocida";
+  } else if (intent === "seguimiento_contextual") {
     const topic = intentResult.contextualTopic || memory.lastTopic || "default";
     candidates = responses.seguimiento_contextual?.[topic] || responses.seguimiento_contextual?.default || [];
     responseType = `seguimiento_contextual:${topic}`;
@@ -355,11 +405,47 @@ function buildConcreteCandidates(facts, responses) {
   ].filter(Boolean);
 }
 
+function buildClarificationCandidates(facts, memory) {
+  const topicLine = memory.lastTopic && memory.lastTopic !== "desconocida"
+    ? `No estoy seguro de haber entendido bien. ¿Te refieres a lo que veníamos hablando sobre ${readableTopic(memory.lastTopic)}?`
+    : "";
+  return [
+    topicLine,
+    "No estoy seguro de haber entendido bien. ¿Te refieres a lo que me preocupa o a cómo llegué hasta acá?",
+    facts.concreteConcern
+      ? `No sé si entendí la pregunta. Si tiene que ver con lo que me preocupa, diría que ${lowerFirst(facts.concreteConcern)}`
+      : "",
+    "Me perdí un poco con eso. Si puedes preguntármelo de otra forma, creo que podría responder mejor."
+  ].filter(Boolean);
+}
+
 function selectConcreteLine(facts, memory, offset = 0) {
   const lines = facts.concreteDisclosures || [facts.concreteConcern, facts.motive].filter(Boolean);
   if (!lines.length) return facts.concreteConcern || facts.motive;
   const index = Math.abs((memory.turnCount || 0) + offset) % lines.length;
   return lines[index];
+}
+
+function readableTopic(topic) {
+  const labels = {
+    motivo_de_consulta: "por qué vine",
+    vivienda: "dónde vivo",
+    ocupacion: "lo que hago",
+    familia: "mi familia",
+    trabajo: "el trabajo",
+    colegio: "el colegio",
+    universidad: "la universidad",
+    digital: "lo digital",
+    emocion: "lo que siento",
+    preferencias: "lo que espero",
+    encuadre: "cómo será la entrevista",
+    presentacion: "la presentación"
+  };
+  return labels[topic] || topic.replace(/_/g, " ");
+}
+
+function lowerFirst(text) {
+  return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 function joinNatural(first, second) {
