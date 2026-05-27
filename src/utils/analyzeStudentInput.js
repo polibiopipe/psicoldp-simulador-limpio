@@ -77,6 +77,21 @@ const lexicon = {
 
 const abruptTopicShifts = ["cambiando de tema", "dejando eso", "pasemos a otra cosa", "otra pregunta"];
 
+const continuityTerms = [
+  "proxima sesion",
+  "próxima sesión",
+  "siguiente sesion",
+  "siguiente sesión",
+  "retomar esto",
+  "podemos retomar",
+  "continuar profundizando",
+  "continuar con calma",
+  "otra sesion",
+  "otra sesión",
+  "volver a conversar",
+  "seguir hablando"
+];
+
 const concreteLexicon = {
   school: [
     "vas al colegio", "vas a colegio", "vas a clases", "estas en el colegio", "sigues en el colegio",
@@ -198,6 +213,7 @@ export function analyzeStudentInput(input, history = []) {
     pressure: includesAny(text, lexicon.pressure),
     empathicSummary: includesAny(text, lexicon.empathicSummary),
     closure: includesAny(text, lexicon.closure),
+    continuityAgreement: includesAny(text, continuityTerms),
     abruptShift: includesAny(text, abruptTopicShifts)
   };
 
@@ -263,6 +279,7 @@ export function summarizeConversationMemory(history) {
       if (categories.preferencesExploration) memory.preferences += 1;
       if (categories.paceRespect) memory.paceRespect += 1;
       if (categories.closure) memory.closure += 1;
+      if (categories.continuityAgreement) memory.continuityAgreement += 1;
       if (categories.goodClosure) memory.goodClosure += 1;
       if (turn.patientState?.trustLevel != null) memory.trustLevels.push(turn.patientState.trustLevel);
       return memory;
@@ -295,6 +312,7 @@ export function summarizeConversationMemory(history) {
       preferences: 0,
       paceRespect: 0,
       closure: 0,
+      continuityAgreement: 0,
       goodClosure: 0,
       trustLevels: []
     }

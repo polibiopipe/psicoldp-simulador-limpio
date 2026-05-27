@@ -1,20 +1,21 @@
 import React from "react";
 import { CheckCircle2, Clock, GraduationCap, TrendingUp } from "lucide-react";
 
-export function ResultsSummary({ report, caseItem, history }) {
+export function ResultsSummary({ report, caseItem, history, sessionNumber = 1 }) {
   const achieved = report.criteria.filter((criterion) => criterion.level === "achieved").length;
   const partial = report.criteria.filter((criterion) => criterion.level === "partial").length;
+  const interviewTurns = history.filter((entry) => !entry.isSessionPrelude);
 
   return (
     <aside className="results-summary" style={{ "--accent": caseItem.accent }}>
-      <span className="eyebrow">Resumen visual</span>
+      <span className="eyebrow">Resumen visual · Sesión {sessionNumber}</span>
       <h1>{caseItem.name}</h1>
       <p>{report.summary}</p>
 
       <div className="summary-metrics">
         <div>
           <Clock aria-hidden="true" />
-          <strong>{history.length}</strong>
+          <strong>{interviewTurns.length}</strong>
           <span>turnos</span>
         </div>
         <div>
@@ -26,6 +27,11 @@ export function ResultsSummary({ report, caseItem, history }) {
           <TrendingUp aria-hidden="true" />
           <strong>{partial}</strong>
           <span>parciales</span>
+        </div>
+        <div>
+          <GraduationCap aria-hidden="true" />
+          <strong>{report.trust.final}/100</strong>
+          <span>apertura</span>
         </div>
       </div>
 

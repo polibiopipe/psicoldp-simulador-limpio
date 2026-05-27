@@ -13,8 +13,9 @@ function labelFor(score) {
 }
 
 export function buildEducationalReport(history, caseItem) {
-  const memory = summarizeConversationMemory(history);
-  const turnCount = history.length;
+  const scoredHistory = history.filter((entry) => !entry.isSessionPrelude);
+  const memory = summarizeConversationMemory(scoredHistory);
+  const turnCount = scoredHistory.length;
   const hasJudgment = memory.judgment > 0;
   const hasRushedAdvice = memory.rushedAdvice > 0;
   const hasPrematureInterpretation = memory.prematureInterpretation > 0;
@@ -40,6 +41,7 @@ export function buildEducationalReport(history, caseItem) {
     paceRespect: memory.paceRespect >= 1 || (memory.openQuestions >= 2 && !hasJudgment) ? 2 : !hasJudgment ? 1 : 0,
     nonJudgment: !hasJudgment && memory.pressure === 0 ? 2 : 0.5,
     closure: memory.goodClosure >= 1 ? 2 : memory.closure >= 1 ? 1 : 0,
+    continuityAgreement: memory.continuityAgreement >= 1 && memory.goodClosure >= 1 ? 2 : memory.continuityAgreement >= 1 || memory.closure >= 1 ? 1 : 0,
     caseCoherence: specificHits >= 2 ? 2 : specificHits >= 1 ? 1 : 0,
     noRush: !hasRushedAdvice && !hasJudgment && !hasPrematureInterpretation ? 2 : hasRushedAdvice || hasPrematureInterpretation ? 0.5 : 1
   };
@@ -76,8 +78,9 @@ export function buildEducationalReport(history, caseItem) {
   if (hasPrematureInterpretation) improvements.push("Evita interpretaciones cerradas demasiado pronto; formula hipótesis como preguntas tentativas.");
   if (memory.pressure) improvements.push("Reduce presión o insistencia: respeta silencios y permite que el paciente ficticio marque ritmo.");
   if (!memory.goodClosure) improvements.push("Cierra con resumen empático, agradecimiento y una pregunta breve sobre cómo queda el paciente.");
+  if (!memory.continuityAgreement) improvements.push("Al cerrar, puedes dejar abierta una próxima sesión simulada sin prometer soluciones inmediatas.");
 
-  const bondMoments = history
+  const bondMoments = scoredHistory
     .filter((entry) =>
       entry.analysis?.categories?.validation ||
       entry.analysis?.categories?.empathicSummary ||
@@ -88,7 +91,7 @@ export function buildEducationalReport(history, caseItem) {
     .slice(0, 4)
     .map((entry) => `“${entry.question}” favoreció mayor apertura o continuidad.`);
 
-  const closingMoments = history
+  const closingMoments = scoredHistory
     .filter((entry) =>
       entry.analysis?.categories?.judgment ||
       entry.analysis?.categories?.rushedAdvice ||

@@ -5,6 +5,7 @@ import { isEvasivePatientResponse } from "./patientMemory.js";
 const intentToFact = {
   nombre: "name",
   edad: "age",
+  vivienda_residencia: "residence",
   motivo_de_consulta: "motive",
   pregunta_escolar: "school",
   pregunta_academica: "academic",
@@ -97,6 +98,86 @@ const occupationResponses = {
   ]
 };
 
+const residenceResponses = {
+  tomas: [
+    "Vivo con mis papás. Últimamente discutimos harto por el tema del computador.",
+    "Vivo con mis papás. En la casa casi siempre el tema termina siendo cuánto juego o si salgo poco.",
+    "Vivo con mis papás. Paso harto tiempo en mi pieza, sobre todo cuando empiezan las discusiones."
+  ],
+  valentina: [
+    "Vivo con mi familia. A veces eso también me pesa, porque siento que esperan mucho de mí.",
+    "Vivo con mi familia. No es que me presionen todo el día, pero igual siento que tengo que estar cumpliendo.",
+    "Vivo con mi familia. Trato de que no se note tanto cuando estoy sobrepasada."
+  ],
+  marcos: [
+    "Vivo con mi pareja. Últimamente me preocupa llegar tan cansado a la casa.",
+    "Vivo con mi pareja. Me da lata que a veces llegue sin energía para conversar.",
+    "Vivo con mi pareja. La casa debería ser un lugar tranquilo, pero a veces llego demasiado irritable.",
+    "Vivo con mi pareja, y eso también me preocupa, porque siento que la pega se me está metiendo en la casa.",
+    "Vivo con mi pareja. A veces respondo más corto de lo que quisiera, no porque no me importe, sino porque llego agotado."
+  ],
+  elena: [
+    "Vivo sola. Mis hijos están pendientes, pero yo trato de no preocuparlos mucho.",
+    "Vivo sola. A veces la casa se siente demasiado silenciosa, aunque no quiera admitirlo.",
+    "Vivo sola. Tengo contacto con mis hijos, pero me cuesta pedirles compañía."
+  ],
+  nicolas: [
+    "Vivo con mi familia. No hablo mucho de estas cosas en la casa.",
+    "Vivo con mi familia. En la casa casi siempre terminan preguntando por el colegio.",
+    "Vivo con mi familia. Prefiero no contar mucho para que no se vuelva otro reto."
+  ],
+  camila: [
+    "Vivo sola, pero estoy muy pendiente de mi familia. A veces siento que igual estoy disponible todo el día.",
+    "Vivo sola. Igual me cuesta desconectarme de lo que necesita mi familia.",
+    "Vivo sola, aunque muchas veces mi cabeza sigue en los problemas de mi familia."
+  ],
+  rodrigo: [
+    "Vivo solo desde la separación. Mis hijos están conmigo algunos días, y trato de que ese tiempo funcione bien.",
+    "Vivo solo ahora. Después de la separación todavía estoy acostumbrándome a esa rutina.",
+    "Vivo solo, aunque parte de mi semana gira en torno a mis hijos y a coordinar la casa con ellos."
+  ],
+  fernanda: [
+    "Vivo con mi pareja. En la casa intento estar tranquila, pero a veces llevo encima la preocupación del trabajo.",
+    "Vivo con mi pareja. Me apoya, pero igual me cuesta contarle cuánto me asusta volver al trabajo.",
+    "Vivo con mi pareja. A veces siento que hasta en la casa estoy anticipando cómo me va a ir al día siguiente."
+  ],
+  hector: [
+    "Vivo con mi esposa. Desde que jubilé paso más tiempo en la casa, y todavía estoy buscando una rutina.",
+    "Vivo con mi esposa. Estoy más en la casa que antes, y eso me hace notar más los cambios del día.",
+    "Vivo con mi esposa. No quiero que esté pendiente de mí como si yo no pudiera solo."
+  ],
+  daniela: [
+    "Vivo con mi hijo. Mi familia me ayuda a ratos, pero la responsabilidad principal la siento en mí.",
+    "Vivo con mi hijo. A veces hay apoyo familiar, pero igual termino sintiendo que tengo que poder con todo.",
+    "Vivo con mi hijo. La casa gira mucho en torno a sus tiempos y a mis estudios."
+  ],
+  andres: [
+    "Vivo con mi familia. Ellos están orgullosos de que esté en la universidad, y eso también pesa.",
+    "Vivo con mi familia. A veces trato de que no noten que me siento fuera de lugar en la universidad.",
+    "Vivo con mi familia. Me apoyan, pero igual siento presión por no decepcionarlos."
+  ],
+  patricia: [
+    "Vivo con mi hija. Últimamente en la casa discutimos más de lo que quisiera.",
+    "Vivo con mi hija. A veces siento que compartimos casa, pero nos cuesta encontrarnos sin pelear.",
+    "Vivo con mi hija. Me preocupa que cada conversación termine como una lucha de autoridad."
+  ],
+  miguel: [
+    "Vivo solo, en un lugar que arriendo. A veces eso se siente tranquilo, pero también bastante solitario.",
+    "Vivo solo por ahora. Estoy armando mi vida acá de a poco.",
+    "Vivo solo. Hablo con mi familia por teléfono, pero no es lo mismo que tenerlos cerca."
+  ],
+  sofia: [
+    "Vivo con mi familia. Igual paso harto tiempo en mi pieza o conectada al celular.",
+    "Vivo con mi familia. A veces estoy en la casa, pero metida en el celular como si estuviera en otra parte.",
+    "Vivo con mi familia. No siempre entienden cuánto me afecta lo que veo en redes."
+  ],
+  claudio: [
+    "Vivo solo. Tengo una rutina bastante ordenada, aunque a veces eso mismo me hace sentir estancado.",
+    "Vivo solo. Mi casa está ordenada, mi rutina también, pero por dentro no siempre se siente tan claro.",
+    "Vivo solo. Me acomoda la rutina, pero a veces también me encierra un poco."
+  ]
+};
+
 export function selectResponse({ caseId, intentResult, memory }) {
   const intent = intentResult.intent;
   const facts = patientFacts[caseId] || patientFacts.tomas;
@@ -108,6 +189,9 @@ export function selectResponse({ caseId, intentResult, memory }) {
     const topic = intentResult.contextualTopic || memory.lastTopic || "default";
     candidates = responses.seguimiento_contextual?.[topic] || responses.seguimiento_contextual?.default || [];
     responseType = `seguimiento_contextual:${topic}`;
+  } else if (intent === "vivienda_residencia") {
+    candidates = residenceResponses[caseId] || [facts.residence || facts.family].filter(Boolean);
+    responseType = "vivienda_residencia";
   } else if (intent === "ocupacion_actividad") {
     candidates = occupationResponses[caseId] || [facts.works || facts.academic || facts.school].filter(Boolean);
     responseType = "ocupacion_actividad";

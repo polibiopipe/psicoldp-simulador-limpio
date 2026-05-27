@@ -40,6 +40,11 @@ export const rubricCriteria = [
     description: "Resume, agradece, pregunta cómo queda el paciente y cierra sin abandono abrupto."
   },
   {
+    id: "continuityAgreement",
+    title: "Acuerdo de continuidad",
+    description: "Deja abierta una próxima sesión simulada, sin prometer soluciones inmediatas ni reemplazar supervisión docente."
+  },
+  {
     id: "caseCoherence",
     title: "Coherencia con el caso",
     description: "Explora temas centrales del caso seleccionado de forma atingente."

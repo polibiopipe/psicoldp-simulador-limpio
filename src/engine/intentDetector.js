@@ -55,6 +55,20 @@ const intentLexicon = {
     "quien te derivo",
     "que paso para que llegaras"
   ],
+  vivienda_residencia: [
+    "donde vives",
+    "con quien vives",
+    "vives solo",
+    "vives sola",
+    "vives con alguien",
+    "vives con tus padres",
+    "vives con tus papas",
+    "vives con tu familia",
+    "vives con mi familia",
+    "vives con tu pareja",
+    "en que lugar vives",
+    "con quien compartes casa"
+  ],
   ocupacion_actividad: [
     "a que te dedicas",
     "a que te dedicas actualmente",
@@ -126,6 +140,7 @@ const priority = [
   "presentacion_personal_abierta",
   "rol_entrevistador",
   "motivo_de_consulta",
+  "vivienda_residencia",
   "ocupacion_actividad",
   "preferencias_valoracion",
   "pregunta_escolar",
@@ -197,6 +212,18 @@ const followUpCues = [
   "en que sentido"
 ];
 
+const continuityTerms = [
+  "proxima sesion",
+  "siguiente sesion",
+  "retomar esto",
+  "podemos retomar",
+  "continuar profundizando",
+  "continuar con calma",
+  "otra sesion",
+  "volver a conversar",
+  "seguir hablando"
+];
+
 export function detectIntent(studentMessage, history = []) {
   const text = normalizeText(studentMessage);
   const matches = {};
@@ -206,6 +233,7 @@ export function detectIntent(studentMessage, history = []) {
   }
 
   matches.ocupacion_actividad = matches.ocupacion_actividad || detectsOccupationActivity(text);
+  matches.vivienda_residencia = matches.vivienda_residencia || detectsResidenceQuestion(text);
   matches.respuesta_general = isGeneralOpenPrompt(text);
 
   const contextualTopic = detectContextualTopic(text, history);
@@ -220,13 +248,14 @@ export function detectIntent(studentMessage, history = []) {
     normalizedText: text,
     contextualTopic,
     matches,
-    categories: toLegacyCategories(intent, matches)
+    categories: toLegacyCategories(intent, matches, text)
   };
 }
 
 function detectContextualTopic(text, history) {
   if (intentLexicon.motivo_de_consulta.some((term) => text.includes(normalizeText(term)))) return null;
   if (intentLexicon.presentacion_personal_abierta.some((term) => text.includes(normalizeText(term)))) return null;
+  if (detectsResidenceQuestion(text)) return null;
   if (detectsOccupationActivity(text)) return null;
   if (text.includes("que te cuesta mas")) return null;
 
@@ -274,24 +303,39 @@ function detectsOccupationActivity(text) {
   );
 }
 
-function toLegacyCategories(intent, matches) {
+function detectsResidenceQuestion(text) {
+  return (
+    /\bdonde vives\b/.test(text) ||
+    /\bcon quien vives\b/.test(text) ||
+    /\bvives solo\b/.test(text) ||
+    /\bvives sola\b/.test(text) ||
+    /\bvives con alguien\b/.test(text) ||
+    /\bvives con (tus|tu) (padres|papas|familia|pareja)\b/.test(text) ||
+    /\ben que lugar vives\b/.test(text) ||
+    /\bcon quien compartes casa\b/.test(text)
+  );
+}
+
+function toLegacyCategories(intent, matches, text = "") {
+  const continuityAgreement = continuityTerms.some((term) => text.includes(term));
   return {
     greeting: intent === "saludo",
     framing: intent === "rol_entrevistador" || intent === "cortesia_vinculo",
     openQuestion: /^(presentacion_personal_abierta|motivo_de_consulta|seguimiento_contextual|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
-    closedQuestion: intent.startsWith("pregunta_") || intent === "ocupacion_actividad" || intent === "nombre" || intent === "edad",
+    closedQuestion: intent.startsWith("pregunta_") || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "nombre" || intent === "edad",
     validation: intent === "validacion_emocional",
     judgment: intent === "juicio_o_critica",
     rushedAdvice: intent === "consejo_apresurado",
     emotionalExploration: intent === "exploracion_emocional" || intent === "seguimiento_contextual",
-    familyExploration: intent === "pregunta_familiar",
+    familyExploration: intent === "pregunta_familiar" || intent === "vivienda_residencia",
     academicExploration: intent === "pregunta_escolar" || intent === "pregunta_academica" || intent === "ocupacion_actividad",
     workExploration: intent === "pregunta_laboral" || intent === "ocupacion_actividad",
     digitalExploration: intent === "pregunta_videojuegos",
     supportExploration: intent === "pregunta_social",
-    contextExploration: intent.startsWith("pregunta_") || intent === "ocupacion_actividad" || intent === "seguimiento_contextual" || intent === "exploracion_contextual",
+    contextExploration: intent.startsWith("pregunta_") || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "seguimiento_contextual" || intent === "exploracion_contextual",
     closure: intent === "cierre",
     goodClosure: intent === "cierre" && matches.validacion_emocional,
+    continuityAgreement,
     pressure: false,
     prematureInterpretation: false,
     paceRespect: intent === "cortesia_vinculo" || intent === "rol_entrevistador",

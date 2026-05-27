@@ -8,7 +8,9 @@ function CriterionIcon({ level }) {
   return <XCircle className="growth-icon" aria-hidden="true" />;
 }
 
-export function FeedbackPanel({ report, caseItem, history, onRestart, onSelectCase }) {
+export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, onRestart, onSelectCase }) {
+  const visibleHistory = history.filter((entry) => !entry.isSessionPrelude);
+
   return (
     <section className="feedback-panel">
       <header className="section-header">
@@ -80,9 +82,9 @@ export function FeedbackPanel({ report, caseItem, history, onRestart, onSelectCa
       </section>
 
       <details className="history-details">
-        <summary>Ver conversación completa ({history.length})</summary>
+        <summary>Ver conversación completa ({visibleHistory.length})</summary>
         <ol>
-          {history.map((entry) => (
+          {visibleHistory.map((entry) => (
             <li key={entry.id}>
               <strong>Estudiante:</strong> {entry.question}
               <br />
@@ -92,7 +94,7 @@ export function FeedbackPanel({ report, caseItem, history, onRestart, onSelectCa
         </ol>
       </details>
 
-      <EmailShare report={report} caseItem={caseItem} history={history} />
+      <EmailShare report={report} caseItem={caseItem} history={visibleHistory} />
 
       <div className="action-row">
         <button className="secondary-action" type="button" onClick={onSelectCase}>

@@ -1,11 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { RotateCcw, Send, SquareCheckBig, Users } from "lucide-react";
 import { PatientCard } from "./PatientCard.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
+import { SessionSelector } from "./SessionSelector.jsx";
 
 export function SimulationChat({
   caseItem,
   difficulty,
+  sessionNumber = 1,
+  sessionSummary,
   history,
   onAsk,
   onFinish,
@@ -13,21 +16,50 @@ export function SimulationChat({
   onChangeCase
 }) {
   const [question, setQuestion] = useState("");
-  const writingSuggestion = analyzeWritingQuality(question);
+  const [validationFeedback, setValidationFeedback] = useState("");
+  const conversationRef = useRef(null);
+  const writingSuggestion = validationFeedback || analyzeWritingQuality(question);
+  const visibleHistory = history.filter(isDisplayableEntry);
+  const interviewTurns = visibleHistory.filter((entry) => !entry.isSessionPrelude);
+
+  useEffect(() => {
+    const conversation = conversationRef.current;
+    if (!conversation) return;
+    conversation.scrollTo({
+      top: conversation.scrollHeight,
+      behavior: "smooth"
+    });
+  }, [history.length]);
 
   function submitQuestion(event) {
     event.preventDefault();
-    const trimmed = question.trim();
-    if (!trimmed) return;
-    onAsk(trimmed);
+    const validation = validateStudentMessage(question);
+    if (!validation.isValid) {
+      setValidationFeedback(validation.suggestion);
+      return;
+    }
+    onAsk(question.trim());
     setQuestion("");
+    setValidationFeedback("");
+  }
+
+  function updateQuestion(value) {
+    setQuestion(value);
+    if (validationFeedback) setValidationFeedback("");
   }
 
   return (
     <section className="screen chat-screen">
       <aside className="chat-sidebar">
         <PatientCard caseItem={caseItem} difficulty={difficulty} />
-        <ProgressBar turnCount={history.length} />
+        <ProgressBar turnCount={interviewTurns.length} />
+        <div className="learning-box">
+          <h2>Tipo de sesión</h2>
+          <SessionSelector currentSession={sessionNumber} availableSessions={[sessionNumber]} />
+          {sessionSummary && (
+            <p>Esta sesión retoma un resumen ficticio guardado de la entrevista anterior.</p>
+          )}
+        </div>
         <div className="learning-box">
           <h2>Objetivo de aprendizaje</h2>
           <p>{caseItem.objectives[0]}</p>
@@ -37,7 +69,9 @@ export function SimulationChat({
       <section className="chat-panel">
         <header className="chat-header">
           <div>
-            <span className="eyebrow">Entrevista simulada</span>
+            <span className="eyebrow">
+              {sessionNumber === 1 ? "Primera entrevista simulada" : `Sesión ${sessionNumber} simulada`}
+            </span>
             <h1>{caseItem.name}</h1>
           </div>
           <div className="chat-actions">
@@ -53,7 +87,7 @@ export function SimulationChat({
               className="primary-action"
               type="button"
               onClick={onFinish}
-              disabled={history.length === 0}
+              disabled={interviewTurns.length === 0}
             >
               <SquareCheckBig aria-hidden="true" />
               Terminar
@@ -61,8 +95,17 @@ export function SimulationChat({
           </div>
         </header>
 
-        <div className="conversation" aria-live="polite">
-          {history.length === 0 ? (
+        <details className="mobile-case-summary">
+          <summary>Ficha y objetivo de la sesión</summary>
+          <div>
+            <strong>{caseItem.name} · {caseItem.age}</strong>
+            <p>{caseItem.communicationStyle}</p>
+            <p>{caseItem.objectives[0]}</p>
+          </div>
+        </details>
+
+        <div className="conversation" aria-live="polite" ref={conversationRef}>
+          {visibleHistory.length === 0 ? (
             <div className="empty-state">
               <p>{caseItem.openingLine}</p>
               <span>
@@ -70,14 +113,16 @@ export function SimulationChat({
               </span>
             </div>
           ) : (
-            history.map((entry) => (
+            visibleHistory.map((entry) => (
               <div className="exchange" key={entry.id}>
-                <div className="message student-message">
-                  <span>Estudiante</span>
-                  <p>{entry.question}</p>
-                </div>
+                {!entry.isSessionPrelude && (
+                  <div className="message student-message">
+                    <span>Estudiante</span>
+                    <p>{entry.question}</p>
+                  </div>
+                )}
                 <div className="message patient-message">
-                  <span>{caseItem.name}</span>
+                  <span>{entry.isSessionPrelude ? `Inicio Sesión ${sessionNumber}` : caseItem.name}</span>
                   <p>{entry.answer}</p>
                 </div>
               </div>
@@ -95,7 +140,7 @@ export function SimulationChat({
             <textarea
               id="student-question"
               value={question}
-              onChange={(event) => setQuestion(event.target.value)}
+              onChange={(event) => updateQuestion(event.target.value)}
               placeholder="Ej.: Antes de comenzar, quisiera explicarte el objetivo de esta entrevista. ¿Qué te gustaría que entienda de lo que estás viviendo?"
               rows={3}
             />
@@ -112,6 +157,91 @@ export function SimulationChat({
       </section>
     </section>
   );
+}
+
+function isSubmittableQuestion(value) {
+  return validateStudentMessage(value).isValid;
+}
+
+function isDisplayableEntry(entry) {
+  if (entry.isSessionPrelude) return Boolean(entry.answer?.trim());
+  return isSubmittableQuestion(entry.question?.trim() || "") && Boolean(entry.answer?.trim());
+}
+
+function validateStudentMessage(message) {
+  const trimmed = message.trim();
+  const normalized = normalizeWritingText(trimmed);
+  const compact = normalized.replace(/\s+/g, "");
+  const allowedBriefMessages = new Set([
+    "si",
+    "no",
+    "claro",
+    "entiendo",
+    "continua",
+    "gracias"
+  ]);
+
+  if (!trimmed) {
+    return {
+      isValid: false,
+      reason: "empty",
+      suggestion: "Escribe una intervención antes de enviarla."
+    };
+  }
+
+  if (allowedBriefMessages.has(normalized)) {
+    return {
+      isValid: true,
+      reason: "brief_but_meaningful",
+      suggestion: ""
+    };
+  }
+
+  if (normalized === "ok") {
+    return {
+      isValid: false,
+      reason: "ambiguous_short",
+      suggestion:
+        "No se envió el mensaje. “Ok” puede ser muy ambiguo en esta práctica; intenta agregar una pregunta o una frase de seguimiento."
+    };
+  }
+
+  if (!/[a-z0-9]/i.test(normalized)) {
+    return {
+      isValid: false,
+      reason: "symbols_only",
+      suggestion:
+        "No se envió el mensaje. Intenta formular una intervención completa, por ejemplo: “¿Podrías contarme un poco más sobre eso?”"
+    };
+  }
+
+  if (compact.length < 3) {
+    return {
+      isValid: false,
+      reason: "too_short",
+      suggestion:
+        "No se envió el mensaje. Parece una entrada accidental. Para practicar una entrevista más clara, intenta escribir una intervención completa."
+    };
+  }
+
+  const hasRecognizableWord = normalized
+    .split(/\s+/)
+    .some((word) => /^[a-z0-9]{3,}$/.test(word));
+
+  if (!hasRecognizableWord) {
+    return {
+      isValid: false,
+      reason: "no_recognizable_word",
+      suggestion:
+        "Tu intervención parece demasiado breve o poco clara. Intenta escribir una pregunta completa para que el paciente ficticio pueda responder de forma más coherente."
+    };
+  }
+
+  return {
+    isValid: true,
+    reason: "valid",
+    suggestion: ""
+  };
 }
 
 function analyzeWritingQuality(studentMessage) {

@@ -140,6 +140,7 @@ function topicFromIntent(intent) {
   if (intent === "pregunta_videojuegos") return "digital";
   if (intent === "pregunta_habitos") return "habitos";
   if (intent === "ocupacion_actividad") return "ocupacion";
+  if (intent === "vivienda_residencia") return "vivienda";
   if (intent === "exploracion_emocional") return "emocion";
   if (intent === "preferencias_valoracion") return "preferencias";
   return null;
