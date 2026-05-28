@@ -3,6 +3,7 @@ import { RotateCcw, Send, SquareCheckBig, Users } from "lucide-react";
 import { PatientCard } from "./PatientCard.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
+import { VoiceDictationButton } from "./VoiceDictationButton.jsx";
 
 export function SimulationChat({
   caseItem,
@@ -46,6 +47,12 @@ export function SimulationChat({
   function updateQuestion(value) {
     setQuestion(value);
     if (validationFeedback) setValidationFeedback("");
+  }
+
+  function appendDictatedText(text) {
+    const transcript = text.trim();
+    if (!transcript) return;
+    setQuestion((current) => [current.trimEnd(), transcript].filter(Boolean).join(" "));
   }
 
   return (
@@ -142,6 +149,10 @@ export function SimulationChat({
               onChange={(event) => updateQuestion(event.target.value)}
               placeholder="Ej.: Antes de comenzar, quisiera explicarte el objetivo de esta entrevista. ¿Qué te gustaría que entienda de lo que estás viviendo?"
               rows={3}
+            />
+            <VoiceDictationButton
+              onTranscript={appendDictatedText}
+              onStatusChange={setValidationFeedback}
             />
             <button className="icon-action" type="submit" aria-label="Enviar intervención">
               <Send aria-hidden="true" />

@@ -211,6 +211,7 @@ a {
 .secondary-action,
 .text-action,
 .danger-action,
+.voice-dictation-button,
 .icon-action,
 .case-card button {
   display: inline-flex;
@@ -263,10 +264,41 @@ a {
   background: #b05268;
 }
 
+.voice-dictation-button {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(29, 106, 115, 0.18);
+  color: #174d54;
+  background: #e6f0ef;
+}
+
+.voice-dictation-button.listening {
+  color: #fff;
+  background: #1d6a73;
+  box-shadow: 0 0 0 4px rgba(29, 106, 115, 0.14);
+}
+
+.voice-dictation-button.unavailable {
+  color: #69736d;
+  background: #eef0e8;
+  box-shadow: none;
+}
+
+.voice-dictation-button span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .primary-action:hover,
 .secondary-action:hover,
 .text-action:hover,
 .danger-action:hover,
+.voice-dictation-button:hover,
 .icon-action:hover,
 .case-card button:hover {
   transform: translateY(-1px);
@@ -1035,7 +1067,7 @@ a {
 
 .input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 52px;
+  grid-template-columns: minmax(0, 1fr) 52px 52px;
   gap: 12px;
   align-items: end;
 }
@@ -1048,6 +1080,11 @@ a {
 }
 
 .chat-panel .icon-action {
+  width: 52px;
+  height: 52px;
+}
+
+.chat-panel .voice-dictation-button {
   width: 52px;
   height: 52px;
 }
@@ -1927,7 +1964,7 @@ textarea:focus {
   }
 
   .chat-panel .input-row {
-    grid-template-columns: minmax(0, 1fr) 50px;
+    grid-template-columns: minmax(0, 1fr) 46px 46px;
   }
 
   .icon-action {
@@ -1935,6 +1972,11 @@ textarea:focus {
   }
 
   .chat-panel .icon-action {
+    width: 46px;
+    height: 46px;
+  }
+
+  .chat-panel .voice-dictation-button {
     width: 46px;
     height: 46px;
   }
