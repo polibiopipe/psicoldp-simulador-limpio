@@ -87,7 +87,6 @@ export function SimulationChat({
               className="primary-action"
               type="button"
               onClick={onFinish}
-              disabled={interviewTurns.length === 0}
             >
               <SquareCheckBig aria-hidden="true" />
               Terminar

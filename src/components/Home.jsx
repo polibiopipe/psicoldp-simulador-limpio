@@ -1,7 +1,7 @@
 import React from "react";
-import { ArrowRight, BookOpenCheck, MessageSquareText, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpenCheck, FolderClock, MessageSquareText, ShieldCheck, Sparkles } from "lucide-react";
 
-export function Home({ onStart }) {
+export function Home({ onStart, onViewHistory }) {
   return (
     <section className="landing-page">
       <header className="landing-header">
@@ -32,6 +32,10 @@ export function Home({ onStart }) {
             </button>
             <button className="secondary-action landing-secondary" type="button" onClick={onStart}>
               Ver casos disponibles
+            </button>
+            <button className="secondary-action landing-secondary" type="button" onClick={onViewHistory}>
+              <FolderClock aria-hidden="true" />
+              Mis sesiones guardadas
             </button>
           </div>
 

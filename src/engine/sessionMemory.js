@@ -43,6 +43,81 @@ export function getLatestSessionSummary(caseId, sessionNumber = 1) {
     .sort((a, b) => new Date(b.simulatedDate).getTime() - new Date(a.simulatedDate).getTime())[0] || null;
 }
 
+export function getSessionSummariesForCase(caseId) {
+  if (!canUseStorage()) return [];
+  return mergeSessionSummaryList(readStoredSessions().filter((item) => item.caseId === caseId));
+}
+
+export function getLatestPreviousSessionSummary(caseId, sessionNumber) {
+  if (sessionNumber <= 1) return null;
+  return getLatestSessionSummary(caseId, sessionNumber - 1);
+}
+
+export function mergeSessionSummaryList(summaries = [], nextSummary = null) {
+  const latestBySession = new Map();
+  for (const summary of [...summaries, nextSummary].filter(Boolean)) {
+    const current = latestBySession.get(summary.sessionNumber);
+    const currentTime = current ? new Date(current.simulatedDate).getTime() : 0;
+    const nextTime = new Date(summary.simulatedDate).getTime();
+    if (!current || nextTime >= currentTime) latestBySession.set(summary.sessionNumber, summary);
+  }
+  return Array.from(latestBySession.values()).sort((a, b) => a.sessionNumber - b.sessionNumber);
+}
+
+export function buildProcessSummary({ caseItem, summaries = [] }) {
+  const orderedSummaries = mergeSessionSummaryList(summaries).slice(0, 4);
+  const workedTopics = uniqueFlatMap(orderedSummaries, "temasExplorados");
+  const pendingTopics = uniqueFlatMap(orderedSummaries, "temasPendientes").slice(0, 6);
+  const studentStrengths = uniqueFlatMap(orderedSummaries, "fortalezasEstudiante").slice(0, 6);
+  const studentImprovements = uniqueFlatMap(orderedSummaries, "aspectosPorMejorar").slice(0, 6);
+  const opennessEvolution = orderedSummaries.map((summary) => ({
+    sessionNumber: summary.sessionNumber,
+    trustFinal: summary.trustFinal,
+    label: summary.nivelApertura
+  }));
+
+  return {
+    caseId: caseItem.id,
+    patientName: caseItem.name,
+    sessions: orderedSummaries,
+    workedTopics,
+    pendingTopics,
+    studentStrengths,
+    studentImprovements,
+    opennessEvolution,
+    summaryText:
+      orderedSummaries.length >= 4
+        ? `Proceso formativo de 4 sesiones con ${caseItem.name}. Se trabajaron entrevista inicial, profundización, contexto y cierre formativo.`
+        : `Proceso formativo parcial con ${caseItem.name}. Hay ${orderedSummaries.length} sesión(es) registrada(s).`
+  };
+}
+
+export function formatProcessSummary(processSummary) {
+  if (!processSummary) return "";
+  return [
+    "Resumen del proceso formativo simulado",
+    `Paciente ficticio: ${processSummary.patientName}`,
+    `Sesiones registradas: ${processSummary.sessions.length}`,
+    "",
+    "Síntesis:",
+    processSummary.summaryText,
+    "",
+    "Temas trabajados:",
+    ...withEmptyFallback(processSummary.workedTopics).map((item) => `- ${item}`),
+    "",
+    "Evolución de apertura:",
+    ...processSummary.opennessEvolution.map((item) => `- Sesión ${item.sessionNumber}: ${item.trustFinal}/100 (${item.label})`),
+    "",
+    "Habilidades logradas por el estudiante:",
+    ...withEmptyFallback(processSummary.studentStrengths).map((item) => `- ${item}`),
+    "",
+    "Aspectos por seguir practicando:",
+    ...withEmptyFallback(processSummary.studentImprovements).map((item) => `- ${item}`),
+    "",
+    "Uso exclusivamente educativo con casos ficticios. No reemplaza atención psicológica real, diagnóstico, tratamiento ni supervisión docente."
+  ].join("\n");
+}
+
 export function formatSessionAgreement(summary) {
   if (!summary) return "";
   return [
@@ -73,6 +148,14 @@ function readStoredSessions() {
   } catch {
     return [];
   }
+}
+
+function uniqueFlatMap(items, key) {
+  return Array.from(new Set(items.flatMap((item) => item?.[key] || []).filter(Boolean)));
+}
+
+function withEmptyFallback(items) {
+  return items?.length ? items : ["No observado en los registros disponibles."];
 }
 
 function canUseStorage() {

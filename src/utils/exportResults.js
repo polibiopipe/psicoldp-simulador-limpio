@@ -33,6 +33,11 @@ ${report.bondMoments.map((item) => `- ${item}`).join("\n")}
 Momentos que pudieron cerrar la comunicación:
 ${report.closingMoments.map((item) => `- ${item}`).join("\n")}
 
+Enfoque terapéutico observado:
+${report.therapeuticApproach?.feedbackText || "No observado con claridad."}
+Predominante: ${report.therapeuticApproach?.primaryApproach?.label || "No observado con claridad"}
+Secundarios: ${report.therapeuticApproach?.secondaryApproaches?.map((approach) => approach.label).join(", ") || "Sin señales secundarias claras"}
+
 Conversación resumida:
 ${conversation || "- No hay conversación registrada."}
 

@@ -6,6 +6,8 @@ export function NextSessionModal({
   open,
   summary,
   patientAgreement,
+  nextSessionNumber = 2,
+  nextSessionStage,
   onClose,
   onContinueSession,
   onSaveSummary,
@@ -34,8 +36,9 @@ export function NextSessionModal({
         <span className="eyebrow">Continuidad simulada</span>
         <h1 id="next-session-title">Propuesta de continuidad</h1>
         <p>
-          En una entrevista inicial no siempre es posible abordar todo. Puedes acordar
-          una nueva sesión simulada para profundizar en los temas que quedaron abiertos.
+          En una sesión simulada no siempre es posible abordar todo. Puedes acordar
+          una nueva sesión para profundizar en los temas que quedaron abiertos.
+          {nextSessionStage ? ` Próximo foco: ${nextSessionStage.focus}` : ""}
         </p>
 
         <div className="patient-agreement">
@@ -46,7 +49,7 @@ export function NextSessionModal({
         <div className="modal-actions">
           <button className="primary-action" type="button" onClick={onContinueSession}>
             <PlayCircle aria-hidden="true" />
-            Continuar con Sesión 2
+            Continuar con Sesión {nextSessionNumber}
           </button>
           <button className="secondary-action" type="button" onClick={onSaveSummary}>
             <Download aria-hidden="true" />

@@ -1,4 +1,5 @@
 import { rubricCriteria, levelLabels } from "../data/rubrics.js";
+import { analyzeTherapeuticApproaches } from "../engine/therapeuticApproachAnalyzer.js";
 import { getTrustStage, summarizeConversationMemory } from "./analyzeStudentInput.js";
 
 function level(score) {
@@ -14,6 +15,7 @@ function labelFor(score) {
 
 export function buildEducationalReport(history, caseItem) {
   const scoredHistory = history.filter((entry) => !entry.isSessionPrelude);
+  const therapeuticApproach = analyzeTherapeuticApproaches(scoredHistory.map((entry) => entry.question));
   const memory = summarizeConversationMemory(scoredHistory);
   const turnCount = scoredHistory.length;
   const hasJudgment = memory.judgment > 0;
@@ -121,6 +123,7 @@ export function buildEducationalReport(history, caseItem) {
       label: trustLabels[trustStage]
     },
     criteria,
+    therapeuticApproach,
     strengths: strengths.length ? strengths : ["Mantuviste la entrevista activa y generaste oportunidades de exploración."],
     improvements,
     bondMoments: bondMoments.length ? bondMoments : ["No se observaron momentos claros de aumento de apertura; prioriza validación y preguntas abiertas."],

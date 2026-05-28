@@ -8,9 +8,17 @@ import {
   MessageSquareText,
   TrendingUp
 } from "lucide-react";
-import { closureExamples, getNextSessionAgreement } from "../data/sessionPrompts.js";
 import {
+  closureExamples,
+  getNextSessionAgreement,
+  getNextSessionNumber,
+  getSessionClosureTitle,
+  getSessionStage
+} from "../data/sessionPrompts.js";
+import {
+  buildProcessSummary,
   buildSessionSummary,
+  formatProcessSummary,
   formatSessionAgreement,
   saveSessionSummary
 } from "../engine/sessionMemory.js";
@@ -21,27 +29,42 @@ export function SessionClosure({
   history,
   report,
   sessionNumber,
+  previousSessionSummaries = [],
   onContinueSession,
   onBackHome
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [processCopied, setProcessCopied] = useState(false);
   const agreement = getNextSessionAgreement(caseItem.id);
   const interviewTurns = history.filter((entry) => !entry.isSessionPrelude);
   const achieved = report.criteria.filter((criterion) => criterion.level === "achieved").length;
   const partial = report.criteria.filter((criterion) => criterion.level === "partial").length;
+  const nextSessionNumber = getNextSessionNumber(sessionNumber);
+  const isFinalSession = !nextSessionNumber;
+  const closureTitle = getSessionClosureTitle(sessionNumber);
+  const nextSessionStage = nextSessionNumber ? getSessionStage(nextSessionNumber) : null;
   const summary = useMemo(
     () => buildSessionSummary({ caseItem, history, report, sessionNumber, agreement }),
     [caseItem, history, report, sessionNumber, agreement]
+  );
+  const processSummary = useMemo(
+    () => buildProcessSummary({ caseItem, summaries: [...previousSessionSummaries, summary] }),
+    [caseItem, previousSessionSummaries, summary]
   );
 
   function saveCurrentSummary() {
     saveSessionSummary(summary);
   }
 
-  function continueSessionTwo() {
+  function continueToNextSession() {
     saveCurrentSummary();
     onContinueSession(summary);
+  }
+
+  function backHomeAfterSave() {
+    saveCurrentSummary();
+    onBackHome();
   }
 
   async function copyCurrentSummary() {
@@ -55,16 +78,34 @@ export function SessionClosure({
     }
   }
 
+  async function copyProcessSummary() {
+    saveCurrentSummary();
+    try {
+      await navigator.clipboard.writeText(formatProcessSummary(processSummary));
+      setProcessCopied(true);
+      window.setTimeout(() => setProcessCopied(false), 1800);
+    } catch {
+      setProcessCopied(false);
+    }
+  }
+
   return (
     <section className="session-closure" aria-labelledby="session-closure-title">
       <header className="session-closure-header">
         <span className="eyebrow">Proceso por sesiones</span>
-        <h1 id="session-closure-title">Cierre de la primera entrevista</h1>
+        <h1 id="session-closure-title">{closureTitle}</h1>
         <p>
           Resumen formativo de la sesión simulada. Esta síntesis es ficticia y ayuda a
-          ordenar qué se exploró y qué podría retomarse en una próxima sesión.
+          ordenar qué se exploró y qué podría retomarse en el proceso.
         </p>
       </header>
+
+      {interviewTurns.length < 3 && (
+        <div className="session-note low-turn-note">
+          Esta sesión tuvo pocas intervenciones. Para un mejor aprendizaje, se recomienda
+          profundizar más antes de avanzar, aunque puedes continuar si estás probando el flujo.
+        </div>
+      )}
 
       <div className="closure-case-strip">
         <div>
@@ -150,36 +191,102 @@ export function SessionClosure({
 
       <div className="continuity-callout">
         <div>
-          <h2>Sugerencia de continuidad</h2>
-          <p>
-            Puedes acordar una Sesión 2 para profundizar el motivo de consulta ficticio
-            y retomar los temas que quedaron abiertos.
-          </p>
+          <h2>{isFinalSession ? "Cierre final del proceso" : "Sugerencia de continuidad"}</h2>
+          {isFinalSession ? (
+            <p>
+              Has completado las cuatro sesiones simuladas. Puedes copiar una síntesis del
+              proceso formativo o volver al inicio para trabajar otro caso.
+            </p>
+          ) : (
+            <p>
+              Puedes continuar con {nextSessionStage.title.toLowerCase()} para retomar
+              los temas abiertos y trabajar el foco: {nextSessionStage.focus}
+            </p>
+          )}
         </div>
         <div className="closure-actions">
-          <button className="primary-action" type="button" onClick={() => setModalOpen(true)}>
-            Acordar próxima sesión
-            <ArrowRight aria-hidden="true" />
-          </button>
+          {isFinalSession ? (
+            <>
+              <button className="primary-action" type="button" onClick={backHomeAfterSave}>
+                <Home aria-hidden="true" />
+                Finalizar proceso formativo
+              </button>
+              <button className="secondary-action" type="button" onClick={copyProcessSummary}>
+                <Clipboard aria-hidden="true" />
+                {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
+              </button>
+            </>
+          ) : (
+            <button className="primary-action" type="button" onClick={() => setModalOpen(true)}>
+              Continuar a sesión {nextSessionNumber}
+              <ArrowRight aria-hidden="true" />
+            </button>
+          )}
           <button className="secondary-action" type="button" onClick={copyCurrentSummary}>
             <Clipboard aria-hidden="true" />
             {copied ? "Resumen copiado" : "Copiar resumen"}
           </button>
-          <button className="secondary-action" type="button" onClick={onBackHome}>
+          <button className="secondary-action" type="button" onClick={backHomeAfterSave}>
             <Home aria-hidden="true" />
             Volver al inicio
           </button>
         </div>
       </div>
 
+      {isFinalSession && (
+        <section className="session-summary-card closure-panel closure-panel-wide">
+          <span className="eyebrow">Síntesis de proceso</span>
+          <h2>Resumen de las 4 sesiones con {processSummary.patientName}</h2>
+          <p>{processSummary.summaryText}</p>
+          <div className="session-summary-grid">
+            <div>
+              <h3>Temas trabajados</h3>
+              <ul>
+                {processSummary.workedTopics.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Evolución de apertura</h3>
+              <ul>
+                {processSummary.opennessEvolution.map((item) => (
+                  <li key={item.sessionNumber}>
+                    Sesión {item.sessionNumber}: {item.trustFinal}/100 ({item.label})
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Habilidades logradas</h3>
+              <ul>
+                {processSummary.studentStrengths.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Aspectos por seguir practicando</h3>
+              <ul>
+                {processSummary.studentImprovements.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
+
       <NextSessionModal
         open={modalOpen}
         summary={summary}
         patientAgreement={agreement}
+        nextSessionNumber={nextSessionNumber}
+        nextSessionStage={nextSessionStage}
         onClose={() => setModalOpen(false)}
-        onContinueSession={continueSessionTwo}
+        onContinueSession={continueToNextSession}
         onSaveSummary={saveCurrentSummary}
-        onBackHome={onBackHome}
+        onBackHome={backHomeAfterSave}
       />
     </section>
   );

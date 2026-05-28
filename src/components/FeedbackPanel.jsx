@@ -59,6 +59,32 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
         </section>
       </div>
 
+      {report.therapeuticApproach && (
+        <section className="feedback-block">
+          <h2>Enfoque terapéutico observado</h2>
+          <p>{report.therapeuticApproach.feedbackText}</p>
+          <ul>
+            <li>
+              Orientación predominante observada: {report.therapeuticApproach.primaryApproach.label}.
+            </li>
+            {report.therapeuticApproach.secondaryApproaches.length > 0 && (
+              <li>
+                Enfoques secundarios observados:{" "}
+                {report.therapeuticApproach.secondaryApproaches
+                  .map((approach) => approach.label)
+                  .join(", ")}.
+              </li>
+            )}
+            {report.therapeuticApproach.primaryApproach.examples?.slice(0, 2).map((example) => (
+              <li key={example}>Ejemplo del estudiante: “{example}”</li>
+            ))}
+            {report.therapeuticApproach.suggestions.slice(0, 2).map((suggestion) => (
+              <li key={suggestion}>{suggestion}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="criteria-list">
         {report.criteria.map((criterion) => (
           <article className={`criterion ${criterion.level}`} key={criterion.id}>

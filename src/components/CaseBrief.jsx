@@ -8,12 +8,11 @@ export function CaseBrief({
   difficulty,
   sessionNumber = 1,
   sessionSummary,
+  availableSessions = [1],
   onBack,
   onBegin,
   onSelectSession
 }) {
-  const availableSessions = sessionSummary ? [1, 2] : [1];
-
   return (
     <section className="screen">
       <button className="text-action" type="button" onClick={onBack}>
@@ -43,8 +42,8 @@ export function CaseBrief({
             />
             {sessionSummary ? (
               <p className="session-note">
-                Hay un resumen ficticio de Sesión 1 guardado para este caso. Puedes
-                continuar con Sesión 2 cuando quieras profundizar.
+                Hay un resumen ficticio de la sesión anterior guardado para este caso.
+                Puedes continuar el proceso formativo sin perder lo ya trabajado.
               </p>
             ) : (
               <p className="session-note">
