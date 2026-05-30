@@ -173,6 +173,7 @@ const intentLexicon = {
 const priority = [
   "saludo",
   "presentacion_estudiante",
+  "encuadre_mas_pregunta_abierta",
   "encuadre_o_consentimiento",
   "cortesia_vinculo",
   "nombre",
@@ -275,6 +276,7 @@ export function detectIntent(studentMessage, history = []) {
 
   matches.presentacion_estudiante = matches.presentacion_estudiante || detectsStudentPresentation(text);
   matches.encuadre_o_consentimiento = matches.encuadre_o_consentimiento || detectsFraming(text);
+  matches.encuadre_mas_pregunta_abierta = detectsCompoundFramingQuestion(text, matches);
   matches.ocupacion_actividad = matches.ocupacion_actividad || detectsOccupationActivity(text);
   matches.vivienda_residencia = matches.vivienda_residencia || detectsResidenceQuestion(text);
   matches.preocupacion_principal = matches.preocupacion_principal || detectsMainConcernQuestion(text);
@@ -367,6 +369,39 @@ function detectsFraming(text) {
   );
 }
 
+function detectsCompoundFramingQuestion(text, matches = {}) {
+  const hasFramingOrSupport =
+    detectsFraming(text) ||
+    matches.validacion_emocional ||
+    [
+      "antes de comenzar",
+      "podemos conversar con calma",
+      "no estoy para juzgarte",
+      "quiero comprender",
+      "este es un lugar seguro",
+      "este es un espacio seguro"
+    ].some((term) => text.includes(normalizeText(term)));
+
+  const hasOpenQuestion = [
+    "que te gustaria que entienda",
+    "que te gustaria que entendiera",
+    "que te gustaria que comprendiera",
+    "que quieres que comprenda",
+    "que quieres que entienda",
+    "que deberia entender",
+    "que deberia comprender",
+    "que te trae hoy",
+    "que te preocupa",
+    "que estas viviendo",
+    "que estas pasando",
+    "que te esta pasando",
+    "que te gustaria contar",
+    "que seria importante que entienda"
+  ].some((term) => text.includes(normalizeText(term)));
+
+  return hasFramingOrSupport && hasOpenQuestion;
+}
+
 function hasExplicitMotiveCue(text) {
   return (
     /\bsabes por que estas (aqui|aca)\b/.test(text) ||
@@ -448,8 +483,8 @@ function toLegacyCategories(intent, matches, text = "") {
   const continuityAgreement = continuityTerms.some((term) => text.includes(term));
   return {
     greeting: intent === "saludo",
-    framing: intent === "rol_entrevistador" || intent === "cortesia_vinculo" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento",
-    openQuestion: /^(presentacion_personal_abierta|motivo_de_consulta|preocupacion_principal|seguimiento_contextual|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
+    framing: intent === "rol_entrevistador" || intent === "cortesia_vinculo" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta_abierta",
+    openQuestion: /^(encuadre_mas_pregunta_abierta|presentacion_personal_abierta|motivo_de_consulta|preocupacion_principal|seguimiento_contextual|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
     closedQuestion: intent.startsWith("pregunta_") || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "nombre" || intent === "edad",
     validation: intent === "validacion_emocional",
     judgment: intent === "juicio_o_critica",
@@ -466,7 +501,7 @@ function toLegacyCategories(intent, matches, text = "") {
     continuityAgreement,
     pressure: false,
     prematureInterpretation: false,
-    paceRespect: intent === "cortesia_vinculo" || intent === "rol_entrevistador" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento",
+    paceRespect: intent === "cortesia_vinculo" || intent === "rol_entrevistador" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta_abierta",
     empathicSummary: intent === "seguimiento_contextual",
     followUp: intent === "seguimiento_contextual",
     preferencesExploration: intent === "preferencias_valoracion",

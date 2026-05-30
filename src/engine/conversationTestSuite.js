@@ -16,12 +16,37 @@ export const standardConversationAuditFlow = [
   "¿Qué crees que podríamos seguir conversando en una próxima sesión?"
 ];
 
+export const compoundFramingAuditMessage =
+  "Antes de comenzar quisiera explicarte el objetivo de esta entrevista. ¿Qué te gustaría que entienda de lo que estás viviendo?";
+
 export function runBasicConversationAudit({ caseIds = cases.map((caseItem) => caseItem.id), difficulty = "intermedio" } = {}) {
   return caseIds.map((caseId) => runCaseAudit({ caseId, difficulty }));
 }
 
 export function runConversationAudit(options = {}) {
   return runBasicConversationAudit(options);
+}
+
+export function runCompoundFramingAudit({
+  caseIds = cases.map((caseItem) => caseItem.id),
+  difficulty = "intermedio",
+  message = compoundFramingAuditMessage
+} = {}) {
+  return caseIds.map((caseId) => {
+    const result = generateLocalPatientResponse({
+      caseId,
+      studentMessage: message,
+      history: [],
+      difficulty
+    });
+
+    return {
+      caseId,
+      detectedIntent: result.intent,
+      responseText: result.responseText,
+      fallbackUsed: result.fallbackUsed
+    };
+  });
 }
 
 export function runCaseAudit({ caseId, difficulty = "intermedio", flow = standardConversationAuditFlow }) {
@@ -112,6 +137,12 @@ const requiredBasicIntents = [
 ];
 
 if (typeof process !== "undefined" && process.argv[1]?.endsWith("conversationTestSuite.js")) {
+  if (process.argv.includes("--compound")) {
+    const results = runCompoundFramingAudit();
+    console.log(JSON.stringify(results, null, 2));
+    process.exit(0);
+  }
+
   const results = runBasicConversationAudit();
   const summary = summarizeAuditResults(results);
   if (process.argv.includes("--json")) {

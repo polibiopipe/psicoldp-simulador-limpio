@@ -54,6 +54,7 @@ function limitSentences(response, opennessLevel, responseType) {
   const isConcreteEngineResponse =
     responseType?.includes(":concreto") ||
     responseType === "apertura_progresiva:forzada" ||
+    responseType === "encuadre_mas_pregunta_abierta" ||
     responseType?.startsWith("seguimiento_contextual:");
   const maxSentences =
     isConcreteEngineResponse || responseType === "presentacion_personal_abierta" || responseType === "motivo_de_consulta" || responseType === "ocupacion_actividad"
