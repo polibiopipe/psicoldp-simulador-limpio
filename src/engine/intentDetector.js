@@ -74,7 +74,6 @@ const intentLexicon = {
     "que te trae",
     "por que te derivaron",
     "por que te mandaron",
-    "que te preocupa",
     "que sucede",
     "que te sucede",
     "que esta pasando",
@@ -106,6 +105,18 @@ const intentLexicon = {
     "trabajas",
     "estudias o trabajas",
     "que haces durante el dia"
+  ],
+  preocupacion_principal: [
+    "que te preocupa",
+    "que te preocupa de esto",
+    "que te preocupa mas",
+    "que es lo que mas te preocupa",
+    "cual es tu preocupacion",
+    "cual es tu principal preocupacion",
+    "que es lo que mas te inquieta",
+    "que te inquieta",
+    "que te da miedo de esto",
+    "que es lo que mas te pesa"
   ],
   preferencias_valoracion: [
     "que esperas de esta conversacion",
@@ -162,15 +173,16 @@ const intentLexicon = {
 const priority = [
   "saludo",
   "presentacion_estudiante",
+  "encuadre_o_consentimiento",
   "cortesia_vinculo",
   "nombre",
   "edad",
   "rol_entrevistador",
-  "encuadre_o_consentimiento",
   "presentacion_personal_abierta",
   "motivo_de_consulta",
-  "ocupacion_actividad",
   "vivienda_residencia",
+  "ocupacion_actividad",
+  "preocupacion_principal",
   "preferencias_valoracion",
   "pregunta_escolar",
   "pregunta_academica",
@@ -265,9 +277,13 @@ export function detectIntent(studentMessage, history = []) {
   matches.encuadre_o_consentimiento = matches.encuadre_o_consentimiento || detectsFraming(text);
   matches.ocupacion_actividad = matches.ocupacion_actividad || detectsOccupationActivity(text);
   matches.vivienda_residencia = matches.vivienda_residencia || detectsResidenceQuestion(text);
+  matches.preocupacion_principal = matches.preocupacion_principal || detectsMainConcernQuestion(text);
   matches.respuesta_general = isGeneralOpenPrompt(text);
 
   if (matches.validacion_emocional && matches.motivo_de_consulta && !hasExplicitMotiveCue(text)) {
+    matches.motivo_de_consulta = false;
+  }
+  if (matches.preocupacion_principal && !hasExplicitMotiveCue(text)) {
     matches.motivo_de_consulta = false;
   }
 
@@ -361,8 +377,7 @@ function hasExplicitMotiveCue(text) {
     /\bque te trae\b/.test(text) ||
     /\bpor que te (derivaron|mandaron)\b/.test(text) ||
     /\bquien te derivo\b/.test(text) ||
-    /\bque paso para que llegaras\b/.test(text) ||
-    /\bque te preocupa\b/.test(text)
+    /\bque paso para que llegaras\b/.test(text)
   );
 }
 
@@ -416,12 +431,25 @@ function detectsResidenceQuestion(text) {
   );
 }
 
+function detectsMainConcernQuestion(text) {
+  return (
+    /\bque te preocupa( de (esto|todo esto))?\b/.test(text) ||
+    /\bque te preocupa mas\b/.test(text) ||
+    /\bque es lo que mas te preocupa\b/.test(text) ||
+    /\bcual es tu( principal)? preocupacion\b/.test(text) ||
+    /\bque te inquieta\b/.test(text) ||
+    /\bque es lo que mas te inquieta\b/.test(text) ||
+    /\bque te da miedo de esto\b/.test(text) ||
+    /\bque es lo que mas te pesa\b/.test(text)
+  );
+}
+
 function toLegacyCategories(intent, matches, text = "") {
   const continuityAgreement = continuityTerms.some((term) => text.includes(term));
   return {
     greeting: intent === "saludo",
     framing: intent === "rol_entrevistador" || intent === "cortesia_vinculo" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento",
-    openQuestion: /^(presentacion_personal_abierta|motivo_de_consulta|seguimiento_contextual|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
+    openQuestion: /^(presentacion_personal_abierta|motivo_de_consulta|preocupacion_principal|seguimiento_contextual|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
     closedQuestion: intent.startsWith("pregunta_") || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "nombre" || intent === "edad",
     validation: intent === "validacion_emocional",
     judgment: intent === "juicio_o_critica",
@@ -442,6 +470,7 @@ function toLegacyCategories(intent, matches, text = "") {
     empathicSummary: intent === "seguimiento_contextual",
     followUp: intent === "seguimiento_contextual",
     preferencesExploration: intent === "preferencias_valoracion",
+    concernExploration: intent === "preocupacion_principal",
     repeatedQuestion: false
   };
 }

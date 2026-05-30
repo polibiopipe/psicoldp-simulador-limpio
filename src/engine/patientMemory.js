@@ -141,8 +141,12 @@ function topicFromIntent(intent) {
   if (intent === "pregunta_laboral") return "trabajo";
   if (intent === "pregunta_videojuegos") return "digital";
   if (intent === "pregunta_habitos") return "habitos";
+  if (intent === "motivo_de_consulta") return "motivo_de_consulta";
   if (intent === "ocupacion_actividad") return "ocupacion";
   if (intent === "vivienda_residencia") return "vivienda";
+  if (intent === "preocupacion_principal") return "preocupacion";
+  if (intent === "validacion_emocional") return "validacion";
+  if (intent === "cierre") return "cierre";
   if (intent === "exploracion_emocional") return "emocion";
   if (intent === "preferencias_valoracion") return "preferencias";
   if (intent === "presentacion_estudiante") return "presentacion";

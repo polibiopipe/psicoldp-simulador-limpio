@@ -7,6 +7,7 @@ const intentToFact = {
   edad: "age",
   vivienda_residencia: "residence",
   motivo_de_consulta: "motive",
+  preocupacion_principal: "concern",
   pregunta_escolar: "school",
   pregunta_academica: "academic",
   pregunta_laboral: "works",
@@ -245,6 +246,12 @@ export function selectResponse({ caseId, intentResult, memory }) {
   } else if (intent === "ocupacion_actividad") {
     candidates = occupationResponses[caseId] || [facts.works || facts.academic || facts.school].filter(Boolean);
     responseType = "ocupacion_actividad";
+  } else if (intent === "preocupacion_principal") {
+    candidates = buildConcernCandidates(facts);
+    responseType = "preocupacion_principal";
+  } else if (intent === "cierre" && intentResult.categories?.continuityAgreement) {
+    candidates = buildContinuityCandidates(facts);
+    responseType = "cierre:continuidad";
   } else {
     candidates = responses[intent] || [];
   }
@@ -292,9 +299,27 @@ export function selectResponse({ caseId, intentResult, memory }) {
 }
 
 function factToResponse(intent, facts) {
-  if (intent === "nombre") return facts.name === "Tomás" || facts.name === "Elena" ? `Me llamo ${facts.name}.` : `${facts.name}.`;
+  if (intent === "nombre") return `Me llamo ${facts.name}.`;
   if (intent === "edad") return `Tengo ${facts.age}.`;
   return facts[intentToFact[intent]] || "No sé bien cómo responder eso.";
+}
+
+function buildConcernCandidates(facts) {
+  return [
+    facts.concern,
+    facts.concreteConcern,
+    ...(facts.concreteDisclosures || []).slice(0, 2)
+  ].filter(Boolean);
+}
+
+function buildContinuityCandidates(facts) {
+  const concern = facts.concreteConcern || facts.concern;
+  const expectation = facts.expectation;
+  return [
+    joinNatural("Creo que podríamos seguir hablando de eso.", concern),
+    joinNatural("Me gustaría retomar esto con calma en otra sesión.", expectation),
+    joinNatural("Quedaría pendiente ordenar mejor lo que me pasa.", concern)
+  ].filter(Boolean);
 }
 
 function forceConcreteDisclosure({ intent, intentResult, memory, facts, responses, currentCandidates }) {

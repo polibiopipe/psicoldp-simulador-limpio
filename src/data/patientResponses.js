@@ -333,7 +333,7 @@ function buildResponses(caseId, kit) {
 }
 
 function nameResponse(name) {
-  return name === "Tomás" || name === "Elena" ? `Me llamo ${name}.` : `${name}.`;
+  return `Me llamo ${name}.`;
 }
 
 function buildSeguimiento(seguimiento) {

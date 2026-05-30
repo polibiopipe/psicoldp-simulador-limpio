@@ -10,14 +10,18 @@ export const standardConversationAuditFlow = [
   "¿Por qué viniste hoy?",
   "¿Dónde vives?",
   "¿A qué te dedicas?",
-  "¿Qué te preocupa de esto?",
+  "¿Qué te preocupa?",
   "A qué te refieres con eso?",
   "No estoy para juzgarte, quiero comprender lo que te sucede.",
   "¿Qué crees que podríamos seguir conversando en una próxima sesión?"
 ];
 
-export function runConversationAudit({ caseIds = cases.map((caseItem) => caseItem.id), difficulty = "intermedio" } = {}) {
+export function runBasicConversationAudit({ caseIds = cases.map((caseItem) => caseItem.id), difficulty = "intermedio" } = {}) {
   return caseIds.map((caseId) => runCaseAudit({ caseId, difficulty }));
+}
+
+export function runConversationAudit(options = {}) {
+  return runBasicConversationAudit(options);
 }
 
 export function runCaseAudit({ caseId, difficulty = "intermedio", flow = standardConversationAuditFlow }) {
@@ -74,6 +78,7 @@ export function summarizeAuditResults(results) {
       turn.intent !== "presentacion_estudiante"
   );
   const fallbackTurns = flattenedTurns.filter((turn) => turn.fallbackUsed);
+  const basicIntentFallbackTurns = fallbackTurns.filter((turn) => requiredBasicIntents.includes(turn.intent));
   const evasivePresentationTurns = flattenedTurns.filter(
     (turn) =>
       turn.intent === "presentacion_estudiante" &&
@@ -86,12 +91,28 @@ export function summarizeAuditResults(results) {
     presentationFailures: presentationFailures.length,
     evasivePresentationTurns: evasivePresentationTurns.length,
     fallbackTurns: fallbackTurns.length,
+    basicIntentFallbackTurns: basicIntentFallbackTurns.length,
     fallbackSamples: fallbackTurns.slice(0, 5)
   };
 }
 
+const requiredBasicIntents = [
+  "saludo",
+  "presentacion_estudiante",
+  "encuadre_o_consentimiento",
+  "nombre",
+  "edad",
+  "motivo_de_consulta",
+  "vivienda_residencia",
+  "ocupacion_actividad",
+  "preocupacion_principal",
+  "validacion_emocional",
+  "seguimiento_contextual",
+  "cierre"
+];
+
 if (typeof process !== "undefined" && process.argv[1]?.endsWith("conversationTestSuite.js")) {
-  const results = runConversationAudit();
+  const results = runBasicConversationAudit();
   const summary = summarizeAuditResults(results);
   if (process.argv.includes("--json")) {
     console.log(JSON.stringify({ summary, results }, null, 2));
