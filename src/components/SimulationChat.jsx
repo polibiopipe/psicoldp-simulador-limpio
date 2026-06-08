@@ -4,6 +4,11 @@ import { PatientCard } from "./PatientCard.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
 import { VoiceDictationButton } from "./VoiceDictationButton.jsx";
+import {
+  getStageSuggestions,
+  guidedInterventionTypes,
+  resolveConversationStage
+} from "../data/guidedConversation.js";
 
 export function SimulationChat({
   caseItem,
@@ -17,11 +22,24 @@ export function SimulationChat({
   onChangeCase
 }) {
   const [question, setQuestion] = useState("");
+  const [selectedInterventionType, setSelectedInterventionType] = useState("");
+  const [showStageSuggestions, setShowStageSuggestions] = useState(false);
   const [validationFeedback, setValidationFeedback] = useState("");
   const conversationRef = useRef(null);
-  const writingSuggestion = validationFeedback || analyzeWritingQuality(question);
   const visibleHistory = history.filter(isDisplayableEntry);
   const interviewTurns = visibleHistory.filter((entry) => !entry.isSessionPrelude);
+  const currentStage = resolveConversationStage({
+    sessionNumber,
+    history: interviewTurns,
+    selectedInterventionType
+  });
+  const stageSuggestions = getStageSuggestions(currentStage.stageName).slice(0, 3);
+  const lastConfidence = visibleHistory.at(-1)?.analysis?.confidence;
+  const lowConfidenceSuggestion =
+    lastConfidence && lastConfidence < 0.55 && !selectedInterventionType
+      ? "Si la respuesta no fue suficientemente precisa, prueba seleccionar un tipo de intervención antes de enviar."
+      : "";
+  const writingSuggestion = validationFeedback || lowConfidenceSuggestion || analyzeWritingQuality(question);
 
   useEffect(() => {
     const conversation = conversationRef.current;
@@ -35,11 +53,22 @@ export function SimulationChat({
   function submitQuestion(event) {
     event.preventDefault();
     const validation = validateStudentMessage(question);
+    console.log("SEND_ATTEMPT", {
+      inputValue: question,
+      selectedInterventionType,
+      canSend: validation.isValid,
+      reasonIfBlocked: validation.isValid ? "" : validation.reason
+    });
     if (!validation.isValid) {
       setValidationFeedback(validation.suggestion);
       return;
     }
-    onAsk(question.trim());
+    const studentMessage = question.trim();
+    const patientResponse = onAsk(studentMessage, selectedInterventionType);
+    console.log("MESSAGE_SENT", {
+      studentMessage,
+      patientResponse
+    });
     setQuestion("");
     setValidationFeedback("");
   }
@@ -142,6 +171,42 @@ export function SimulationChat({
             Redacta tu pregunta con claridad. Usa puntuación y evita mensajes demasiado
             ambiguos.
           </p>
+          <div className="guided-intervention-panel">
+            <label htmlFor="intervention-type">Tipo de intervención</label>
+            <select
+              id="intervention-type"
+              value={selectedInterventionType}
+              onChange={(event) => {
+                setSelectedInterventionType(event.target.value);
+                setShowStageSuggestions(false);
+              }}
+            >
+              <option value="">Automático</option>
+              {guidedInterventionTypes.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+            <button
+              className="stage-suggestions-toggle"
+              type="button"
+              onClick={() => setShowStageSuggestions((current) => !current)}
+              aria-expanded={showStageSuggestions}
+            >
+              {showStageSuggestions ? "▾ Ocultar sugerencias" : "▸ Ver sugerencias para esta etapa"}
+            </button>
+            {showStageSuggestions && (
+              <div className="stage-suggestions">
+                <span>Intervenciones sugeridas: {currentStage.stageLabel}</span>
+                <ul>
+                  {stageSuggestions.map((suggestion) => (
+                    <li key={suggestion}>{suggestion}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
           <div className="input-row">
             <textarea
               id="student-question"

@@ -1,27 +1,40 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CalendarClock, Eye, FileText, Trash2 } from "lucide-react";
 import {
   clearAllSessionHistory,
   deleteSessionHistory,
-  getSessionHistory
+  getSessionHistoryForUser
 } from "../engine/sessionHistory.js";
+import { isSupabaseConfigured } from "../lib/supabaseClient.js";
 
-export function SavedSessions({ onBackHome }) {
-  const [sessions, setSessions] = useState(() => getSessionHistory());
+export function SavedSessions({ authSession, onBackHome }) {
+  const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const selectedSession = useMemo(
     () => sessions.find((session) => session.id === selectedId) || null,
     [sessions, selectedId]
   );
 
-  function removeSession(sessionId) {
-    deleteSessionHistory(sessionId);
-    setSessions(getSessionHistory());
+  useEffect(() => {
+    loadSessions();
+  }, [authSession?.user?.id]);
+
+  async function loadSessions() {
+    setIsLoading(true);
+    const nextSessions = await getSessionHistoryForUser(authSession);
+    setSessions(nextSessions);
+    setIsLoading(false);
+  }
+
+  async function removeSession(sessionId) {
+    await deleteSessionHistory(sessionId, authSession);
+    await loadSessions();
     if (selectedId === sessionId) setSelectedId("");
   }
 
-  function removeAllSessions() {
-    clearAllSessionHistory();
+  async function removeAllSessions() {
+    await clearAllSessionHistory(authSession);
     setSessions([]);
     setSelectedId("");
   }
@@ -34,16 +47,22 @@ export function SavedSessions({ onBackHome }) {
           Volver al inicio
         </button>
         <div>
-          <span className="eyebrow">Historial local</span>
+          <span className="eyebrow">{isSupabaseConfigured && authSession ? "Historial en la nube" : "Historial local"}</span>
           <h1>Mis sesiones guardadas</h1>
           <p>
-            Registros ficticios guardados solo en este navegador. En esta etapa no hay
-            usuarios reales ni sincronizacion en la nube.
+            Registros ficticios de entrevistas simuladas. Solo se deben usar casos
+            educativos; no ingreses informacion sensible de pacientes reales.
           </p>
         </div>
       </header>
 
-      {sessions.length === 0 ? (
+      {isLoading ? (
+        <section className="saved-empty-state">
+          <FileText aria-hidden="true" />
+          <h2>Cargando sesiones</h2>
+          <p>Estamos revisando el historial asociado a tu cuenta.</p>
+        </section>
+      ) : sessions.length === 0 ? (
         <section className="saved-empty-state">
           <FileText aria-hidden="true" />
           <h2>Aun no hay sesiones guardadas</h2>
@@ -111,7 +130,7 @@ export function SavedSessions({ onBackHome }) {
                   <section>
                     <h3>Aspectos logrados</h3>
                     <ul>
-                      {selectedSession.feedback?.strengths?.slice(0, 4).map((item) => (
+                      {(selectedSession.feedback?.strengths || []).slice(0, 4).map((item) => (
                         <li key={item}>{item}</li>
                       ))}
                     </ul>
@@ -120,7 +139,16 @@ export function SavedSessions({ onBackHome }) {
                   <section>
                     <h3>Aspectos por mejorar</h3>
                     <ul>
-                      {selectedSession.feedback?.improvements?.slice(0, 4).map((item) => (
+                      {(selectedSession.feedback?.improvements || selectedSession.feedback?.nextSuggestions || []).slice(0, 4).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3>Sugerencias</h3>
+                    <ul>
+                      {(selectedSession.feedback?.nextSuggestions || []).slice(0, 4).map((item) => (
                         <li key={item}>{item}</li>
                       ))}
                     </ul>

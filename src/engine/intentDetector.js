@@ -1,4 +1,5 @@
 import { normalizeText } from "../utils/textUtils.js";
+import { isCompositeOpenQuestionMessage } from "./compositeResponses.js";
 
 const intentLexicon = {
   saludo: ["hola", "buenos dias", "buen dia", "buenas tardes", "buenas noches", "como estas", "como te encuentras"],
@@ -276,7 +277,9 @@ export function detectIntent(studentMessage, history = []) {
 
   matches.presentacion_estudiante = matches.presentacion_estudiante || detectsStudentPresentation(text);
   matches.encuadre_o_consentimiento = matches.encuadre_o_consentimiento || detectsFraming(text);
-  matches.encuadre_mas_pregunta_abierta = detectsCompoundFramingQuestion(text, matches);
+  matches.encuadre_mas_pregunta_abierta =
+    isCompositeOpenQuestionMessage(studentMessage) ||
+    detectsCompoundFramingQuestion(text, matches);
   matches.ocupacion_actividad = matches.ocupacion_actividad || detectsOccupationActivity(text);
   matches.vivienda_residencia = matches.vivienda_residencia || detectsResidenceQuestion(text);
   matches.preocupacion_principal = matches.preocupacion_principal || detectsMainConcernQuestion(text);

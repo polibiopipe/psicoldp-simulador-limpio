@@ -85,6 +85,31 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
         </section>
       )}
 
+      {report.guidedInterventionFeedback && (
+        <section className="feedback-block">
+          <h2>Uso del selector de intervención</h2>
+          <p>{report.guidedInterventionFeedback.summary}</p>
+          {report.guidedInterventionFeedback.counts.length > 0 && (
+            <ul>
+              {report.guidedInterventionFeedback.counts.map((item) => (
+                <li key={item.typeId}>
+                  {item.label}: {item.count} intervención(es).
+                </li>
+              ))}
+              <li>
+                Coherencia selector-texto: {report.guidedInterventionFeedback.coherentCount} de{" "}
+                {report.guidedInterventionFeedback.totalGuided} intervención(es) guiadas.
+              </li>
+            </ul>
+          )}
+          <ul>
+            {report.guidedInterventionFeedback.suggestions.map((suggestion) => (
+              <li key={suggestion}>{suggestion}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="criteria-list">
         {report.criteria.map((criterion) => (
           <article className={`criterion ${criterion.level}`} key={criterion.id}>

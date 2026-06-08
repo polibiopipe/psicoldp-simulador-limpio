@@ -1,5 +1,6 @@
 import { patientFacts } from "../data/patientFacts.js";
 import { patientResponses } from "../data/patientResponses.js";
+import { forceCompositeOpenQuestionResponse } from "./compositeResponses.js";
 import { isEvasivePatientResponse } from "./patientMemory.js";
 
 const intentToFact = {
@@ -267,7 +268,7 @@ export function selectResponse({ caseId, intentResult, memory }) {
     candidates = buildPresentation(intentResult.studentName || "");
     responseType = "presentacion_estudiante";
   } else if (intent === "encuadre_mas_pregunta_abierta") {
-    candidates = buildCompoundFramingQuestionCandidates({ caseId, facts });
+    candidates = [forceCompositeOpenQuestionResponse(caseId, facts)];
     responseType = "encuadre_mas_pregunta_abierta";
   } else if (intent === "encuadre_o_consentimiento") {
     candidates = framingResponses[caseId] || ["Entiendo. Está bien, podemos conversar con calma."];

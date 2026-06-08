@@ -1,11 +1,20 @@
 import { generateLocalPatientResponse } from "../engine/localMiniAI.js";
 
-export function createPatientResponse({ caseItem, difficulty, question, history }) {
+export function createPatientResponse({
+  caseItem,
+  difficulty,
+  question,
+  history,
+  sessionNumber = 1,
+  selectedInterventionType = ""
+}) {
   const result = generateLocalPatientResponse({
     caseId: caseItem.id,
     studentMessage: question,
     history,
-    difficulty
+    difficulty,
+    sessionNumber,
+    selectedInterventionType
   });
 
   return {
@@ -20,10 +29,12 @@ export function createPatientResponse({ caseItem, difficulty, question, history 
       text: result.intentResult.normalizedText,
       detectedIntent: result.intent,
       contextualTopic: result.intentResult.contextualTopic,
+      confidence: result.confidence,
       categories: result.intentResult.categories,
       categoryList: Object.entries(result.intentResult.categories)
         .filter(([, value]) => value)
-        .map(([key]) => key)
+        .map(([key]) => key),
+      guidedIntervention: result.debug.guided
     },
     patientState: {
       trustLevel: result.memoryUpdate.trustLevel,
@@ -31,6 +42,7 @@ export function createPatientResponse({ caseItem, difficulty, question, history 
       opennessLevel: result.memoryUpdate.opennessLevel,
       repeatedQuestion: false
     },
-    responseCategory: result.intent
+    responseCategory: result.intent,
+    guidedIntervention: result.debug.guided
   };
 }

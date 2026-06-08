@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { cases, difficultyOptions } from "./data/cases.js";
 import { createPatientResponse } from "./utils/responseEngine.js";
 import { buildEducationalReport } from "./utils/scoring.js";
@@ -18,6 +18,8 @@ import { ResultsSummary } from "./components/ResultsSummary.jsx";
 import { EthicalNotice } from "./components/EthicalNotice.jsx";
 import { SessionClosure } from "./components/SessionClosure.jsx";
 import { SavedSessions } from "./components/SavedSessions.jsx";
+import { AuthScreen } from "./components/AuthScreen.jsx";
+import { isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
 
 const screens = {
   home: "home",
@@ -36,10 +38,39 @@ export default function App() {
   const [sessionNumber, setSessionNumber] = useState(1);
   const [sessionSummary, setSessionSummary] = useState(null);
   const [sessionSummaries, setSessionSummaries] = useState(() => getSessionSummariesForCase(cases[0].id));
+  const [authSession, setAuthSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
+  const [saveStatus, setSaveStatus] = useState(null);
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
   const report = useMemo(() => buildEducationalReport(history, selectedCase), [history, selectedCase]);
   const availableSessions = useMemo(() => getAvailableSessions(sessionSummaries), [sessionSummaries]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) {
+      setAuthLoading(false);
+      return undefined;
+    }
+
+    let isMounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted) return;
+      setAuthSession(data.session);
+      setAuthLoading(false);
+    });
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setAuthSession(nextSession);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   function resetConversation(nextScreen = screens.brief) {
     setHistory(sessionNumber > 1 ? [createSessionPrelude(selectedCase, sessionNumber, sessionSummary)] : []);
@@ -65,6 +96,7 @@ export default function App() {
     setSessionNumber(session);
     setSessionSummary(summary);
     setHistory(session > 1 ? [createSessionPrelude(selectedCase, session, summary)] : []);
+    setSaveStatus(null);
     setScreen(screens.simulation);
   }
 
@@ -99,15 +131,18 @@ export default function App() {
     setSessionNumber(1);
     setSessionSummary(null);
     setSessionSummaries(getSessionSummariesForCase(selectedCase.id));
+    setSaveStatus(null);
     setScreen(screens.home);
   }
 
-  function handleAsk(question) {
+  function handleAsk(question, selectedInterventionType = "") {
     const response = createPatientResponse({
       caseItem: selectedCase,
       difficulty,
       question,
-      history
+      history,
+      sessionNumber,
+      selectedInterventionType
     });
 
     setHistory((current) => [
@@ -120,25 +155,108 @@ export default function App() {
         analysis: response.analysis,
         patientState: response.patientState,
         responseCategory: response.responseCategory,
+        interventionType: selectedInterventionType,
+        guidedIntervention: response.guidedIntervention,
+        conversationStage: response.guidedIntervention
+          ? {
+              sessionNumber,
+              stageName: response.guidedIntervention.stageName,
+              stageLabel: response.guidedIntervention.stageLabel
+            }
+          : null,
         createdAt: new Date().toISOString()
       }
     ]);
+
+    return response.text;
   }
 
-  function finishSession() {
+  async function finishSession() {
+    setSaveStatus({
+      type: "saving",
+      message: "Guardando sesion..."
+    });
     const sessionRecord = buildSessionHistoryRecord({
       caseItem: selectedCase,
       history,
       report,
       sessionNumber
     });
-    saveSessionHistory(sessionRecord);
+    const saveResult = await saveSessionHistory(sessionRecord);
+    if (saveResult.cloudSaved) {
+      setSaveStatus({
+        type: "success",
+        message: "Sesion guardada correctamente."
+      });
+    } else if (saveResult.error) {
+      setSaveStatus({
+        type: "error",
+        message:
+          typeof saveResult.error === "string"
+            ? saveResult.error
+            : saveResult.error.message || "No se pudo guardar la sesion en Supabase."
+      });
+    } else {
+      setSaveStatus({
+        type: "local",
+        message: "Modo local: Supabase no esta configurado. El historial no se guardara en la nube."
+      });
+    }
     setScreen(screens.results);
+  }
+
+  async function handleSignOut() {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    setHistory([]);
+    setSessionNumber(1);
+    setSessionSummary(null);
+    setScreen(screens.home);
+  }
+
+  if (authLoading) {
+    return (
+      <main className="app-shell">
+        <EthicalNotice compact />
+        <section className="screen auth-screen">
+          <div className="auth-card">
+            <span className="eyebrow">Cargando acceso</span>
+            <h1>Preparando tu sesion</h1>
+            <p>Estamos verificando si ya tienes una sesion activa.</p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (isSupabaseConfigured && !authSession) {
+    return (
+      <main className="app-shell">
+        <EthicalNotice compact />
+        <AuthScreen />
+      </main>
+    );
   }
 
   return (
     <main className={`app-shell ${screen === screens.simulation ? "simulation-mode" : ""}`}>
       <EthicalNotice compact={screen !== screens.home} />
+      <div className="user-session-bar">
+        {isSupabaseConfigured && authSession ? (
+          <>
+            <span>{authSession.user.email}</span>
+            <button className="secondary-action" type="button" onClick={() => setScreen(screens.savedSessions)}>
+              Mis sesiones
+            </button>
+            <button className="danger-action" type="button" onClick={handleSignOut}>
+              Cerrar sesion
+            </button>
+          </>
+        ) : (
+          <span>Modo local: Supabase no esta configurado. El historial no se guardara en la nube.</span>
+        )}
+      </div>
 
       {screen === screens.home && (
         <Home
@@ -148,7 +266,7 @@ export default function App() {
       )}
 
       {screen === screens.savedSessions && (
-        <SavedSessions onBackHome={goHome} />
+        <SavedSessions authSession={authSession} onBackHome={goHome} />
       )}
 
       {screen === screens.select && (
@@ -191,6 +309,16 @@ export default function App() {
 
       {screen === screens.results && (
         <section className="results-layout screen">
+          {saveStatus && (
+            <div className={`save-status ${saveStatus.type}`}>
+              {saveStatus.message}
+              {saveStatus.type === "success" && (
+                <button className="secondary-action" type="button" onClick={() => setScreen(screens.savedSessions)}>
+                  Ver Mis sesiones
+                </button>
+              )}
+            </div>
+          )}
           <ResultsSummary report={report} caseItem={selectedCase} history={history} sessionNumber={sessionNumber} />
           <FeedbackPanel
             report={report}

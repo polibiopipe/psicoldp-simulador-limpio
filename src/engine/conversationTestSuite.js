@@ -17,7 +17,7 @@ export const standardConversationAuditFlow = [
 ];
 
 export const compoundFramingAuditMessage =
-  "Antes de comenzar quisiera explicarte el objetivo de esta entrevista. ¿Qué te gustaría que entienda de lo que estás viviendo?";
+  "antes de comenzar quisiera explicarte el objetivo de esta entrevista qué te gustaría que entienda de lo que estás viviendo";
 
 export function runBasicConversationAudit({ caseIds = cases.map((caseItem) => caseItem.id), difficulty = "intermedio" } = {}) {
   return caseIds.map((caseId) => runCaseAudit({ caseId, difficulty }));

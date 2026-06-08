@@ -1,3 +1,6 @@
+import { patientFacts } from "../data/patientFacts.js";
+import { forceCompositeOpenQuestionResponse, isIncompleteCompositeResponse } from "./compositeResponses.js";
+
 const forbiddenClinicalTerms = [
   "ansiedad social",
   "síntomas",
@@ -33,6 +36,13 @@ export function composeFinalResponse({ selectedResponse, memory }) {
   response = limitSentences(response, memory.opennessLevel, selectedResponse.responseType);
   response = avoidExactRepetition(response, memory.lastPatientMessage, memory.caseId);
   response = ensurePunctuation(response);
+
+  if (
+    selectedResponse.responseType === "encuadre_mas_pregunta_abierta" &&
+    isIncompleteCompositeResponse(response)
+  ) {
+    response = ensurePunctuation(forceCompositeOpenQuestionResponse(memory.caseId, patientFacts[memory.caseId]));
+  }
 
   return response;
 }

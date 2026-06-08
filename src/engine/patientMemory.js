@@ -42,9 +42,10 @@ export function buildPatientMemory({ caseId, history = [], difficulty = "interme
 export function updatePatientMemory({ memory, intent, intentResult, responseId, responseText, studentMessage }) {
   let trustLevel = memory.trustLevel;
   if (intent === "validacion_emocional") trustLevel += 12;
+  if (intent === "saludo_simple") trustLevel += 3;
   if (intent === "cortesia_vinculo") trustLevel += 6;
   if (intent === "presentacion_estudiante") trustLevel += 4;
-  if (intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta_abierta") trustLevel += 6;
+  if (intent === "encuadre" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta" || intent === "encuadre_mas_pregunta_abierta") trustLevel += 6;
   if (intent === "presentacion_personal_abierta" || intent === "motivo_de_consulta") trustLevel += 2;
   if (intent === "seguimiento_contextual") trustLevel += 4;
   if (intent === "exploracion_emocional" || intent === "exploracion_contextual") trustLevel += 5;
@@ -72,7 +73,7 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
     hadValidation: memory.hadValidation || intent === "validacion_emocional",
     hadJudgment: memory.hadJudgment || intent === "juicio_o_critica",
     hadRushedAdvice: memory.hadRushedAdvice || intent === "consejo_apresurado",
-    hadFraming: memory.hadFraming || intent === "rol_entrevistador" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta_abierta",
+    hadFraming: memory.hadFraming || intent === "saludo_simple" || intent === "rol_entrevistador" || intent === "presentacion_estudiante" || intent === "encuadre" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta" || intent === "encuadre_mas_pregunta_abierta",
     hadClosure: memory.hadClosure || intent === "cierre",
     hadFollowUp: memory.hadFollowUp || intent === "seguimiento_contextual"
   };
@@ -150,7 +151,10 @@ function topicFromIntent(intent) {
   if (intent === "exploracion_emocional") return "emocion";
   if (intent === "preferencias_valoracion") return "preferencias";
   if (intent === "presentacion_estudiante") return "presentacion";
+  if (intent === "saludo_simple") return "saludo";
+  if (intent === "encuadre") return "encuadre";
   if (intent === "encuadre_o_consentimiento") return "encuadre";
+  if (intent === "encuadre_mas_pregunta") return "encuadre_y_pregunta";
   if (intent === "encuadre_mas_pregunta_abierta") return "encuadre_y_pregunta";
   return null;
 }

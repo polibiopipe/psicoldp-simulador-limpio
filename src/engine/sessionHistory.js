@@ -1,4 +1,5 @@
 import { buildSessionSummary } from "./sessionMemory.js";
+import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 
 const HISTORY_STORAGE_KEY = "simuladorClinicoLdp.sessionHistory.v1";
 const LOCAL_STUDENT_ID = "local-browser-student";
@@ -24,6 +25,8 @@ export function buildSessionHistoryRecord({
       question: entry.question,
       answer: entry.answer,
       responseCategory: entry.responseCategory,
+      interventionType: entry.interventionType,
+      guidedIntervention: entry.guidedIntervention,
       patientState: entry.patientState,
       createdAt: entry.createdAt
     }));
@@ -31,7 +34,7 @@ export function buildSessionHistoryRecord({
   return {
     id: createHistoryId(caseItem.id, sessionNumber),
     storageVersion: 1,
-    storageScope: "localStorage",
+    storageScope: isSupabaseConfigured ? "supabase" : "localStorage",
     studentScope: LOCAL_STUDENT_ID,
     caseId: caseItem.id,
     caseName: caseItem.name,
@@ -68,16 +71,57 @@ export function buildSessionHistoryRecord({
   };
 }
 
-export function saveSessionHistory(record) {
-  if (!canUseStorage() || !record) return false;
-  const sessions = getSessionHistory();
+export async function saveSessionHistory(record) {
+  if (!record) {
+    return {
+      localSaved: false,
+      cloudSaved: false,
+      error: "No hay registro de sesion para guardar."
+    };
+  }
+
   const nextRecord = {
     ...record,
     updatedAt: new Date().toISOString()
   };
-  const filtered = sessions.filter((session) => session.id !== nextRecord.id);
-  globalThis.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify([nextRecord, ...filtered]));
-  return true;
+  if (canUseStorage()) saveLocalSessionHistory(nextRecord);
+
+  if (!isSupabaseConfigured || !supabase) {
+    return { localSaved: true, cloudSaved: false, mode: "local" };
+  }
+
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  console.log("SAVE_SESSION_USER", user);
+
+  if (userError || !user) {
+    const errorMessage = "No se pudo guardar la sesion porque no hay usuario autenticado.";
+    console.error("SAVE_SESSION_ERROR", userError || errorMessage);
+    return {
+      localSaved: canUseStorage(),
+      cloudSaved: false,
+      error: errorMessage
+    };
+  }
+
+  const payload = mapRecordToSupabasePayload(nextRecord, user);
+  console.log("SAVE_SESSION_ATTEMPT", payload);
+
+  const { data, error } = await supabase
+    .from("simulation_sessions")
+    .insert(payload)
+    .select();
+
+  if (error) {
+    console.error("SAVE_SESSION_ERROR", error);
+    return { localSaved: true, cloudSaved: false, error };
+  }
+
+  console.log("SAVE_SESSION_SUCCESS", data);
+  return { localSaved: true, cloudSaved: true, data };
 }
 
 export function getSessionHistory() {
@@ -95,17 +139,60 @@ export function getSessionHistoryById(sessionId) {
   return getSessionHistory().find((session) => session.id === sessionId) || null;
 }
 
-export function deleteSessionHistory(sessionId) {
+export async function getSessionHistoryForUser(authSession = null) {
+  if (!isSupabaseConfigured || !supabase || !authSession?.user) return getSessionHistory();
+
+  const { data, error } = await supabase
+    .from("simulation_sessions")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("LOAD_SESSIONS_ERROR", error);
+    return getSessionHistory();
+  }
+
+  return (data || []).map(mapSupabaseRowToRecord);
+}
+
+export async function deleteSessionHistory(sessionId, authSession = null) {
+  if (isSupabaseConfigured && supabase && authSession?.user) {
+    const { error } = await supabase
+      .from("simulation_sessions")
+      .delete()
+      .eq("id", sessionId)
+      .eq("user_id", authSession.user.id);
+    if (error) {
+      console.warn("No se pudo eliminar la sesion en Supabase.", error);
+    }
+  }
+
   if (!canUseStorage()) return false;
   const sessions = getSessionHistory().filter((session) => session.id !== sessionId);
   globalThis.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(sessions));
   return true;
 }
 
-export function clearAllSessionHistory() {
+export async function clearAllSessionHistory(authSession = null) {
+  if (isSupabaseConfigured && supabase && authSession?.user) {
+    const { error } = await supabase
+      .from("simulation_sessions")
+      .delete()
+      .eq("user_id", authSession.user.id);
+    if (error) {
+      console.warn("No se pudo eliminar todo el historial en Supabase.", error);
+    }
+  }
+
   if (!canUseStorage()) return false;
   globalThis.localStorage.removeItem(HISTORY_STORAGE_KEY);
   return true;
+}
+
+function saveLocalSessionHistory(record) {
+  const sessions = getSessionHistory();
+  const filtered = sessions.filter((session) => session.id !== record.id);
+  globalThis.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify([record, ...filtered]));
 }
 
 function createHistoryId(caseId, sessionNumber) {
@@ -117,4 +204,55 @@ function createHistoryId(caseId, sessionNumber) {
 
 function canUseStorage() {
   return typeof globalThis !== "undefined" && Boolean(globalThis.localStorage);
+}
+
+function mapRecordToSupabasePayload(record, user) {
+  const feedbackPayload = {
+    ...record.feedback,
+    summary: record.summary,
+    patientOpenness: record.patientOpenness,
+    continuityAgreement: record.continuityAgreement,
+    sessionSummary: record.sessionSummary
+  };
+
+  return {
+    user_id: user.id,
+    user_email: user.email,
+    case_id: record.caseId,
+    case_name: record.caseName,
+    session_number: record.sessionNumber,
+    conversation: record.conversationHistory,
+    feedback: feedbackPayload,
+    score: Math.round(record.patientOpenness?.final ?? 0),
+    created_at: record.createdAt
+  };
+}
+
+function mapSupabaseRowToRecord(row) {
+  return {
+    id: row.id,
+    storageVersion: 1,
+    storageScope: "supabase",
+    studentScope: row.user_id,
+    userEmail: row.user_email,
+    caseId: row.case_id,
+    caseName: row.case_name,
+    sessionNumber: row.session_number,
+    createdAt: row.created_at,
+    updatedAt: row.created_at,
+    conversationHistory: row.conversation || [],
+    summary: row.feedback?.summary || {
+      brief: "Sesion guardada en Supabase.",
+      closure: "Detalle disponible en el historial guardado."
+    },
+    feedback: row.feedback || {},
+    patientOpenness: row.feedback?.patientOpenness || {
+      final: row.score,
+      label: "Registrada",
+      delta: 0,
+      level: "registrada"
+    },
+    continuityAgreement: row.feedback?.continuityAgreement || "",
+    sessionSummary: row.feedback?.sessionSummary || null
+  };
 }

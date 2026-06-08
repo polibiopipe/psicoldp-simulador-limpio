@@ -1,4 +1,5 @@
 import { rubricCriteria, levelLabels } from "../data/rubrics.js";
+import { guidedInterventionTypes } from "../data/guidedConversation.js";
 import { analyzeTherapeuticApproaches } from "../engine/therapeuticApproachAnalyzer.js";
 import { getTrustStage, summarizeConversationMemory } from "./analyzeStudentInput.js";
 
@@ -16,6 +17,7 @@ function labelFor(score) {
 export function buildEducationalReport(history, caseItem) {
   const scoredHistory = history.filter((entry) => !entry.isSessionPrelude);
   const therapeuticApproach = analyzeTherapeuticApproaches(scoredHistory.map((entry) => entry.question));
+  const guidedInterventionFeedback = analyzeGuidedInterventionUsage(scoredHistory);
   const memory = summarizeConversationMemory(scoredHistory);
   const turnCount = scoredHistory.length;
   const hasJudgment = memory.judgment > 0;
@@ -124,6 +126,7 @@ export function buildEducationalReport(history, caseItem) {
     },
     criteria,
     therapeuticApproach,
+    guidedInterventionFeedback,
     strengths: strengths.length ? strengths : ["Mantuviste la entrevista activa y generaste oportunidades de exploración."],
     improvements,
     bondMoments: bondMoments.length ? bondMoments : ["No se observaron momentos claros de aumento de apertura; prioriza validación y preguntas abiertas."],
@@ -140,5 +143,78 @@ export function buildEducationalReport(history, caseItem) {
     ],
     ethicalNotice:
       "Informe formativo basado en una simulación con datos ficticios. No corresponde a diagnóstico, tratamiento ni intervención clínica real."
+  };
+}
+
+function analyzeGuidedInterventionUsage(history) {
+  const guidedTurns = history.filter((entry) => entry.guidedIntervention || entry.analysis?.guidedIntervention);
+  if (!guidedTurns.length) {
+    return {
+      usedSelector: false,
+      summary: "No se usó el selector de tipo de intervención. El sistema funcionó en modo automático.",
+      counts: [],
+      coherentCount: 0,
+      totalGuided: 0,
+      suggestions: [
+        "Para estabilizar la simulación, prueba seleccionar un tipo de intervención cuando formules preguntas compuestas.",
+        "El selector puede ayudarte a practicar intención clínica: encuadre, motivo, validación, seguimiento o cierre."
+      ]
+    };
+  }
+
+  const labels = Object.fromEntries(guidedInterventionTypes.map((type) => [type.id, type.label]));
+  const countsMap = new Map();
+  let coherentCount = 0;
+  const incongruentSamples = [];
+
+  for (const entry of guidedTurns) {
+    const guided = entry.guidedIntervention || entry.analysis?.guidedIntervention;
+    const typeId = guided?.selectedInterventionType || entry.interventionType;
+    if (!typeId) continue;
+    countsMap.set(typeId, (countsMap.get(typeId) || 0) + 1);
+    if (guided?.isCoherent) {
+      coherentCount += 1;
+    } else {
+      incongruentSamples.push({
+        typeLabel: labels[typeId] || typeId,
+        question: entry.question
+      });
+    }
+  }
+
+  const counts = Array.from(countsMap.entries())
+    .map(([typeId, count]) => ({
+      typeId,
+      label: labels[typeId] || typeId,
+      count
+    }))
+    .sort((a, b) => b.count - a.count);
+  const coherenceRatio = coherentCount / guidedTurns.length;
+  const summary =
+    coherenceRatio >= 0.75
+      ? "Usaste el selector de tipo de intervención de forma mayoritariamente coherente con tus preguntas."
+      : "Usaste el selector, pero conviene revisar mejor la coherencia entre el tipo elegido y la frase escrita.";
+  const suggestions = [
+    counts[0]
+      ? `El tipo más usado fue “${counts[0].label}”. Revisa si esa elección calza con el objetivo de cada etapa.`
+      : "Elige un tipo de intervención antes de enviar cuando quieras orientar mejor la respuesta del paciente.",
+    coherenceRatio >= 0.75
+      ? "Cuando seleccionaste un tipo y escribiste una intervención coherente, el paciente tendió a responder de forma más estable."
+      : "Si seleccionas “Motivo de consulta”, formula una pregunta sobre lo que trae al paciente; si seleccionas “Cierre”, escribe una frase de síntesis o continuidad."
+  ];
+
+  if (incongruentSamples.length) {
+    suggestions.push(
+      `Ejemplo a revisar: seleccionaste “${incongruentSamples[0].typeLabel}” para “${incongruentSamples[0].question}”.`
+    );
+  }
+
+  return {
+    usedSelector: true,
+    summary,
+    counts,
+    coherentCount,
+    totalGuided: guidedTurns.length,
+    suggestions
   };
 }
