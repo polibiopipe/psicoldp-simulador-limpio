@@ -93,6 +93,8 @@ export function generateLocalPatientResponse({
     selectedResponseId: selectedResponse.responseId,
     selectedResponse: selectedResponse.response,
     finalResponse: responseText,
+    ambiguityDetected: intentResult.ambiguityDetected,
+    explicitReferenceDetected: intentResult.explicitReferenceDetected,
     memory: memoryUpdate,
     fallbackUsed: selectedResponse.fallbackUsed,
     wasCompositeForced,
@@ -103,6 +105,8 @@ export function generateLocalPatientResponse({
           stageName: guidedResult.stage.stageName,
           stageLabel: guidedResult.stage.stageLabel,
           resolvedGuidedIntent: guidedResult.resolvedGuidedIntent,
+          coveredTopic: guidedResult.coveredTopic,
+          opennessDelta: guidedResult.opennessDelta,
           isCoherent: guidedResult.coherence.isCoherent,
           expectedIntents: guidedResult.coherence.expectedIntents,
           detectedIntentBeforeGuide: guidedResult.coherence.detectedIntent
@@ -147,7 +151,7 @@ function isDevRuntime() {
 function applyGuidedIntentResult(intentResult, guidedResult) {
   intentResult.intent = guidedResult.intent;
   intentResult.confidence = 0.98;
-  intentResult.contextualTopic = guidedResult.stage.stageName;
+  intentResult.contextualTopic = guidedResult.coveredTopic || guidedResult.stage.stageName;
   intentResult.matches = {
     ...intentResult.matches,
     [guidedResult.intent]: true
@@ -165,26 +169,28 @@ function categoriesForGuidedIntent(intent) {
       "encuadre_mas_pregunta",
       "encuadre_mas_pregunta_abierta",
       "motivo_de_consulta",
+      "derivacion_llegada_consulta",
       "respuesta_general",
       "seguimiento_contextual",
+      "seguimiento_contextual_explicito",
       "exploracion_emocional",
       "preocupacion_principal",
       "preferencias_valoracion"
     ].includes(intent),
-    closedQuestion: ["nombre", "edad", "vivienda_residencia", "ocupacion_actividad"].includes(intent),
+    closedQuestion: ["nombre", "edad", "vivienda_residencia", "ocupacion_actividad", "derivacion_llegada_consulta"].includes(intent),
     validation: intent === "validacion_emocional",
     judgment: false,
     rushedAdvice: false,
-    emotionalExploration: ["exploracion_emocional", "seguimiento_contextual"].includes(intent),
+    emotionalExploration: ["exploracion_emocional", "seguimiento_contextual", "seguimiento_contextual_explicito", "validacion_emocional"].includes(intent),
     familyExploration: intent === "exploracion_contextual" || intent === "vivienda_residencia",
-    contextExploration: ["exploracion_contextual", "vivienda_residencia", "ocupacion_actividad"].includes(intent),
+    contextExploration: ["contexto_familiar_social", "exploracion_contextual", "vivienda_residencia", "ocupacion_actividad", "derivacion_llegada_consulta"].includes(intent),
     closure: intent === "cierre",
     goodClosure: intent === "cierre",
     continuityAgreement: intent === "cierre",
     paceRespect: ["saludo_simple", "encuadre", "encuadre_o_consentimiento", "encuadre_mas_pregunta", "encuadre_mas_pregunta_abierta"].includes(intent),
-    empathicSummary: intent === "seguimiento_contextual",
-    followUp: intent === "seguimiento_contextual",
+    empathicSummary: intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito" || intent === "validacion_emocional",
+    followUp: intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito",
     preferencesExploration: intent === "preferencias_valoracion",
-    concernExploration: intent === "preocupacion_principal" || intent === "motivo_de_consulta"
+    concernExploration: intent === "preocupacion_principal" || intent === "motivo_de_consulta" || intent === "derivacion_llegada_consulta"
   };
 }

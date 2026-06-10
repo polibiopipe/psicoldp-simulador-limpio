@@ -7,8 +7,8 @@ export function Home({ onStart, onViewHistory }) {
       <header className="landing-header">
         <img
           className="brand-logo"
-          src="/logo-psicoldp.png"
-          alt="Logo PSICOLDP"
+          src="/nucleo-vivo-logo-horizontal.png"
+          alt="Núcleo Vivo"
         />
         <span className="ethical-banner">
           <ShieldCheck aria-hidden="true" />
@@ -19,7 +19,7 @@ export function Home({ onStart, onViewHistory }) {
       <div className="hero-section">
         <div className="hero-content">
           <span className="eyebrow">Plataforma formativa</span>
-          <h1 className="hero-title">Simulador Clínico LDP</h1>
+          <h1 className="hero-title">Simulador Clínico Núcleo Vivo</h1>
           <p className="hero-subtitle">
             Practica entrevistas psicológicas iniciales con pacientes virtuales ficticios,
             en un entorno seguro, ético y orientado al aprendizaje.

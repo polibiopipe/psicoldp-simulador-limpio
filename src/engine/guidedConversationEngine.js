@@ -74,6 +74,24 @@ const validationBriefByCase = {
   claudio: "Gracias. Me ayuda que no suene como que estoy inventando un problema."
 };
 
+const explicitFollowUpByCase = {
+  tomas: "Que mis papas creen que todo es por el computador, pero no es solo eso. A veces me voy a jugar porque me siento pasado a llevar o porque no se como decir lo que me pasa.",
+  valentina: "Que no es solo estar cansada. Es como si incluso cuando paro siguiera sintiendo que deberia estar haciendo algo.",
+  marcos: "Que no es solo cansancio fisico. Es como si llegara sin paciencia para nada, incluso para la gente que quiero.",
+  elena: "Que no es solo estar sola. Es que me cuesta pedir compania sin sentir que estoy molestando.",
+  nicolas: "Que no es solo que este callado. Siento que muchas veces ya decidieron que pasa conmigo antes de escucharme.",
+  camila: "Que no es solo estar ocupada. Es que digo que si aunque por dentro ya no tenga energia para seguir disponible.",
+  rodrigo: "Que no es solo separarme. Es tratar de seguir siendo papa, trabajador y estar bien, aunque por dentro todavia me mueva.",
+  fernanda: "Que no es solo volver al trabajo. Es sentir que todos van a mirar si todavia puedo rendir como antes.",
+  hector: "Que no es solo tener mas tiempo libre. Es que sin la rutina del trabajo a veces no se bien donde ponerme.",
+  daniela: "Que siento que no deberia cansarme tanto, como si descansar fuera fallarle a los demas.",
+  andres: "Que no es solo entrar a la universidad. Es sentir que estoy ahi, pero todavia mirando desde afuera.",
+  patricia: "Que no es solo querer controlar. Es miedo a perder el vinculo con mi hija y no saber como acercarme sin pelear.",
+  miguel: "Que no es solo vivir en otro pais. Es tener que empezar de nuevo y al mismo tiempo extranar quien era antes.",
+  sofia: "Que no es solo dejar de mirar o dejar de compararme. Es que despues me quedo pensando en eso mucho mas de lo que quisiera.",
+  claudio: "Que no es solo aburrimiento. Por fuera mi vida esta ordenada, pero siento que llevo tiempo viviendo en automatico."
+};
+
 const guidedCompositeOpenQuestionByCase = {
   tomas: "Ya... me sirve saberlo. Me gustaria que entendieras que no es solo que juego mucho; tambien me cuesta estar con gente en persona.",
   valentina: "Gracias. Me ayuda que lo expliques asi. Me gustaria que entendieras que estoy cansada de exigirme todo el tiempo y que descansar me da culpa.",
@@ -97,7 +115,7 @@ const guidedProgressionByCase = {
     motiveBase: "Creo que es por el tema del computador. Mis papas dicen que paso mucho tiempo jugando y que casi no salgo, pero yo siento que no es tan simple.",
     derivation: "Vine con mi mama. Ella insistio mas. Yo no se si habria venido solo, pero tampoco queria seguir peleando por lo mismo.",
     followUp: "No es solo jugar. Cuando me siento pasado a llevar o no se que hacer, me voy al computador porque ahi siento que controlo algo.",
-    emotion: "No se... me cierro. A veces me voy al computador porque ahi no tengo que explicar tanto.",
+    emotion: "A veces me cierro y me voy al computador porque ahi no tengo que explicar tanto lo que me pasa.",
     context: "Mis papas creen que el problema es el computador, pero a veces siento que no me escuchan antes de retarme.",
     repetitionFallback: "Si, tiene que ver con eso, pero no es solo el computador. Es mas que cuando me siento pasado a llevar, me encierro ahi y despues todo se transforma en pelea."
   },
@@ -285,91 +303,260 @@ export function generateGuidedPatientResponse({
       history: conversationHistory,
       selectedInterventionType
   });
-  const concreteIntent = detectConcreteQuestionIntent(studentMessage);
-  const resolvedGuidedIntent = resolveGuidedIntent({ selectedInterventionType, studentMessage });
-  const intent = concreteIntent || resolvedGuidedIntent || stageIntentByIntervention[selectedInterventionType] || intervention.intent;
-  const candidates = buildGuidedCandidates({
+  const flexibleResponse = generatePatientResponse({
+    caseData: facts,
     caseId,
-    facts,
-    intent,
-    interventionType: selectedInterventionType,
-    stage,
-    opennessLevel,
-    history: conversationHistory
-  });
-  const candidateResponse = pickUnused(candidates, conversationHistory, caseId, selectedInterventionType, stage.stageName);
-  const selected = avoidRepeatedResponse({
-    caseId,
-    candidateResponse,
-    candidatePool: candidates,
-    usedResponses: conversationHistory.map((entry) => entry.answer).filter(Boolean),
     usedResponseIds: conversationHistory.map((entry) => entry.responseId).filter(Boolean),
-    studentMessage,
     selectedInterventionType,
     conversationHistory,
-    intent,
-    stageName: stage.stageName
+    coveredTopics: collectCoveredTopics(conversationHistory),
+    opennessLevel,
+    studentMessage
   });
+  const intent = flexibleResponse.resolvedIntent;
+  const normalizedStudentMessage = normalizeText(studentMessage);
+  const explicitReferenceDetected = hasExplicitContextualReference(normalizedStudentMessage);
+  const ambiguityDetected = isAmbiguousShortMessage(normalizedStudentMessage) && !explicitReferenceDetected;
   const coherence = assessInterventionTypeCoherence({
     selectedInterventionType,
     studentMessage,
     detectedIntent,
-    concreteIntent,
-    resolvedGuidedIntent
+    concreteIntent: null,
+    resolvedGuidedIntent: intent
   });
 
-  console.log("DEBUG GUIDED INTENT", {
+  console.log("DEBUG FLEXIBLE PATIENT RESPONSE", {
+    caseId,
     selectedInterventionType,
     studentMessage,
-    resolvedGuidedIntent,
-    candidateResponseId: selected.candidateResponseId,
-    candidateResponse: selected.candidateResponse,
-    usedResponseIds: selected.usedResponseIds,
-    wasRepeated: selected.wasRepeated,
-    finalResponseId: selected.id,
-    finalResponse: selected.text,
-    responseText: selected.text
+    resolvedIntent: intent,
+    lastPatientMessage: conversationHistory.at(-1)?.answer || "",
+    usedResponseIds: conversationHistory.map((entry) => entry.responseId).filter(Boolean),
+    coveredTopics: flexibleResponse.coveredTopics,
+    opennessLevel,
+    ambiguityDetected,
+    explicitReferenceDetected,
+    selectedResponseId: flexibleResponse.responseId,
+    responseText: flexibleResponse.responseText
   });
 
   const responseType =
     intent === "encuadre_mas_pregunta" || intent === "encuadre_mas_pregunta_abierta"
       ? "encuadre_mas_pregunta_abierta"
-      : `guiado:${selectedInterventionType}:${stage.stageName}`;
+      : `guiado:flexible:${intent}`;
 
   return {
-    responseText: selected.text,
+    responseText: flexibleResponse.responseText,
     intent,
-    responseId: selected.id,
+    responseId: flexibleResponse.responseId,
     responseType,
     fallbackUsed: false,
     stage,
     selectedInterventionType,
-    resolvedGuidedIntent,
+    resolvedGuidedIntent: intent,
+    coveredTopic: flexibleResponse.coveredTopic,
+    opennessDelta: flexibleResponse.opennessDelta,
     interventionLabel: intervention.label,
     coherence
   };
 }
 
-export function resolveGuidedIntent({ selectedInterventionType, studentMessage = "" }) {
+export function generatePatientResponse({
+  caseData,
+  caseId,
+  selectedInterventionType,
+  studentMessage,
+  conversationHistory = [],
+  usedResponseIds = [],
+  coveredTopics = [],
+  opennessLevel = "apertura_media"
+}) {
+  const facts = caseData || patientFacts[caseId] || patientFacts.tomas;
+  const resolvedIntent = resolveGuidedIntent({
+    selectedInterventionType,
+    studentMessage,
+    conversationHistory
+  });
+  const coveredTopic = topicFromFlexibleIntent(resolvedIntent, studentMessage, conversationHistory);
+  const candidates = buildFlexibleCandidates({
+    caseId,
+    facts,
+    resolvedIntent,
+    selectedInterventionType,
+    studentMessage,
+    conversationHistory,
+    opennessLevel,
+    coveredTopics
+  });
+  const candidateResponse = pickUnused(candidates, conversationHistory, caseId, selectedInterventionType, resolvedIntent);
+  const selected = avoidRepeatedResponse({
+    caseId,
+    candidateResponse,
+    candidatePool: candidates,
+    usedResponses: conversationHistory.map((entry) => entry.answer).filter(Boolean),
+    usedResponseIds,
+    studentMessage,
+    selectedInterventionType,
+    conversationHistory,
+    intent: resolvedIntent,
+    stageName: resolvedIntent
+  });
+
+  return {
+    responseText: selected.text,
+    responseId: selected.id,
+    resolvedIntent,
+    coveredTopic,
+    coveredTopics: Array.from(new Set([...coveredTopics, coveredTopic].filter(Boolean))),
+    opennessDelta: opennessDeltaForIntent(resolvedIntent),
+    wasRepeated: selected.wasRepeated
+  };
+}
+
+export function resolveGuidedIntent({ selectedInterventionType, studentMessage = "", conversationHistory = [] }) {
   const text = normalizeText(studentMessage);
   if (!text) return stageIntentByIntervention[selectedInterventionType] || null;
 
   if (isSimpleGreeting(text)) return "saludo_simple";
+  if (hasExplicitContextualReference(text)) return "seguimiento_contextual_explicito";
+  if (isAmbiguousShortMessage(text)) return "respuesta_ambigua";
+  if (hasFramingCue(text) && hasOpenQuestionCue(text)) return "encuadre_mas_pregunta";
+  if (hasFramingCue(text)) return "encuadre";
+  if (hasValidationCue(text)) return "validacion_emocional";
+  if (hasClosingCue(text)) return "cierre";
+
+  const concreteIntent = detectConcreteQuestionIntent(studentMessage);
+  if (concreteIntent) return concreteIntent;
+
+  if (hasFollowUpCue(text, conversationHistory)) return "seguimiento_contextual";
+  if (hasMotiveCue(text)) return "motivo_de_consulta";
+  if (hasFamilyContextCue(text)) return "contexto_familiar_social";
 
   if (selectedInterventionType === "saludo_encuadre") {
-    const hasFraming = hasFramingCue(text);
-    const hasQuestion = hasOpenQuestionCue(text);
-    if (hasFraming && hasQuestion) return "encuadre_mas_pregunta";
-    if (hasValidationCue(text)) return "validacion_emocional";
-    if (hasFraming) return "encuadre";
     if (hasStudentPresentationCue(text)) return "presentacion_estudiante";
     return "encuadre";
   }
 
-  if (hasFramingCue(text) && hasOpenQuestionCue(text)) return "encuadre_mas_pregunta";
-  if (selectedInterventionType === "validacion_emocional" && hasValidationCue(text)) return "validacion_emocional";
-
   return stageIntentByIntervention[selectedInterventionType] || null;
+}
+
+function buildFlexibleCandidates({
+  caseId,
+  facts,
+  resolvedIntent,
+  selectedInterventionType,
+  studentMessage,
+  conversationHistory,
+  opennessLevel
+}) {
+  const progression = getGuidedProgression(caseId, facts);
+  const acknowledgement = acknowledgementByCase[caseId] || "Gracias. Podemos conversarlo con calma.";
+  const motiveWasCovered = hasUsedResponseKey(conversationHistory, `${caseId}_motivo_base`) ||
+    conversationHistory.some((entry) => areResponsesSimilar(entry.answer, progression.motiveBase));
+  const lastPatientMessage = conversationHistory.at(-1)?.answer || "";
+
+  if (resolvedIntent === "respuesta_ambigua") {
+    return [responseItem(caseId, "respuesta_ambigua", "No se bien que responder a eso.")];
+  }
+
+  if (resolvedIntent === "nombre") return [`Me llamo ${facts.name}.`];
+  if (resolvedIntent === "edad") return [`Tengo ${facts.age}.`];
+  if (resolvedIntent === "saludo_simple") return simpleGreetingByCase[caseId] || ["Hola."];
+  if (resolvedIntent === "encuadre") return framingByCase[caseId] || [acknowledgement];
+  if (resolvedIntent === "presentacion_estudiante") return simpleGreetingByCase[caseId] || ["Hola. Esta bien."];
+  if (resolvedIntent === "encuadre_mas_pregunta" || resolvedIntent === "encuadre_mas_pregunta_abierta") {
+    return [
+      responseItem(
+        caseId,
+        "encuadre_mas_pregunta",
+        guidedCompositeOpenQuestionByCase[caseId] || joinNatural(framingByCase[caseId]?.[0] || acknowledgement, facts.concreteConcern || facts.concern || facts.motive)
+      )
+    ];
+  }
+
+  if (resolvedIntent === "motivo_de_consulta") {
+    return motiveWasCovered
+      ? [
+          responseItem(caseId, "motivo_profundizacion", progression.followUp),
+          responseItem(caseId, "motivo_matiz", progression.repetitionFallback),
+          responseItem(caseId, "contexto_caso", progression.context)
+        ].filter(Boolean)
+      : [
+          responseItem(caseId, "motivo_base", progression.motiveBase),
+          responseItem(caseId, "motivo_profundizacion", progression.followUp),
+          responseItem(caseId, "preocupacion_principal", facts.concreteConcern || facts.concern)
+        ].filter(Boolean);
+  }
+
+  if (resolvedIntent === "derivacion_llegada_consulta" || resolvedIntent === "derivacion_llegada") {
+    return [
+      responseItem(caseId, "derivacion_llegada", progression.derivation),
+      responseItem(caseId, "motivo_voluntariedad", progression.repetitionFallback),
+      responseItem(caseId, "contexto_caso", progression.context)
+    ].filter(Boolean);
+  }
+
+  if (resolvedIntent === "vivienda_residencia") return [responseItem(caseId, "vivienda_residencia", residenceByCase[caseId] || facts.family)].filter(Boolean);
+  if (resolvedIntent === "ocupacion_actividad") return [responseItem(caseId, "ocupacion_actividad", occupationByCase[caseId] || facts.works || facts.academic || facts.school)].filter(Boolean);
+
+  if (resolvedIntent === "contexto_familiar_social" || resolvedIntent === "exploracion_contextual") {
+    return [
+      responseItem(caseId, "contexto_familiar", progression.context),
+      responseItem(caseId, "contexto_relacional", joinNatural(facts.family, facts.social)),
+      responseItem(caseId, "seguimiento_emocion", progression.emotion)
+    ].filter(Boolean);
+  }
+
+  if (resolvedIntent === "seguimiento_contextual_explicito") {
+    return [
+      responseForExplicitFollowUp({ caseId, facts, studentMessage, currentMessage: lastPatientMessage }),
+      responseForFollowUpTopic({ caseId, facts, studentMessage, currentMessage: lastPatientMessage }),
+      responseItem(caseId, "seguimiento_profundizacion", progression.followUp),
+      responseItem(caseId, "seguimiento_emocion", progression.emotion),
+      responseItem(caseId, "seguimiento_contexto", progression.context)
+    ].filter(Boolean);
+  }
+
+  if (resolvedIntent === "seguimiento_contextual") {
+    return [
+      responseForFollowUpTopic({ caseId, facts, studentMessage, currentMessage: lastPatientMessage }),
+      responseItem(caseId, "seguimiento_profundizacion", progression.followUp),
+      responseItem(caseId, "seguimiento_emocion", progression.emotion),
+      responseItem(caseId, "seguimiento_contexto", progression.context),
+      responseItem(caseId, "seguimiento_reformulacion", progression.repetitionFallback)
+    ].filter(Boolean);
+  }
+
+  if (resolvedIntent === "validacion_emocional") {
+    const openDetail = opennessLevel === "apertura_baja" ? progression.emotion : joinNatural(progression.emotion, progression.followUp);
+    return [
+      responseItem(caseId, "validacion_apertura", joinNatural(validationBriefByCase[caseId] || "Eso ayuda un poco.", openDetail)),
+      responseItem(caseId, "validacion_breve", validationBriefByCase[caseId]),
+      responseItem(caseId, "validacion_matiz", joinNatural("Eso ayuda un poco.", progression.repetitionFallback))
+    ].filter(Boolean);
+  }
+
+  if (resolvedIntent === "cierre") {
+    return [
+      responseItem(caseId, "cierre_continuidad", closeForSession(facts, 1)),
+      responseItem(caseId, "cierre_breve", "Si... creo que podemos retomarlo otro dia."),
+      responseItem(caseId, "cierre_matiz", joinNatural("Me parece bien dejarlo hasta aqui por ahora.", facts.expectation))
+    ].filter(Boolean);
+  }
+
+  if (selectedInterventionType === "pregunta_abierta") {
+    return [
+      responseItem(caseId, "pregunta_abierta_contextual", progression.followUp),
+      responseItem(caseId, "pregunta_abierta_emocion", progression.emotion),
+      responseItem(caseId, "pregunta_abierta_contexto", progression.context)
+    ].filter(Boolean);
+  }
+
+  return [
+    responseItem(caseId, "respuesta_general_contextual", progression.followUp),
+    responseItem(caseId, "respuesta_general_emocion", progression.emotion),
+    responseItem(caseId, "respuesta_general_contexto", progression.context)
+  ].filter(Boolean);
 }
 
 function buildGuidedCandidates({ caseId, facts, intent, interventionType, stage, opennessLevel, history }) {
@@ -508,7 +695,7 @@ function detectConcreteQuestionIntent(studentMessage = "") {
   const text = normalizeText(studentMessage);
   if (/\b(cual es tu nombre|como te llamas|me dices tu nombre|quien eres)\b/.test(text)) return "nombre";
   if (/\b(cuantos anos tienes|que edad tienes|edad)\b/.test(text)) return "edad";
-  if (/\b(viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te trajo|fue idea tuya|viniste por tu cuenta|te enviaron tus padres|te mandaron tus padres)\b/.test(text)) return "derivacion_llegada";
+  if (/\b(viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te trajo|fue idea tuya|viniste por tu cuenta|te enviaron tus padres|te mandaron tus padres)\b/.test(text)) return "derivacion_llegada_consulta";
   if (/\b(donde vives|con quien vives|vives solo|vives sola|vives con alguien|vives con tus papas|vives con tu familia|vives con tu pareja)\b/.test(text)) return "vivienda_residencia";
   if (/\b(a que te dedicas|en que trabajas|cual es tu trabajo|trabajas|estudias o trabajas|que haces actualmente|que haces durante el dia)\b/.test(text)) return "ocupacion_actividad";
   return null;
@@ -538,10 +725,10 @@ function assessInterventionTypeCoherence({ selectedInterventionType, studentMess
 
 const expectedIntentsForType = {
   saludo_encuadre: ["saludo", "saludo_simple", "encuadre", "encuadre_o_consentimiento", "encuadre_mas_pregunta", "encuadre_mas_pregunta_abierta", "cortesia_vinculo", "presentacion_estudiante", "validacion_emocional"],
-  motivo_consulta: ["motivo_de_consulta", "preocupacion_principal", "derivacion_llegada"],
+  motivo_consulta: ["motivo_de_consulta", "preocupacion_principal", "derivacion_llegada", "derivacion_llegada_consulta", "seguimiento_contextual", "seguimiento_contextual_explicito"],
   pregunta_abierta: ["respuesta_general", "motivo_de_consulta", "preocupacion_principal", "exploracion_emocional"],
   validacion_emocional: ["validacion_emocional"],
-  seguimiento: ["seguimiento_contextual", "exploracion_emocional"],
+  seguimiento: ["seguimiento_contextual", "seguimiento_contextual_explicito", "exploracion_emocional"],
   contexto_familiar_social: ["pregunta_familiar", "pregunta_social", "exploracion_contextual", "vivienda_residencia"],
   ocupacion_vivienda: ["ocupacion_actividad", "vivienda_residencia", "pregunta_laboral", "pregunta_academica", "pregunta_escolar"],
   exploracion_emocional: ["exploracion_emocional", "preocupacion_principal"],
@@ -559,6 +746,14 @@ function isSimpleGreeting(text = "") {
   );
 }
 
+function isAmbiguousShortMessage(text = "") {
+  return /^(y|ya|mmm|ah|ok|bueno|dale)$/.test(normalizeText(text));
+}
+
+function hasExplicitContextualReference(text = "") {
+  return /\b(me dijiste que|dijiste que|mencionaste que|cuando dices|cuando dijiste|a que te refieres con|que quieres decir con|que no es tan simple|por que no es tan simple|eso que dijiste|lo que mencionaste)\b/.test(text);
+}
+
 function hasFramingCue(text = "") {
   return /\b(antes de comenzar|objetivo|entrevista|espacio|confidencialidad|confidencial|explicarte|explicar|conversar con calma|podemos conversar|como funciona|fines educativos)\b/.test(text);
 }
@@ -568,11 +763,77 @@ function hasOpenQuestionCue(text = "") {
 }
 
 function hasValidationCue(text = "") {
-  return /\b(no estoy para juzgar|no vengo a juzgar|sin juzgar|no juzgarte|comprenderte|quiero comprenderte|a tu ritmo|tomarte tu tiempo|puedes tomarte tu tiempo|te escucho|lo que sientes es importante)\b/.test(text);
+  return /\b(no estoy para juzgar|no vengo a juzgar|sin juzgar|no juzgarte|comprenderte|quiero comprenderte|a tu ritmo|tomarte tu tiempo|puedes tomarte tu tiempo|te escucho|lo que sientes es importante|entiendo|comprendo|tiene sentido|no sea solo|no es solo|quiero comprender)\b/.test(text);
 }
 
 function hasStudentPresentationCue(text = "") {
   return /\b(quisiera presentarme|quiero presentarme|me presento|mi nombre es|soy quien va a conversar|soy el estudiante)\b/.test(text);
+}
+
+function hasClosingCue(text = "") {
+  return /\b(dejarlo hasta aqui|retomarlo|proxima sesion|otra sesion|cerrar|terminar por hoy|hasta aqui|continuar otro dia|podemos dejarlo)\b/.test(text);
+}
+
+function hasFollowUpCue(text = "", conversationHistory = []) {
+  const hasPreviousPatientMessage = Boolean(conversationHistory.at(-1)?.answer);
+  return (
+    hasPreviousPatientMessage &&
+    /\b(a que te refieres|a que te refieres con|que quieres decir|cuentame mas|como asi|eso tiene que ver|por que dices|que pasa cuando|que pasa con eso|que significa|en que sentido|no es tan simple|cuando sientes|cuando dices|y que pasa)\b/.test(text)
+  );
+}
+
+function hasMotiveCue(text = "") {
+  return /\b(que te trae|por que viniste|por que estas aca|por que estas aqui|motivo|que te preocupa|que paso para que vinieras|que esta pasando)\b/.test(text);
+}
+
+function hasFamilyContextCue(text = "") {
+  return /\b(casa|familia|papas|papa|mama|padres|hijos|hija|hijo|pareja|como se vive|en tu casa|con ellos|social|amigos|companeros)\b/.test(text);
+}
+
+function collectCoveredTopics(history = []) {
+  return Array.from(
+    new Set(
+      history
+        .flatMap((entry) => [
+          entry.responseCategory,
+          entry.analysis?.contextualTopic,
+          entry.conversationStage?.stageName
+        ])
+        .filter(Boolean)
+    )
+  );
+}
+
+function topicFromFlexibleIntent(intent, studentMessage = "", history = []) {
+  if (intent === "saludo_simple") return "saludo";
+  if (intent === "encuadre" || intent === "encuadre_mas_pregunta") return "encuadre";
+  if (intent === "motivo_de_consulta") return "motivo_de_consulta";
+  if (intent === "derivacion_llegada_consulta" || intent === "derivacion_llegada") return "llegada_consulta";
+  if (intent === "contexto_familiar_social" || intent === "exploracion_contextual") return "contexto";
+  if (intent === "validacion_emocional") return "validacion";
+  if (intent === "cierre") return "cierre";
+  if (intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito") {
+    const text = normalizeText(`${studentMessage} ${history.at(-1)?.answer || ""}`);
+    if (/\b(computador|jugar|juego|videojuego|videojuegos|redes|celular)\b/.test(text)) return "digital";
+    if (/\b(casa|familia|papas|padres|mama|papa|hija|hijo|pareja)\b/.test(text)) return "contexto";
+    return "seguimiento";
+  }
+  if (intent === "vivienda_residencia") return "vivienda";
+  if (intent === "ocupacion_actividad") return "ocupacion";
+  return intent || "respuesta_general";
+}
+
+function opennessDeltaForIntent(intent) {
+  if (intent === "validacion_emocional") return 8;
+  if (intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito") return 4;
+  if (intent === "encuadre" || intent === "encuadre_mas_pregunta") return 3;
+  if (intent === "juicio_o_critica") return -10;
+  if (intent === "consejo_apresurado") return -6;
+  return 0;
+}
+
+function hasUsedResponseKey(history = [], responseId) {
+  return history.some((entry) => entry.responseId === responseId);
 }
 
 function openingContinuation(facts, sessionNumber) {
@@ -628,6 +889,15 @@ function responseForFollowUpTopic({ caseId, facts, studentMessage = "", currentM
   }
 
   return responseItem(caseId, "seguimiento_profundizacion", progression.followUp);
+}
+
+function responseForExplicitFollowUp({ caseId, facts, studentMessage = "", currentMessage = "" }) {
+  const text = normalizeText(`${studentMessage} ${currentMessage}`);
+  const progression = getGuidedProgression(caseId, facts);
+  if (/\b(no es tan simple|no era tan simple|no tan simple)\b/.test(text)) {
+    return responseItem(caseId, "seguimiento_explicito_no_es_tan_simple", explicitFollowUpByCase[caseId] || progression.followUp);
+  }
+  return responseItem(caseId, "seguimiento_explicito", explicitFollowUpByCase[caseId] || progression.followUp);
 }
 
 function pickUnused(candidates, history, caseId, interventionType, stageName) {
@@ -698,7 +968,23 @@ function buildProgressiveAlternatives({ caseId, studentMessage = "", conversatio
   const progression = getGuidedProgression(caseId, facts);
   const text = normalizeText(`${studentMessage} ${conversationHistory.at(-1)?.answer || ""}`);
 
-  if (intent === "derivacion_llegada" || /\b(viniste|enviaron|mandaron|trajeron|derivaron|solo|sola)\b/.test(text)) {
+  if (intent === "validacion_emocional") {
+    return [
+      responseItem(caseId, "validacion_matiz_contextual", joinNatural("Eso ayuda un poco.", progression.emotion)),
+      responseItem(caseId, "validacion_apertura_contextual", joinNatural(validationBriefByCase[caseId] || "Gracias.", progression.repetitionFallback)),
+      responseItem(caseId, "validacion_breve", validationBriefByCase[caseId])
+    ].filter(Boolean);
+  }
+
+  if (intent === "seguimiento_contextual_explicito") {
+    return [
+      responseForExplicitFollowUp({ caseId, facts, studentMessage, currentMessage: conversationHistory.at(-1)?.answer || "" }),
+      responseForFollowUpTopic({ caseId, facts, studentMessage, currentMessage: conversationHistory.at(-1)?.answer || "" }),
+      responseItem(caseId, "seguimiento_emocion", progression.emotion)
+    ].filter(Boolean);
+  }
+
+  if (intent === "derivacion_llegada" || intent === "derivacion_llegada_consulta" || /\b(viniste|enviaron|mandaron|trajeron|derivaron|solo|sola)\b/.test(text)) {
     return [
       responseItem(caseId, "derivacion_llegada", progression.derivation),
       responseItem(caseId, "motivo_voluntariedad", progression.repetitionFallback)

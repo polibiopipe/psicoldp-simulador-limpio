@@ -2,10 +2,12 @@ import React from "react";
 import { Brain, MessageCircle, Signal } from "lucide-react";
 
 export function PatientCard({ caseItem, difficulty }) {
+  const caseImage = caseItem.image || "/casos/placeholder.png";
+
   return (
     <aside className="patient-card" style={{ "--accent": caseItem.accent }}>
-      <div className="patient-portrait" aria-hidden="true">
-        <div />
+      <div className="patient-portrait">
+        <img src={caseImage} alt={`Retrato ficticio de ${caseItem.name}`} />
       </div>
       <h2>{caseItem.name}</h2>
       <p>{caseItem.age}</p>

@@ -6,9 +6,9 @@ export function EthicalNotice({ compact = false }) {
     <aside className={compact ? "ethical-notice compact" : "ethical-notice"}>
       {compact && (
         <img
-          className="logo-psicoldp logo-psicoldp-small"
-          src="/logo-psicoldp.png"
-          alt="Logo PSICOLDP"
+          className="institutional-logo institutional-logo-small"
+          src="/nucleo-vivo-logo-horizontal.png"
+          alt="Núcleo Vivo"
         />
       )}
       <ShieldCheck aria-hidden="true" />

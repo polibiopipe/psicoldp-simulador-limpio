@@ -1,4 +1,4 @@
-# Simulador Clinico LDP
+# Simulador Clinico Nucleo Vivo
 
 Plataforma educativa para estudiantes de psicologia. Permite practicar entrevistas psicologicas iniciales con pacientes virtuales ficticios y recibir retroalimentacion formativa sobre el desempeno.
 

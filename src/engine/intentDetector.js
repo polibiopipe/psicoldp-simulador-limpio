@@ -193,6 +193,7 @@ const priority = [
   "pregunta_social",
   "pregunta_videojuegos",
   "pregunta_habitos",
+  "seguimiento_contextual_explicito",
   "validacion_emocional",
   "seguimiento_contextual",
   "juicio_o_critica",
@@ -252,7 +253,18 @@ const followUpCues = [
   "y despues que haces",
   "como lo vives",
   "cuando te pasa",
-  "en que sentido"
+  "en que sentido",
+  "me dijiste que",
+  "dijiste que",
+  "mencionaste que",
+  "cuando dices",
+  "cuando dijiste",
+  "a que te refieres con",
+  "que quieres decir con",
+  "que no es tan simple",
+  "por que no es tan simple",
+  "eso que dijiste",
+  "lo que mencionaste"
 ];
 
 const continuityTerms = [
@@ -292,24 +304,29 @@ export function detectIntent(studentMessage, history = []) {
     matches.motivo_de_consulta = false;
   }
 
-  const contextualTopic = detectContextualTopic(text, history);
-  matches.seguimiento_contextual = Boolean(contextualTopic);
+  const explicitReferenceDetected = detectsExplicitContextualReference(text);
+  const contextualTopic = detectContextualTopic(text, history, explicitReferenceDetected);
+  matches.seguimiento_contextual_explicito = Boolean(explicitReferenceDetected && history.at(-1)?.answer);
+  matches.seguimiento_contextual = Boolean(contextualTopic) && !matches.seguimiento_contextual_explicito;
 
   const intent = priority.find((candidate) => matches[candidate]) || "desconocida";
   const confidence = intent === "desconocida" ? 0.25 : contextualTopic ? 0.86 : 0.92;
+  const ambiguityDetected = isAmbiguousContextualMessage(text, explicitReferenceDetected);
 
   return {
     intent,
     confidence,
     normalizedText: text,
     contextualTopic,
+    explicitReferenceDetected,
+    ambiguityDetected,
     studentName: extractStudentName(text),
     matches,
     categories: toLegacyCategories(intent, matches, text)
   };
 }
 
-function detectContextualTopic(text, history) {
+function detectContextualTopic(text, history, explicitReferenceDetected = false) {
   if (intentLexicon.motivo_de_consulta.some((term) => text.includes(normalizeText(term)))) return null;
   if (intentLexicon.presentacion_personal_abierta.some((term) => text.includes(normalizeText(term)))) return null;
   if (detectsStudentPresentation(text) || detectsFraming(text)) return null;
@@ -321,7 +338,7 @@ function detectContextualTopic(text, history) {
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   const isBrief = wordCount <= 9;
   const hasFollowUpCue = followUpCues.some((cue) => text.includes(cue));
-  if (!lastPatientMessage || (!isBrief && !hasFollowUpCue)) return null;
+  if (!lastPatientMessage || (!isBrief && !hasFollowUpCue && !explicitReferenceDetected)) return null;
 
   for (const [topic, terms] of Object.entries(contextualTopics)) {
     if (topic === "default") continue;
@@ -332,7 +349,21 @@ function detectContextualTopic(text, history) {
   }
 
   if (hasFollowUpCue) return "default";
+  if (explicitReferenceDetected) return "default";
   return null;
+}
+
+function detectsExplicitContextualReference(text) {
+  return (
+    /\b(me dijiste que|dijiste que|mencionaste que|cuando dices|cuando dijiste)\b/.test(text) ||
+    /\b(a que te refieres con|que quieres decir con|eso que dijiste|lo que mencionaste)\b/.test(text) ||
+    /\b(que no es tan simple|por que no es tan simple)\b/.test(text)
+  );
+}
+
+function isAmbiguousContextualMessage(text, explicitReferenceDetected) {
+  if (explicitReferenceDetected) return false;
+  return /^(y|y eso|eso|como|por que|que cosa|explicate|no entiendo|como asi)$/.test(text);
 }
 
 function isGeneralOpenPrompt(text) {
@@ -487,26 +518,26 @@ function toLegacyCategories(intent, matches, text = "") {
   return {
     greeting: intent === "saludo",
     framing: intent === "rol_entrevistador" || intent === "cortesia_vinculo" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta_abierta",
-    openQuestion: /^(encuadre_mas_pregunta_abierta|presentacion_personal_abierta|motivo_de_consulta|preocupacion_principal|seguimiento_contextual|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
+    openQuestion: /^(encuadre_mas_pregunta_abierta|presentacion_personal_abierta|motivo_de_consulta|preocupacion_principal|seguimiento_contextual|seguimiento_contextual_explicito|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
     closedQuestion: intent.startsWith("pregunta_") || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "nombre" || intent === "edad",
     validation: intent === "validacion_emocional",
     judgment: intent === "juicio_o_critica",
     rushedAdvice: intent === "consejo_apresurado",
-    emotionalExploration: intent === "exploracion_emocional" || intent === "seguimiento_contextual",
+    emotionalExploration: intent === "exploracion_emocional" || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito",
     familyExploration: intent === "pregunta_familiar" || intent === "vivienda_residencia",
     academicExploration: intent === "pregunta_escolar" || intent === "pregunta_academica" || intent === "ocupacion_actividad",
     workExploration: intent === "pregunta_laboral" || intent === "ocupacion_actividad",
     digitalExploration: intent === "pregunta_videojuegos",
     supportExploration: intent === "pregunta_social",
-    contextExploration: intent.startsWith("pregunta_") || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "seguimiento_contextual" || intent === "exploracion_contextual",
+    contextExploration: intent.startsWith("pregunta_") || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito" || intent === "exploracion_contextual",
     closure: intent === "cierre",
     goodClosure: intent === "cierre" && matches.validacion_emocional,
     continuityAgreement,
     pressure: false,
     prematureInterpretation: false,
     paceRespect: intent === "cortesia_vinculo" || intent === "rol_entrevistador" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta_abierta",
-    empathicSummary: intent === "seguimiento_contextual",
-    followUp: intent === "seguimiento_contextual",
+    empathicSummary: intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito",
+    followUp: intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito",
     preferencesExploration: intent === "preferencias_valoracion",
     concernExploration: intent === "preocupacion_principal",
     repeatedQuestion: false

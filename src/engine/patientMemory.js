@@ -34,7 +34,7 @@ export function buildPatientMemory({ caseId, history = [], difficulty = "interme
     hadRushedAdvice: history.some((turn) => turn.analysis?.categories?.rushedAdvice),
     hadFraming: history.some((turn) => turn.analysis?.categories?.framing),
     hadClosure: history.some((turn) => turn.analysis?.categories?.closure),
-    hadFollowUp: history.some((turn) => turn.responseCategory === "seguimiento_contextual"),
+    hadFollowUp: history.some((turn) => turn.responseCategory === "seguimiento_contextual" || turn.responseCategory === "seguimiento_contextual_explicito"),
     ...(memory || {})
   };
 }
@@ -47,8 +47,9 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
   if (intent === "presentacion_estudiante") trustLevel += 4;
   if (intent === "encuadre" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta" || intent === "encuadre_mas_pregunta_abierta") trustLevel += 6;
   if (intent === "presentacion_personal_abierta" || intent === "motivo_de_consulta") trustLevel += 2;
-  if (intent === "seguimiento_contextual") trustLevel += 4;
-  if (intent === "exploracion_emocional" || intent === "exploracion_contextual") trustLevel += 5;
+  if (intent === "derivacion_llegada_consulta") trustLevel += 2;
+  if (intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito") trustLevel += 4;
+  if (intent === "exploracion_emocional" || intent === "exploracion_contextual" || intent === "contexto_familiar_social") trustLevel += 5;
   if (intent === "juicio_o_critica") trustLevel -= 16;
   if (intent === "consejo_apresurado") trustLevel -= 10;
   if (intent === "cierre") trustLevel += 2;
@@ -75,7 +76,7 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
     hadRushedAdvice: memory.hadRushedAdvice || intent === "consejo_apresurado",
     hadFraming: memory.hadFraming || intent === "saludo_simple" || intent === "rol_entrevistador" || intent === "presentacion_estudiante" || intent === "encuadre" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta" || intent === "encuadre_mas_pregunta_abierta",
     hadClosure: memory.hadClosure || intent === "cierre",
-    hadFollowUp: memory.hadFollowUp || intent === "seguimiento_contextual"
+    hadFollowUp: memory.hadFollowUp || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito"
   };
 }
 
@@ -143,10 +144,13 @@ function topicFromIntent(intent) {
   if (intent === "pregunta_videojuegos") return "digital";
   if (intent === "pregunta_habitos") return "habitos";
   if (intent === "motivo_de_consulta") return "motivo_de_consulta";
+  if (intent === "derivacion_llegada_consulta") return "llegada_consulta";
   if (intent === "ocupacion_actividad") return "ocupacion";
   if (intent === "vivienda_residencia") return "vivienda";
   if (intent === "preocupacion_principal") return "preocupacion";
+  if (intent === "seguimiento_contextual_explicito") return "seguimiento";
   if (intent === "validacion_emocional") return "validacion";
+  if (intent === "contexto_familiar_social") return "contexto";
   if (intent === "cierre") return "cierre";
   if (intent === "exploracion_emocional") return "emocion";
   if (intent === "preferencias_valoracion") return "preferencias";

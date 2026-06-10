@@ -47,10 +47,14 @@ export function CaseSelector({
             key={caseItem.id}
             style={{ "--accent": caseItem.accent }}
           >
-            <div className="case-card-top">
-              <div className="case-avatar">
+            <div className="case-card-image">
+              {caseItem.image ? (
+                <img src={caseItem.image} alt={`Retrato ficticio de ${caseItem.name}`} loading="lazy" />
+              ) : (
                 <Users aria-hidden="true" />
-              </div>
+              )}
+            </div>
+            <div className="case-card-top">
               <span>{caseItem.difficulty}</span>
             </div>
             <h2>{caseItem.name}</h2>

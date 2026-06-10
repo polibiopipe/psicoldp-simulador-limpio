@@ -256,6 +256,25 @@ const compoundAcknowledgements = {
   claudio: "Está bien."
 };
 
+const explicitFollowUpResponses = {
+  tomas: [
+    "Que mis papas creen que todo es por el computador, pero no es solo eso. A veces me voy a jugar porque me siento pasado a llevar o porque no se como decir lo que me pasa.",
+    "Que no es solamente que me guste jugar. A veces el computador es como la forma que tengo de salir de lo que pasa en la casa o de no sentirme tan encima."
+  ],
+  marcos: [
+    "Que no es solo cansancio fisico. Es como si llegara sin paciencia para nada, incluso para la gente que quiero."
+  ],
+  daniela: [
+    "Que siento que no deberia cansarme tanto, como si descansar fuera fallarle a los demas."
+  ],
+  sofia: [
+    "Que no es solo dejar de mirar o dejar de compararme. Es que despues me quedo pensando en eso mucho mas de lo que quisiera."
+  ],
+  claudio: [
+    "Que no es solo aburrimiento. Por fuera mi vida esta ordenada, pero siento que llevo tiempo viviendo en automatico."
+  ]
+};
+
 export function selectResponse({ caseId, intentResult, memory }) {
   const intent = intentResult.intent;
   const facts = patientFacts[caseId] || patientFacts.tomas;
@@ -276,6 +295,10 @@ export function selectResponse({ caseId, intentResult, memory }) {
   } else if (intent === "desconocida") {
     candidates = buildClarificationCandidates(facts, memory);
     responseType = "clarificacion_desconocida";
+  } else if (intent === "seguimiento_contextual_explicito") {
+    const topic = intentResult.contextualTopic || memory.lastTopic || "default";
+    candidates = buildExplicitFollowUpCandidates({ caseId, facts, responses, intentResult, memory });
+    responseType = `seguimiento_contextual_explicito:${topic}`;
   } else if (intent === "seguimiento_contextual") {
     const topic = intentResult.contextualTopic || memory.lastTopic || "default";
     candidates = responses.seguimiento_contextual?.[topic] || responses.seguimiento_contextual?.default || [];
@@ -376,6 +399,7 @@ function buildCompoundFramingQuestionCandidates({ caseId, facts }) {
 function forceConcreteDisclosure({ intent, intentResult, memory, facts, responses, currentCandidates }) {
   const forceableIntents = [
     "motivo_de_consulta",
+    "seguimiento_contextual_explicito",
     "seguimiento_contextual",
     "exploracion_emocional",
     "validacion_emocional",
@@ -401,6 +425,13 @@ function forceConcreteDisclosure({ intent, intentResult, memory, facts, response
     return {
       candidates: buildValidationCandidates(facts, responses, memory),
       responseType: "validacion_emocional:concreto"
+    };
+  }
+
+  if (intent === "seguimiento_contextual_explicito") {
+    return {
+      candidates: buildExplicitFollowUpCandidates({ caseId: memory.caseId, facts, responses, intentResult, memory }),
+      responseType: `seguimiento_contextual_explicito:${intentResult.contextualTopic || memory.lastTopic || "concreto"}`
     };
   }
 
@@ -459,6 +490,17 @@ function buildFollowUpCandidates({ facts, responses, intentResult, memory }) {
     nextConcrete,
     facts.concreteConcern,
     ...topicResponses.filter((response) => !isEvasivePatientResponse(response)).slice(0, 3)
+  ].filter(Boolean);
+}
+
+function buildExplicitFollowUpCandidates({ caseId, facts, responses, intentResult, memory }) {
+  const topic = intentResult.contextualTopic || memory.lastTopic || "default";
+  const caseSpecific = explicitFollowUpResponses[caseId] || [];
+  const topicResponses = responses.seguimiento_contextual?.[topic] || responses.seguimiento_contextual?.default || [];
+  return [
+    ...caseSpecific,
+    ...buildFollowUpCandidates({ facts, responses, intentResult, memory }),
+    ...topicResponses.filter((response) => !isEvasivePatientResponse(response)).slice(0, 2)
   ].filter(Boolean);
 }
 
