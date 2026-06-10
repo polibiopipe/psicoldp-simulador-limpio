@@ -72,7 +72,16 @@ const lexicon = {
     "si entiendo bien", "lo que escucho", "parece que", "mencionaste", "dijiste",
     "retomando", "resumo", "por un lado", "por otro lado"
   ],
-  closure: ["cerrar", "terminar", "finalizar", "resumen", "antes de terminar", "cómo quedas", "como quedas", "agradezco"]
+  closure: ["cerrar", "terminar", "finalizar", "resumen", "antes de terminar", "cómo quedas", "como quedas", "agradezco"],
+  risk: [
+    "hacerte dano", "hacerte daño", "danarte", "dañarte", "no querer vivir", "morir",
+    "suicid", "riesgo", "urgencia", "derivar", "apoyo inmediato", "seguridad"
+  ],
+  followUp: [
+    "me dijiste que", "dijiste que", "mencionaste", "cuando dices", "cuando dijiste",
+    "a que te refieres", "a qué te refieres", "que quieres decir", "qué quieres decir",
+    "cuentame mas", "cuéntame más", "en que sentido", "en qué sentido", "retomando"
+  ]
 };
 
 const abruptTopicShifts = ["cambiando de tema", "dejando eso", "pasemos a otra cosa", "otra pregunta"];
@@ -212,6 +221,8 @@ export function analyzeStudentInput(input, history = []) {
     prematureInterpretation: includesAny(text, lexicon.prematureInterpretation),
     pressure: includesAny(text, lexicon.pressure),
     empathicSummary: includesAny(text, lexicon.empathicSummary),
+    followUp: includesAny(text, lexicon.followUp),
+    riskExploration: includesAny(text, lexicon.risk),
     closure: includesAny(text, lexicon.closure),
     continuityAgreement: includesAny(text, continuityTerms),
     abruptShift: includesAny(text, abruptTopicShifts)
@@ -251,7 +262,9 @@ export function analyzeStudentInput(input, history = []) {
 export function summarizeConversationMemory(history) {
   return history.reduce(
     (memory, turn) => {
-      const categories = turn.analysis?.categories || analyzeStudentInput(turn.question).categories;
+      const inferredCategories = analyzeStudentInput(turn.question).categories;
+      const engineCategories = turn.analysis?.categories || {};
+      const categories = mergeCategories(inferredCategories, engineCategories);
       if (categories.greeting) memory.greeting += 1;
       if (categories.name) memory.name += 1;
       if (categories.age) memory.age += 1;
@@ -276,6 +289,7 @@ export function summarizeConversationMemory(history) {
       if (categories.pressure) memory.pressure += 1;
       if (categories.empathicSummary) memory.empathicSummary += 1;
       if (categories.followUp) memory.followUp += 1;
+      if (categories.riskExploration) memory.riskExploration += 1;
       if (categories.preferencesExploration) memory.preferences += 1;
       if (categories.paceRespect) memory.paceRespect += 1;
       if (categories.closure) memory.closure += 1;
@@ -309,6 +323,7 @@ export function summarizeConversationMemory(history) {
       pressure: 0,
       empathicSummary: 0,
       followUp: 0,
+      riskExploration: 0,
       preferences: 0,
       paceRespect: 0,
       closure: 0,
@@ -317,6 +332,16 @@ export function summarizeConversationMemory(history) {
       trustLevels: []
     }
   );
+}
+
+function mergeCategories(...categorySets) {
+  const merged = {};
+  for (const set of categorySets) {
+    for (const [key, value] of Object.entries(set || {})) {
+      merged[key] = Boolean(merged[key] || value);
+    }
+  }
+  return merged;
 }
 
 export function getTrustStage(trustLevel) {

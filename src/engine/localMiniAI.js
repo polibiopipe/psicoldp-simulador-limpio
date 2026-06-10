@@ -3,6 +3,7 @@ import { forceCompositeOpenQuestionResponse, isCompositeOpenQuestionMessage, isI
 import { detectIntent } from "./intentDetector.js";
 import { generateGuidedPatientResponse } from "./guidedConversationEngine.js";
 import { buildPatientMemory, getTrustStage, updatePatientMemory } from "./patientMemory.js";
+import { selectCaseProfileResponse } from "./caseProfileResponse.js";
 import { selectResponse } from "./responseSelector.js";
 import { composeFinalResponse } from "./responseComposer.js";
 
@@ -51,7 +52,31 @@ export function generateLocalPatientResponse({
     applyGuidedIntentResult(intentResult, guidedResult);
   }
 
-  const selectedResponse = guidedResult
+  const profileResponse = selectCaseProfileResponse({
+    caseId,
+    studentMessage,
+    intentResult,
+    memory: workingMemory
+  });
+
+  if (profileResponse) {
+    intentResult.intent = profileResponse.resolvedIntent || intentResult.intent;
+    intentResult.profileTopic = profileResponse.profileTopic;
+    intentResult.contextualTopic = profileResponse.profileTopic || intentResult.contextualTopic;
+    intentResult.matches = {
+      ...intentResult.matches,
+      [intentResult.intent]: true
+    };
+  }
+
+  const selectedResponse = profileResponse
+    ? {
+        response: profileResponse.response,
+        responseId: profileResponse.responseId,
+        responseType: profileResponse.responseType,
+        fallbackUsed: profileResponse.fallbackUsed
+      }
+    : guidedResult
     ? {
         response: guidedResult.responseText,
         responseId: guidedResult.responseId,
@@ -83,18 +108,23 @@ export function generateLocalPatientResponse({
 
   const debug = {
     studentMessage,
+    normalizedMessage: intentResult.normalizedText,
     detectedIntent: intentResult.intent,
     caseId,
     responseType: selectedResponse.responseType,
     selectedResponseType: selectedResponse.responseType,
     opennessLevel: workingMemory.opennessLevel,
     evasiveCount: workingMemory.evasiveCount || 0,
+    lastPatientMessage: workingMemory.lastPatientMessage,
+    detectedEmotionInLastPatientMessage: intentResult.detectedEmotionInLastPatientMessage || null,
     lastTopic: intentResult.contextualTopic || workingMemory.lastTopic,
     selectedResponseId: selectedResponse.responseId,
     selectedResponse: selectedResponse.response,
     finalResponse: responseText,
     ambiguityDetected: intentResult.ambiguityDetected,
     explicitReferenceDetected: intentResult.explicitReferenceDetected,
+    profileTopic: profileResponse?.profileTopic || null,
+    profileResponseUsed: Boolean(profileResponse),
     memory: memoryUpdate,
     fallbackUsed: selectedResponse.fallbackUsed,
     wasCompositeForced,
@@ -122,6 +152,18 @@ export function generateLocalPatientResponse({
       selectedResponse: selectedResponse.response,
       finalResponse: responseText,
       wasCompositeForced
+    });
+  }
+
+  if (intentResult.intent === "seguimiento_emocional_contextual") {
+    console.log("DEBUG EMOTIONAL CONTEXTUAL FOLLOWUP", {
+      studentMessage,
+      normalizedMessage: intentResult.normalizedText,
+      lastPatientMessage: workingMemory.lastPatientMessage,
+      detectedEmotionInLastPatientMessage: intentResult.detectedEmotionInLastPatientMessage || null,
+      resolvedIntent: intentResult.intent,
+      ambiguityDetected: intentResult.ambiguityDetected,
+      responseText
     });
   }
 

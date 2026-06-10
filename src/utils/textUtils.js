@@ -1,11 +1,13 @@
 export function normalizeText(text = "") {
-  return text
+  const normalized = String(text)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[¿?¡!.,;:()[\]{}"]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+  return normalizeInformalSpanish(normalized);
 }
 
 export function includesAny(text, terms) {
@@ -32,4 +34,24 @@ export function getTrustStage(trustLevel = 40) {
 
 export function clamp(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function normalizeInformalSpanish(text) {
+  const replacements = {
+    pq: ["por", "que"],
+    xq: ["por", "que"],
+    q: ["que"],
+    k: ["que"],
+    incomdo: ["incomodo"],
+    incomoda: ["incomoda"],
+    incomodo: ["incomodo"],
+    asi: ["asi"]
+  };
+
+  return text
+    .split(/\s+/)
+    .flatMap((word) => replacements[word] || [word])
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

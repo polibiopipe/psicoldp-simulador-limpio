@@ -743,6 +743,7 @@ a {
 
 .difficulty-panel {
   display: flex;
+  flex-wrap: wrap;
   gap: 20px;
   align-items: center;
   justify-content: space-between;
@@ -1848,6 +1849,39 @@ textarea:focus {
   min-width: 0;
 }
 
+.level-focus {
+  flex: 1 1 100%;
+  margin: 6px 0 0;
+  color: #52606d;
+  font-size: 0.92rem;
+}
+
+.feedback-score-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid #d9e2e1;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(19, 34, 43, 0.08);
+}
+
+.feedback-score-card strong {
+  display: block;
+  margin-top: 4px;
+  color: #0f5c63;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 1;
+}
+
+.feedback-score-card p {
+  margin: 0;
+  color: #52606d;
+}
+
 .feedback-sections {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1902,6 +1936,74 @@ textarea:focus {
 .criterion.partial strong {
   color: #6a4b10;
   background: #fff7ea;
+}
+
+.objective-feedback-list,
+.reformulation-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.objective-feedback-list li,
+.reformulation-list li {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid #e7eceb;
+  border-radius: 12px;
+  background: #f7f5f0;
+}
+
+.objective-feedback-list strong {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #eef3f1;
+  color: #13222b;
+  font-size: 0.82rem;
+}
+
+.objective-feedback-list .achieved strong {
+  background: #def3e6;
+  color: #1d5634;
+}
+
+.objective-feedback-list .partial strong {
+  background: #fff7ea;
+  color: #6a4b10;
+}
+
+.reformulation-list li {
+  display: grid;
+  justify-content: stretch;
+}
+
+.reformulation-list span {
+  color: #52606d;
+}
+
+.reformulation-list strong {
+  color: #13222b;
+}
+
+.skill-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.skill-chip-list span {
+  border: 1px solid #d9e2e1;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #eef3f1;
+  color: #13222b;
+  font-size: 0.86rem;
+  font-weight: 750;
 }
 
 .success-icon {
@@ -2660,5 +2762,16 @@ textarea:focus,
 .auth-error,
 .save-status.error {
   color: #7a2630;
+}
+
+@media (max-width: 760px) {
+  .feedback-score-card {
+    grid-template-columns: 1fr;
+  }
+
+  .objective-feedback-list li,
+  .reformulation-list li {
+    display: grid;
+  }
 }
 

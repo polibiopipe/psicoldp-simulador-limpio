@@ -52,9 +52,13 @@ export function buildSessionHistoryRecord({
       ethicalNotice: sessionSummary.ethicalNotice
     },
     feedback: {
+      generalScore: report.generalScore,
       strengths: report.strengths,
       improvements: report.improvements,
       criteria: report.criteria,
+      objectiveEvaluation: report.objectiveEvaluation,
+      reformulationSuggestions: report.reformulationSuggestions,
+      skillClassification: report.skillClassification,
       nextSuggestions: report.nextSuggestions,
       bondMoments: report.bondMoments,
       closingMoments: report.closingMoments,
@@ -223,7 +227,7 @@ function mapRecordToSupabasePayload(record, user) {
     session_number: record.sessionNumber,
     conversation: record.conversationHistory,
     feedback: feedbackPayload,
-    score: Math.round(record.patientOpenness?.final ?? 0),
+    score: Math.round(record.feedback?.generalScore ?? record.patientOpenness?.final ?? 0),
     created_at: record.createdAt
   };
 }

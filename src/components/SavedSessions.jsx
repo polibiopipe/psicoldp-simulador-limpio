@@ -95,7 +95,7 @@ export function SavedSessions({ authSession, onBackHome }) {
                   <div className="saved-session-meta">
                     <span>{formatDate(session.createdAt)}</span>
                     <span>{session.conversationHistory?.length || 0} turnos</span>
-                    <span>Apertura {session.patientOpenness?.final ?? "N/O"}/100</span>
+                    <span>Puntaje {session.feedback?.generalScore ?? session.patientOpenness?.final ?? "N/O"}/100</span>
                   </div>
                   <p>{session.summary?.brief || session.summary?.closure}</p>
                   <div className="saved-session-actions">
@@ -126,6 +126,10 @@ export function SavedSessions({ authSession, onBackHome }) {
                   <span className="eyebrow">Detalle local</span>
                   <h2>{selectedSession.caseName} - Sesion {selectedSession.sessionNumber}</h2>
                   <p>{selectedSession.summary?.closure}</p>
+                  <p>
+                    Puntaje formativo:{" "}
+                    <strong>{selectedSession.feedback?.generalScore ?? selectedSession.patientOpenness?.final ?? "N/O"}/100</strong>
+                  </p>
 
                   <section>
                     <h3>Aspectos logrados</h3>
@@ -153,6 +157,32 @@ export function SavedSessions({ authSession, onBackHome }) {
                       ))}
                     </ul>
                   </section>
+
+                  {selectedSession.feedback?.objectiveEvaluation?.length > 0 && (
+                    <section>
+                      <h3>Objetivos del caso</h3>
+                      <ul>
+                        {selectedSession.feedback.objectiveEvaluation.slice(0, 6).map((item) => (
+                          <li key={item.objective}>
+                            {item.objective}: {item.levelLabel || item.status}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  {selectedSession.feedback?.reformulationSuggestions?.length > 0 && (
+                    <section>
+                      <h3>Reformulaciones sugeridas</h3>
+                      <ul>
+                        {selectedSession.feedback.reformulationSuggestions.slice(0, 3).map((item) => (
+                          <li key={`${item.insteadOf}-${item.tryThis}`}>
+                            Podrías decir: “{item.tryThis}”
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
 
                   <section>
                     <h3>Conversacion resumida</h3>

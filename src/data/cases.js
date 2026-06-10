@@ -18,6 +18,115 @@ const caseImages = {
   claudio: "/casos/claudio.png"
 };
 
+const learningObjectivesByCase = {
+  tomas: [
+    "Realizar un encuadre inicial claro y respetuoso.",
+    "Explorar el motivo de consulta sin juzgar el uso de videojuegos.",
+    "Diferenciar conducta observable de posible malestar emocional.",
+    "Indagar contexto familiar y social de forma gradual.",
+    "Usar preguntas abiertas, validación y seguimiento contextual.",
+    "Cerrar la entrevista dejando continuidad formativa."
+  ],
+  valentina: [
+    "Explorar sobrecarga académica y autoexigencia.",
+    "Indagar expectativas familiares y personales.",
+    "Validar el cansancio sin patologizar de inmediato.",
+    "Explorar hábitos de descanso y apoyo.",
+    "Cerrar identificando temas relevantes para continuar."
+  ],
+  marcos: [
+    "Explorar estrés laboral sin reducirlo solo a rendimiento.",
+    "Indagar cansancio, irritabilidad y pérdida de sentido.",
+    "Diferenciar síntomas, contexto laboral y recursos disponibles.",
+    "Evitar entregar soluciones prematuras.",
+    "Favorecer reflexión sobre malestar y funcionamiento cotidiano."
+  ],
+  elena: [
+    "Explorar soledad y cambios vitales sin dramatizar.",
+    "Indagar rol de cuidadora y dificultad para pedir ayuda.",
+    "Validar necesidades propias sin culpabilizar a la familia.",
+    "Explorar redes de apoyo y recursos cotidianos.",
+    "Cerrar con síntesis respetuosa y continuidad formativa."
+  ],
+  nicolas: [
+    "Construir alianza en una derivación no solicitada.",
+    "Explorar colegio y pares sin convertir la entrevista en interrogatorio.",
+    "Diferenciar hechos observados de etiquetas adultas.",
+    "Respetar respuestas breves y ritmo de apertura.",
+    "Cerrar sin reforzar sensación de reto o evaluación."
+  ],
+  camila: [
+    "Explorar sobrecarga relacional y dificultad para poner límites.",
+    "Identificar emociones asociadas al cansancio y disponibilidad hacia otros.",
+    "Validar sin reforzar culpa ni autoexigencia.",
+    "Indagar red de apoyo y recursos personales.",
+    "Cerrar con una síntesis cuidadosa del motivo inicial."
+  ],
+  rodrigo: [
+    "Explorar separación reciente y reorganización familiar.",
+    "Indagar rol parental, pérdida y cambios de rutina.",
+    "Validar fortaleza sin impedir expresión emocional.",
+    "Explorar recursos y apoyos sin mediar el conflicto real.",
+    "Cerrar identificando temas para continuidad."
+  ],
+  fernanda: [
+    "Explorar retorno laboral y temor al juicio.",
+    "Indagar confianza, rendimiento y sensación de observación.",
+    "Validar inseguridad sin dar indicaciones médicas.",
+    "Explorar apoyos y recursos para reintegración gradual.",
+    "Cerrar con foco en continuidad formativa."
+  ],
+  hector: [
+    "Explorar jubilación, rutina e identidad.",
+    "Indagar sentido de utilidad y redes actuales.",
+    "Validar orgullo y pérdida sin infantilizar.",
+    "Explorar recursos cotidianos y vínculos significativos.",
+    "Cerrar con síntesis de temas abiertos."
+  ],
+  daniela: [
+    "Explorar maternidad reciente, estudio y autocuidado.",
+    "Indagar culpa, cansancio y exigencias del rol.",
+    "Validar la experiencia sin idealizar la maternidad.",
+    "Explorar red de apoyo y distribución de responsabilidades.",
+    "Cerrar con síntesis y continuidad."
+  ],
+  andres: [
+    "Explorar pertenencia universitaria y comparación con pares.",
+    "Indagar presión familiar y transición académica.",
+    "Validar inseguridad sin minimizar el cambio vital.",
+    "Explorar recursos, redes y estrategias de adaptación.",
+    "Cerrar con temas claros para continuidad."
+  ],
+  patricia: [
+    "Explorar conflicto con hija adolescente sin culpabilizar.",
+    "Distinguir preocupación, miedo y control.",
+    "Indagar comunicación familiar y patrones relacionales.",
+    "Validar preocupación sin reforzar respuestas controladoras.",
+    "Cerrar con síntesis cuidadosa del vínculo."
+  ],
+  miguel: [
+    "Explorar migración, adaptación e identidad.",
+    "Indagar redes, rutina y sensación de empezar de cero.",
+    "Validar cansancio sin negar esperanza.",
+    "Evitar asesoría legal o soluciones fuera del marco formativo.",
+    "Cerrar identificando recursos y temas pendientes."
+  ],
+  sofia: [
+    "Explorar redes sociales y comparación sin moralizar.",
+    "Indagar autoimagen, validación externa y hábitos digitales.",
+    "Validar vergüenza y ambivalencia sin llamarla superficial.",
+    "Usar seguimiento contextual para profundizar ejemplos concretos.",
+    "Cerrar con continuidad y síntesis del tema central."
+  ],
+  claudio: [
+    "Explorar estancamiento vital y rutina rígida.",
+    "Indagar sentido, decisiones y miedo al cambio.",
+    "Conectar emoción con análisis sin forzar vulnerabilidad.",
+    "Evitar empujar cambios impulsivos o consejos directivos.",
+    "Cerrar con síntesis y próximos temas formativos."
+  ]
+};
+
 export const difficultyOptions = [
   {
     id: "introductorio",
@@ -137,6 +246,8 @@ const catalog = [
 export const cases = catalog.map((caseItem) => ({
   ...caseItem,
   image: caseImages[caseItem.id],
+  learningObjectives: learningObjectivesByCase[caseItem.id] || caseItem.objectives || [],
+  objectives: learningObjectivesByCase[caseItem.id] || caseItem.objectives || [],
   basicFacts: patientFacts[caseItem.id],
   domains: {},
   resistance: []

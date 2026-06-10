@@ -30,8 +30,8 @@ export function ResultsSummary({ report, caseItem, history, sessionNumber = 1 })
         </div>
         <div>
           <GraduationCap aria-hidden="true" />
-          <strong>{report.trust.final}/100</strong>
-          <span>apertura</span>
+          <strong>{report.generalScore ?? 0}/100</strong>
+          <span>puntaje</span>
         </div>
       </div>
 

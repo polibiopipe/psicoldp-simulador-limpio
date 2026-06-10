@@ -1,60 +1,43 @@
-export const rubricCriteria = [
-  {
-    id: "framing",
-    title: "Encuadre inicial",
-    description: "Explica propósito educativo, límites de la simulación, consentimiento y ritmo de la entrevista."
+export const feedbackRubric = {
+  encuadre: {
+    label: "Encuadre inicial",
+    description: "Explica el propósito de la entrevista, confidencialidad y límites éticos."
   },
-  {
-    id: "openQuestions",
-    title: "Preguntas abiertas",
-    description: "Usa preguntas que invitan a elaborar y no solo a responder sí/no."
+  vinculo: {
+    label: "Vínculo y clima de confianza",
+    description: "Construye una interacción respetuosa, cálida y no enjuiciadora."
   },
-  {
-    id: "activeListening",
-    title: "Escucha activa",
-    description: "Refleja, resume o retoma información entregada por el paciente ficticio."
+  preguntasAbiertas: {
+    label: "Preguntas abiertas",
+    description: "Usa preguntas que favorecen exploración y no solo respuestas cerradas."
   },
-  {
-    id: "validation",
-    title: "Validación emocional",
-    description: "Reconoce emociones o experiencias sin apresurar soluciones."
+  escuchaValidacion: {
+    label: "Escucha y validación",
+    description: "Reconoce emociones y significados sin apresurarse a aconsejar."
   },
-  {
-    id: "context",
-    title: "Exploración contextual",
-    description: "Indaga familia, redes, estudio, trabajo, vida digital o entorno relevante al caso."
+  exploracionMotivo: {
+    label: "Exploración del motivo de consulta",
+    description: "Indaga qué trae al paciente, cómo lo vive y qué contexto lo rodea."
   },
-  {
-    id: "paceRespect",
-    title: "Respeto por el ritmo",
-    description: "Evita presionar, permite no responder y acompaña resistencias."
+  seguimientoContextual: {
+    label: "Seguimiento contextual",
+    description: "Retoma frases del paciente y profundiza en lo que acaba de decir."
   },
-  {
-    id: "nonJudgment",
-    title: "Evitación de juicios",
-    description: "Evita etiquetas, moralizaciones o culpabilización."
+  eticaRiesgo: {
+    label: "Ética y señales de riesgo",
+    description: "Considera confidencialidad, límites y señales que podrían requerir derivación o apoyo."
   },
-  {
-    id: "closure",
-    title: "Cierre adecuado",
-    description: "Resume, agradece, pregunta cómo queda el paciente y cierra sin abandono abrupto."
-  },
-  {
-    id: "continuityAgreement",
-    title: "Acuerdo de continuidad",
-    description: "Deja abierta una próxima sesión simulada, sin prometer soluciones inmediatas ni reemplazar supervisión docente."
-  },
-  {
-    id: "caseCoherence",
-    title: "Coherencia con el caso",
-    description: "Explora temas centrales del caso seleccionado de forma atingente."
-  },
-  {
-    id: "noRush",
-    title: "No apresura conclusiones",
-    description: "Evita diagnósticos, interpretaciones cerradas o consejos clínicos directivos."
+  cierre: {
+    label: "Cierre de entrevista",
+    description: "Resume, valida y deja continuidad o próximos pasos formativos."
   }
-];
+};
+
+export const rubricCriteria = Object.entries(feedbackRubric).map(([id, item]) => ({
+  id,
+  title: item.label,
+  description: item.description
+}));
 
 export const levelLabels = {
   achieved: "Logrado",

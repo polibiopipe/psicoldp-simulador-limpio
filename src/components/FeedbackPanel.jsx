@@ -19,6 +19,17 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
         <p>{report.ethicalNotice}</p>
       </header>
 
+      <section className="feedback-score-card">
+        <div>
+          <span className="eyebrow">Puntaje general formativo</span>
+          <strong>{report.generalScore ?? 0}/100</strong>
+        </div>
+        <p>
+          Puntaje orientativo basado en habilidades de entrevista observadas. No equivale
+          a evaluación clínica ni reemplaza supervisión docente.
+        </p>
+      </section>
+
       <div className="feedback-sections">
         <section className="feedback-block">
           <h2>Fortalezas observadas</h2>
@@ -118,10 +129,49 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
               <h2>{criterion.title}</h2>
               <p>{criterion.description}</p>
             </div>
-            <strong>{criterion.levelLabel}</strong>
+            <strong>{criterion.levelLabel} · {Math.round((criterion.score / 2) * 100)}%</strong>
           </article>
         ))}
       </div>
+
+      {report.objectiveEvaluation?.length > 0 && (
+        <section className="feedback-block">
+          <h2>Objetivos del caso</h2>
+          <ul className="objective-feedback-list">
+            {report.objectiveEvaluation.map((item) => (
+              <li className={item.level} key={item.objective}>
+                <span>{item.objective}</span>
+                <strong>{item.levelLabel}</strong>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {report.reformulationSuggestions?.length > 0 && (
+        <section className="feedback-block">
+          <h2>Sugerencias concretas de reformulación</h2>
+          <ul className="reformulation-list">
+            {report.reformulationSuggestions.map((item) => (
+              <li key={`${item.insteadOf}-${item.tryThis}`}>
+                <span>En vez de: “{item.insteadOf}”</span>
+                <strong>Podrías decir: “{item.tryThis}”</strong>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {report.skillClassification?.length > 0 && (
+        <section className="feedback-block">
+          <h2>Habilidades observadas durante la entrevista</h2>
+          <div className="skill-chip-list">
+            {report.skillClassification.map((item) => (
+              <span key={item.label}>{item.label}: {item.count}</span>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="feedback-block">
         <h2>Sugerencias para una próxima entrevista</h2>

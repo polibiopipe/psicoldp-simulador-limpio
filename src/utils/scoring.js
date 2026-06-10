@@ -37,17 +37,34 @@ export function buildEducationalReport(history, caseItem) {
   }).length;
 
   const rawScores = {
-    framing: memory.framing >= 1 ? 2 : 0,
-    openQuestions: memory.openQuestions >= 3 ? 2 : memory.openQuestions >= 1 ? 1 : 0,
-    activeListening: memory.empathicSummary + memory.followUp >= 2 ? 2 : memory.empathicSummary + memory.followUp >= 1 ? 1 : 0,
-    validation: memory.validation >= 2 ? 2 : memory.validation >= 1 ? 1 : 0,
-    context: memory.contextExploration >= 3 ? 2 : memory.contextExploration >= 1 ? 1 : 0,
-    paceRespect: memory.paceRespect >= 1 || (memory.openQuestions >= 2 && !hasJudgment) ? 2 : !hasJudgment ? 1 : 0,
-    nonJudgment: !hasJudgment && memory.pressure === 0 ? 2 : 0.5,
-    closure: memory.goodClosure >= 1 ? 2 : memory.closure >= 1 ? 1 : 0,
-    continuityAgreement: memory.continuityAgreement >= 1 && memory.goodClosure >= 1 ? 2 : memory.continuityAgreement >= 1 || memory.closure >= 1 ? 1 : 0,
-    caseCoherence: specificHits >= 2 ? 2 : specificHits >= 1 ? 1 : 0,
-    noRush: !hasRushedAdvice && !hasJudgment && !hasPrematureInterpretation ? 2 : hasRushedAdvice || hasPrematureInterpretation ? 0.5 : 1
+    encuadre: memory.framing >= 1 ? 2 : memory.initialPresentation || memory.greeting ? 1 : 0,
+    vinculo: !hasJudgment && memory.pressure === 0 && (memory.validation || memory.paceRespect || memory.greeting)
+      ? 2
+      : !hasJudgment && memory.pressure === 0
+        ? 1
+        : 0.5,
+    preguntasAbiertas: memory.openQuestions >= 3 ? 2 : memory.openQuestions >= 1 ? 1 : 0,
+    escuchaValidacion: memory.validation + memory.empathicSummary >= 2
+      ? 2
+      : memory.validation + memory.empathicSummary >= 1
+        ? 1
+        : 0,
+    exploracionMotivo: memory.consultationReason >= 1 && (memory.emotion || memory.contextExploration)
+      ? 2
+      : memory.consultationReason >= 1
+        ? 1
+        : 0,
+    seguimientoContextual: memory.followUp >= 2 ? 2 : memory.followUp >= 1 ? 1 : 0,
+    eticaRiesgo: memory.riskExploration >= 1 || memory.framing >= 1
+      ? 2
+      : !hasJudgment && !hasRushedAdvice
+        ? 1
+        : 0,
+    cierre: memory.goodClosure >= 1 && memory.continuityAgreement >= 1
+      ? 2
+      : memory.closure >= 1
+        ? 1
+        : 0
   };
 
   const criteria = rubricCriteria.map((criterion) => {
@@ -59,6 +76,12 @@ export function buildEducationalReport(history, caseItem) {
       levelLabel: labelFor(score)
     };
   });
+  const generalScore = Math.round(
+    (criteria.reduce((sum, criterion) => sum + criterion.score, 0) / (criteria.length * 2)) * 100
+  );
+  const objectiveEvaluation = evaluateLearningObjectives({ caseItem, memory, history: scoredHistory });
+  const reformulationSuggestions = buildReformulationSuggestions(scoredHistory, caseItem);
+  const skillClassification = buildSkillClassification(memory);
 
   const strengths = [];
   const improvements = [];
@@ -117,6 +140,7 @@ export function buildEducationalReport(history, caseItem) {
   return {
     caseName: caseItem.name,
     turnCount,
+    generalScore,
     trust: {
       initial: initialTrust,
       final: finalTrust,
@@ -125,6 +149,9 @@ export function buildEducationalReport(history, caseItem) {
       label: trustLabels[trustStage]
     },
     criteria,
+    objectiveEvaluation,
+    reformulationSuggestions,
+    skillClassification,
     therapeuticApproach,
     guidedInterventionFeedback,
     strengths: strengths.length ? strengths : ["Mantuviste la entrevista activa y generaste oportunidades de exploración."],
@@ -144,6 +171,171 @@ export function buildEducationalReport(history, caseItem) {
     ethicalNotice:
       "Informe formativo basado en una simulación con datos ficticios. No corresponde a diagnóstico, tratamiento ni intervención clínica real."
   };
+}
+
+function evaluateLearningObjectives({ caseItem, memory, history }) {
+  const objectives = caseItem.learningObjectives || caseItem.objectives || [];
+  return objectives.map((objective) => {
+    const score = scoreObjective(objective, memory, history);
+    const status = score >= 2 ? "logrado" : score >= 1 ? "parcialmente logrado" : "no abordado";
+    return {
+      objective,
+      score,
+      status,
+      level: score >= 2 ? "achieved" : score >= 1 ? "partial" : "notObserved",
+      levelLabel: status.charAt(0).toUpperCase() + status.slice(1)
+    };
+  });
+}
+
+function scoreObjective(objective, memory, history) {
+  const text = normalizeForFeedback(objective);
+  const checks = [];
+
+  if (includesAnyObjective(text, ["encuadre", "proposito", "limites", "eticos", "entrevista inicial"])) {
+    checks.push(memory.framing >= 1 || memory.initialPresentation >= 1);
+  }
+  if (includesAnyObjective(text, ["motivo", "consulta", "trae al paciente"])) {
+    checks.push(memory.consultationReason >= 1);
+  }
+  if (includesAnyObjective(text, ["validar", "validacion", "sin juzgar", "no enjuiciadora", "sin culpabilizar", "sin moralizar"])) {
+    checks.push(memory.validation >= 1 && memory.judgment === 0);
+  }
+  if (includesAnyObjective(text, ["preguntas abiertas", "seguimiento", "retomar", "profundizar"])) {
+    checks.push(memory.openQuestions >= 1 || memory.followUp >= 1);
+  }
+  if (includesAnyObjective(text, ["familia", "familiar", "red", "apoyo", "recursos", "contexto", "responsabilidades", "pares"])) {
+    checks.push(memory.contextExploration >= 1 || memory.family >= 1 || memory.support >= 1);
+  }
+  if (includesAnyObjective(text, ["emocion", "culpa", "cansancio", "autoexigencia", "irritabilidad", "miedo", "ambivalencia", "perdida"])) {
+    checks.push(memory.emotion >= 1 || memory.validation >= 1);
+  }
+  if (includesAnyObjective(text, ["videojuego", "digital", "redes", "celular", "comparacion"])) {
+    checks.push(memory.digital >= 1);
+  }
+  if (includesAnyObjective(text, ["academ", "universidad", "estudio", "colegio"])) {
+    checks.push(memory.academic >= 1);
+  }
+  if (includesAnyObjective(text, ["laboral", "trabajo", "rendimiento", "reintegracion"])) {
+    checks.push(memory.work >= 1);
+  }
+  if (includesAnyObjective(text, ["limites", "sobrecarga relacional", "disponibilidad"])) {
+    checks.push(memory.emotion >= 1 || memory.support >= 1 || memory.contextExploration >= 1);
+  }
+  if (includesAnyObjective(text, ["cerrar", "cierre", "continuidad", "proxima"])) {
+    checks.push(memory.closure >= 1 || memory.continuityAgreement >= 1);
+  }
+  if (includesAnyObjective(text, ["evitar", "no entregar", "no idealizar", "no patologizar", "sin apresurar"])) {
+    checks.push(memory.rushedAdvice === 0 && memory.prematureInterpretation === 0 && memory.judgment === 0);
+  }
+  if (includesAnyObjective(text, ["riesgo", "etica", "derivacion"])) {
+    checks.push(memory.riskExploration >= 1 || memory.framing >= 1);
+  }
+
+  if (!checks.length) {
+    checks.push(memory.openQuestions >= 1 || memory.validation >= 1 || memory.contextExploration >= 1);
+  }
+
+  const hits = checks.filter(Boolean).length;
+  if (hits === checks.length && hits > 0) return 2;
+  if (hits > 0 || history.length >= 4) return 1;
+  return 0;
+}
+
+function buildReformulationSuggestions(history, caseItem) {
+  const suggestions = [];
+  const questions = history.map((entry) => entry.question || "");
+  const firstJudgment = history.find((entry) => entry.analysis?.categories?.judgment);
+  const firstAdvice = history.find((entry) => entry.analysis?.categories?.rushedAdvice);
+  const firstClosed = history.find((entry) => entry.analysis?.categories?.closedQuestion && !entry.analysis?.categories?.openQuestion);
+
+  if (firstJudgment) {
+    suggestions.push({
+      insteadOf: firstJudgment.question,
+      tryThis: suggestionByCase(caseItem.id, "judgment")
+    });
+  }
+  if (firstAdvice) {
+    suggestions.push({
+      insteadOf: firstAdvice.question,
+      tryThis: "Antes de pensar en soluciones, ¿podrías contarme cómo has estado viviendo esto?"
+    });
+  }
+  if (firstClosed) {
+    suggestions.push({
+      insteadOf: firstClosed.question,
+      tryThis: "¿Cómo ha sido para ti vivir esta situación en el día a día?"
+    });
+  }
+  if (!questions.some((question) => normalizeForFeedback(question).includes("familia")) && caseItem.id !== "miguel") {
+    suggestions.push({
+      insteadOf: "Pregunta general sin contexto familiar.",
+      tryThis: "¿Cómo se vive esto en tu casa o con las personas cercanas a ti?"
+    });
+  }
+
+  if (!suggestions.length) {
+    suggestions.push({
+      insteadOf: "Pregunta amplia: ¿qué te pasa?",
+      tryThis: suggestionByCase(caseItem.id, "open")
+    });
+  }
+
+  return suggestions.slice(0, 3);
+}
+
+function buildSkillClassification(memory) {
+  return [
+    ["Saludo", memory.greeting],
+    ["Encuadre", memory.framing],
+    ["Pregunta abierta", memory.openQuestions],
+    ["Pregunta cerrada", memory.closedQuestions],
+    ["Validación", memory.validation],
+    ["Reflejo o resumen", memory.empathicSummary],
+    ["Seguimiento contextual", memory.followUp],
+    ["Familia/contexto", memory.family],
+    ["Emoción", memory.emotion],
+    ["Motivo de consulta", memory.consultationReason],
+    ["Cierre", memory.closure],
+    ["Posible juicio", memory.judgment],
+    ["Consejo prematuro", memory.rushedAdvice],
+    ["Ética/riesgo", memory.riskExploration]
+  ]
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => ({ label, count }));
+}
+
+function suggestionByCase(caseId, type) {
+  if (type === "judgment") {
+    const byCase = {
+      tomas: "¿Qué lugar ocupa el juego para ti cuando estás en la casa?",
+      camila: "¿Qué pasa contigo cuando sientes que tienes que estar disponible para todos?",
+      marcos: "¿Cómo notas que el cansancio del trabajo se mete en tu vida fuera de la pega?",
+      valentina: "¿Qué ocurre contigo cuando intentas descansar y aparece la culpa?",
+      daniela: "¿Cómo conviven el amor por tu hijo y el cansancio que estás sintiendo?"
+    };
+    return byCase[caseId] || "¿Cómo estás viviendo esto, sin tener que justificarlo ahora?";
+  }
+
+  const byCase = {
+    tomas: "¿Qué te gustaría que entienda sobre el computador y lo que pasa fuera de él?",
+    camila: "¿En qué momentos notas más fuerte la culpa cuando intentas poner un límite?",
+    marcos: "¿Qué te preocupa de llegar a la casa con tan poca energía?",
+    valentina: "¿Cómo se siente para ti parar cuando todavía quedan pendientes?",
+    daniela: "¿Qué parte de todo esto te pesa más durante el día?"
+  };
+  return byCase[caseId] || "¿Qué sería importante que entienda de lo que estás viviendo?";
+}
+
+function includesAnyObjective(text, terms) {
+  return terms.some((term) => text.includes(normalizeForFeedback(term)));
+}
+
+function normalizeForFeedback(text) {
+  return String(text)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function analyzeGuidedInterventionUsage(history) {

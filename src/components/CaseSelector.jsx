@@ -1,6 +1,12 @@
 import React from "react";
 import { ArrowRight, Gauge, Users } from "lucide-react";
 
+const levelLearningFocus = {
+  introductorio: "Encuadre, motivo de consulta, preguntas abiertas y escucha básica.",
+  intermedio: "Ambivalencia, emociones, familia, validación y seguimiento contextual.",
+  avanzado: "Riesgo, dilemas éticos, derivación, resistencia y cierre complejo."
+};
+
 export function CaseSelector({
   cases,
   difficulty,
@@ -9,6 +15,8 @@ export function CaseSelector({
   onDifficultyChange,
   onSelectCase
 }) {
+  const selectedLevel = difficultyOptions.find((option) => option.id === difficulty);
+
   return (
     <section className="screen">
       <header className="section-header">
@@ -38,6 +46,9 @@ export function CaseSelector({
             </button>
           ))}
         </div>
+        <p className="level-focus">
+          {selectedLevel?.label}: {levelLearningFocus[difficulty] || selectedLevel?.description}
+        </p>
       </div>
 
       <div className="case-grid">

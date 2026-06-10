@@ -68,10 +68,10 @@ export function CaseBrief({
           <section className="info-panel">
             <div className="panel-heading">
               <Target aria-hidden="true" />
-              <h2>Objetivo de aprendizaje</h2>
+              <h2>Objetivos formativos de esta simulaciÃ³n</h2>
             </div>
             <ul>
-              {caseItem.objectives.map((item) => (
+              {(caseItem.learningObjectives || caseItem.objectives || []).slice(0, 6).map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
