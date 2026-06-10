@@ -34,7 +34,7 @@ export function buildPatientMemory({ caseId, history = [], difficulty = "interme
     hadRushedAdvice: history.some((turn) => turn.analysis?.categories?.rushedAdvice),
     hadFraming: history.some((turn) => turn.analysis?.categories?.framing),
     hadClosure: history.some((turn) => turn.analysis?.categories?.closure),
-    hadFollowUp: history.some((turn) => turn.responseCategory === "seguimiento_contextual" || turn.responseCategory === "seguimiento_contextual_explicito" || turn.responseCategory === "seguimiento_emocional_contextual"),
+    hadFollowUp: history.some((turn) => turn.responseCategory === "seguimiento_contextual" || turn.responseCategory === "seguimiento_contextual_explicito" || turn.responseCategory === "seguimiento_contextual_breve" || turn.responseCategory === "seguimiento_emocional_contextual"),
     ...(memory || {})
   };
 }
@@ -43,6 +43,8 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
   let trustLevel = memory.trustLevel;
   if (intent === "validacion_emocional") trustLevel += 12;
   if (intent === "estado_actual") trustLevel += 2;
+  if (intent === "convivencia_familia") trustLevel += 2;
+  if (intent === "colegio_estudios") trustLevel += 2;
   if (intent === "saludo_simple") trustLevel += 3;
   if (intent === "saludo") trustLevel += 3;
   if (intent === "cortesia_vinculo") trustLevel += 6;
@@ -50,8 +52,8 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
   if (intent === "encuadre" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta" || intent === "encuadre_mas_pregunta_abierta") trustLevel += 6;
   if (intent === "presentacion_personal_abierta" || intent === "motivo_de_consulta") trustLevel += 2;
   if (intent === "preocupacion_principal" || intent === "preferencias_valoracion" || intent === "ayuda") trustLevel += 3;
-  if (intent === "derivacion_llegada_consulta") trustLevel += 2;
-  if (intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito" || intent === "seguimiento_emocional_contextual") trustLevel += 4;
+  if (intent === "derivacion_llegada" || intent === "derivacion_llegada_consulta") trustLevel += 2;
+  if (intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito" || intent === "seguimiento_contextual_breve" || intent === "seguimiento_emocional_contextual") trustLevel += 4;
   if (intent === "exploracion_emocional" || intent === "exploracion_contextual" || intent === "contexto_familiar_social") trustLevel += 5;
   if (intent === "juicio_o_critica") trustLevel -= 16;
   if (intent === "consejo_apresurado") trustLevel -= 10;
@@ -79,7 +81,7 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
     hadRushedAdvice: memory.hadRushedAdvice || intent === "consejo_apresurado",
     hadFraming: memory.hadFraming || intent === "saludo" || intent === "saludo_simple" || intent === "rol_entrevistador" || intent === "presentacion_estudiante" || intent === "encuadre" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta" || intent === "encuadre_mas_pregunta_abierta",
     hadClosure: memory.hadClosure || intent === "cierre",
-    hadFollowUp: memory.hadFollowUp || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito" || intent === "seguimiento_emocional_contextual"
+    hadFollowUp: memory.hadFollowUp || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito" || intent === "seguimiento_contextual_breve" || intent === "seguimiento_emocional_contextual"
   };
 }
 
@@ -149,19 +151,22 @@ function topicFromIntent(intent) {
   if (intent === "pregunta_academica") return "universidad";
   if (intent === "pregunta_laboral") return "trabajo";
   if (intent === "estudios_trabajo") return "ocupacion";
+  if (intent === "colegio_estudios") return "colegio";
   if (intent === "pregunta_videojuegos") return "digital";
   if (intent === "videojuegos") return "digital";
   if (intent === "pregunta_habitos") return "habitos";
   if (intent === "rutina_diaria") return "rutina";
   if (intent === "motivo_de_consulta") return "motivo_de_consulta";
   if (intent === "estado_actual") return "estado_actual";
-  if (intent === "derivacion_llegada_consulta") return "llegada_consulta";
+  if (intent === "derivacion_llegada" || intent === "derivacion_llegada_consulta") return "llegada_consulta";
   if (intent === "ocupacion_actividad") return "ocupacion";
   if (intent === "vivienda_residencia") return "vivienda";
+  if (intent === "convivencia_familia") return "vivienda";
   if (intent === "preocupacion_principal") return "preocupacion";
   if (intent === "riesgo") return "riesgo";
   if (intent === "ambiguo_real") return "ambiguo_real";
   if (intent === "seguimiento_contextual_explicito") return "seguimiento";
+  if (intent === "seguimiento_contextual_breve") return "seguimiento";
   if (intent === "seguimiento_emocional_contextual") return "seguimiento_emocional";
   if (intent === "validacion_emocional") return "validacion";
   if (intent === "contexto_familiar_social") return "contexto";

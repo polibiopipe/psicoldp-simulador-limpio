@@ -26,13 +26,24 @@ const forbiddenClinicalTerms = [
   "red de apoyo deficiente",
   "redes de apoyo deficientes",
   "presento",
-  "experimento"
+  "experimento",
+  "estado actual",
+  "exploraciÃ³n emocional",
+  "exploracion emocional",
+  "motivo de consulta",
+  "seguimiento contextual",
+  "categorÃ­a",
+  "categoria",
+  "intervenciÃ³n",
+  "intervencion"
 ];
 
 export function composeFinalResponse({ selectedResponse, memory }) {
   let response = selectedResponse.response || memory.voice?.fallback || "No sé bien cómo responder eso.";
 
   response = cleanTechnicalLanguage(response);
+  response = enforceFirstPerson(response, memory.caseId);
+  response = enforceFirstPersonAliases(response, memory.caseId);
   response = limitSentences(response, memory.opennessLevel, selectedResponse.responseType);
   response = avoidExactRepetition(response, memory.lastPatientMessage, memory.caseId);
   response = ensurePunctuation(response);
@@ -58,6 +69,71 @@ function cleanTechnicalLanguage(response) {
     .replace(/,\s*,/g, ",")
     .replace(/:\s*$/g, "")
     .trim();
+}
+
+function enforceFirstPerson(response, caseId) {
+  let cleaned = response;
+  const patientName = caseId === "tomas" ? "TomÃ¡s|Tomas" : "";
+
+  cleaned = cleaned
+    .replace(/\bdiria que se siente juzgado\b/gi, "diría que me siento juzgado")
+    .replace(/\bdirÃ­a que se siente juzgado\b/gi, "diría que me siento juzgado")
+    .replace(/\bse siente juzgado\b/gi, "me siento juzgado")
+    .replace(/\bse siente pasado a llevar\b/gi, "me siento pasado a llevar")
+    .replace(/\bel paciente siente\b/gi, "yo siento")
+    .replace(/\bel paciente se siente\b/gi, "yo me siento");
+
+  if (patientName) {
+    cleaned = cleaned
+      .replace(new RegExp(`\\b(${patientName}) siente\\b`, "gi"), "yo siento")
+      .replace(new RegExp(`\\b(${patientName}) se siente\\b`, "gi"), "yo me siento");
+  }
+
+  return cleaned;
+}
+
+function enforceFirstPersonAliases(response, caseId) {
+  let cleaned = response
+    .replace(/\bse siente juzgado\b/gi, "me siento juzgado")
+    .replace(/\bse siente pasado a llevar\b/gi, "me siento pasado a llevar")
+    .replace(/\bdiria que se siente\b/gi, "diria que me siento")
+    .replace(/\bdiría que se siente\b/gi, "diría que me siento")
+    .replace(/\bel paciente siente\b/gi, "yo siento")
+    .replace(/\bel paciente se siente\b/gi, "yo me siento")
+    .replace(/\bel paciente cree\b/gi, "yo creo")
+    .replace(/\bel paciente piensa\b/gi, "yo pienso");
+
+  const namesByCase = {
+    tomas: ["Tomas", "Tomás", "TomÃ¡s", "TomÃƒÂ¡s"],
+    valentina: ["Valentina"],
+    marcos: ["Marcos"],
+    camila: ["Camila"],
+    daniela: ["Daniela"],
+    elena: ["Elena"],
+    nicolas: ["Nicolas", "Nicolás", "NicolÃ¡s", "NicolÃƒÂ¡s"],
+    sofia: ["Sofia", "Sofía", "SofÃ­a", "SofÃƒÂ­a"],
+    claudio: ["Claudio"],
+    rodrigo: ["Rodrigo"],
+    fernanda: ["Fernanda"],
+    hector: ["Hector", "Héctor", "HÃ©ctor", "HÃƒÂ©ctor"],
+    andres: ["Andres", "Andrés", "AndrÃ©s", "AndrÃƒÂ©s"],
+    patricia: ["Patricia"],
+    miguel: ["Miguel"]
+  };
+
+  for (const name of namesByCase[caseId] || []) {
+    cleaned = cleaned
+      .replace(new RegExp(`\\b${escapeRegExp(name)} siente\\b`, "gi"), "yo siento")
+      .replace(new RegExp(`\\b${escapeRegExp(name)} se siente\\b`, "gi"), "yo me siento")
+      .replace(new RegExp(`\\b${escapeRegExp(name)} cree\\b`, "gi"), "yo creo")
+      .replace(new RegExp(`\\b${escapeRegExp(name)} piensa\\b`, "gi"), "yo pienso");
+  }
+
+  return cleaned;
+}
+
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function limitSentences(response, opennessLevel, responseType) {

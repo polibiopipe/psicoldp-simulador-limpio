@@ -14,6 +14,53 @@ const commonProgressiveDisclosure = {
   high: "Puede reconocer contradicciones, necesidades y ejemplos más personales."
 };
 
+const learningObjectivesByProfile = {
+  tomas: [
+    "Realizar un encuadre inicial claro y respetuoso.",
+    "Explorar el motivo de consulta sin juzgar el uso de videojuegos.",
+    "Diferenciar conducta observable de posible malestar emocional.",
+    "Indagar contexto familiar y social de forma gradual.",
+    "Usar preguntas abiertas, validacion y seguimiento contextual.",
+    "Cerrar la entrevista dejando continuidad formativa."
+  ],
+  camila: [
+    "Explorar sobrecarga relacional y dificultad para poner limites.",
+    "Identificar emociones asociadas al cansancio y disponibilidad hacia otros.",
+    "Validar sin reforzar culpa ni autoexigencia.",
+    "Indagar red de apoyo y recursos personales.",
+    "Cerrar con una sintesis cuidadosa del motivo inicial."
+  ],
+  daniela: [
+    "Explorar maternidad reciente, estudio y autocuidado.",
+    "Indagar culpa, cansancio y exigencias del rol.",
+    "Validar la experiencia sin idealizar la maternidad.",
+    "Explorar red de apoyo y distribucion de responsabilidades.",
+    "Cerrar con sintesis y continuidad."
+  ],
+  marcos: [
+    "Explorar estres laboral sin reducirlo solo a rendimiento.",
+    "Indagar cansancio, irritabilidad y perdida de sentido.",
+    "Diferenciar sintomas, contexto laboral y recursos disponibles.",
+    "Evitar entregar soluciones prematuras.",
+    "Favorecer reflexion sobre malestar y funcionamiento cotidiano."
+  ],
+  valentina: [
+    "Explorar sobrecarga academica y autoexigencia.",
+    "Indagar expectativas familiares y personales.",
+    "Validar el cansancio sin patologizar de inmediato.",
+    "Explorar habitos de descanso y apoyo.",
+    "Cerrar identificando temas relevantes para continuar."
+  ]
+};
+
+const referredByByProfile = {
+  tomas: "Mis papás insistieron. Yo no sé si habría venido solo, pero tampoco quería seguir peleando por lo mismo.",
+  camila: "Vine por mi cuenta, aunque me costó reconocer que necesitaba hablar de esto. Sentía que ya no estaba pudiendo con todo.",
+  daniela: "Vine por mi cuenta. Me costó decidirlo, porque siento culpa cada vez que pienso en mí, pero necesitaba hablarlo.",
+  marcos: "Mi pareja me sugirió hablar. Al principio lo tomé como exageración, pero creo que algo de razón tenía.",
+  valentina: "Vine por mi cuenta, porque me sentí sobrepasada. Igual me costó admitir que necesitaba parar un poco."
+};
+
 export const caseProfiles = {
   tomas: createProfile({
     id: "tomas",
@@ -69,6 +116,10 @@ export const caseProfiles = {
         "Vivo con mis papás. Últimamente discutimos harto por el tema del computador.",
         "Vivo con mis papás. Paso harto tiempo en mi pieza, sobre todo cuando empiezan las discusiones."
       ],
+      convivencia_familia: [
+        "Vivo con mis papás.",
+        "Vivo con mis papás. Paso harto tiempo en mi pieza, sobre todo cuando empiezan las discusiones."
+      ],
       videojuegos: [
         "Juego más online, cosas de equipo. Me gusta porque ahí sé qué tengo que hacer.",
         "En el computador siento que tengo un lugar más claro. Afuera me cuesta más saber cómo actuar.",
@@ -78,6 +129,10 @@ export const caseProfiles = {
         "Voy al colegio. No es que odie ir, pero me cuesta sentirme cómodo con los demás.",
         "En el colegio hablo poco. A veces prefiero no decir nada.",
         "No trabajo. Mi rutina es colegio, casa y computador."
+      ],
+      colegio_estudios: [
+        "Sí, voy al colegio. Hablo poco allá; a veces prefiero no decir nada.",
+        "Sí, voy al colegio. No es que odie ir, pero me cuesta sentirme cómodo con los demás."
       ],
       amistades: [
         "Tengo más contacto con gente online que en persona.",
@@ -112,6 +167,18 @@ export const caseProfiles = {
       seguimiento_emocional_contextual: [
         "Porque no sé bien qué decir. Me cuesta hablar cuando siento que me están mirando o esperando que explique algo.",
         "Porque todavía no sé si quiero hablar mucho. Me cuesta explicar lo que me pasa sin sentir que me van a juzgar."
+      ],
+      seguimiento_colegio_habla_poco: [
+        "Porque siento que si digo algo, los demás pueden encontrarlo raro o tonto. Entonces prefiero quedarme callado.",
+        "Porque me cuesta saber qué decir. A veces pienso mucho antes de hablar y al final no digo nada."
+      ],
+      seguimiento_discusiones_computador: [
+        "A las discusiones por el computador. Mis papás dicen que juego mucho y que casi no salgo.",
+        "Casi siempre terminan siendo por el computador. Ellos dicen que juego mucho y yo siento que no escuchan lo que intento explicar."
+      ],
+      seguimiento_sentirse_juzgado: [
+        "Me siento juzgado cuando ya vienen con la idea de que todo lo hago mal por estar en el computador. Ahí siento que no escuchan lo que me pasa.",
+        "Cuando hablan como si el computador explicara todo, me siento juzgado. Es como si antes de escucharme ya tuvieran la respuesta."
       ],
       seguimiento_contextual: [
         "Creo que lo que trato de decir es que no juego solo por jugar. A veces ahí me siento menos raro que cuando estoy con gente.",
@@ -571,14 +638,60 @@ export const caseProfiles = {
 };
 
 function createProfile(profile) {
+  const topics = {
+    ...(profile.topics || {}),
+    derivacion: profile.topics?.derivacion || [referredByByProfile[profile.id] || profile.reasonForConsultation].filter(Boolean)
+  };
+  const basicFacts = {
+    livesWith: profile.basicFacts?.livesWith || firstOf(topics.convivencia) || profile.familyContext || "",
+    siblings: profile.basicFacts?.siblings || profile.siblings || firstOf(topics.hermanos) || "",
+    studiesOrWork: profile.basicFacts?.studiesOrWork || firstOf(topics.estudios_trabajo) || profile.academicOrWorkContext || "",
+    dailyRoutine: profile.basicFacts?.dailyRoutine || firstOf(topics.rutina_diaria) || profile.dailyRoutine || "",
+    referredBy: profile.basicFacts?.referredBy || referredByByProfile[profile.id] || "",
+    reasonForConsultation: profile.basicFacts?.reasonForConsultation || profile.reasonForConsultation || firstOf(topics.motivo_consulta) || ""
+  };
+  const personality = {
+    communicationStyle: profile.personality?.communicationStyle || profile.communicationStyle || "",
+    initialAttitude: profile.personality?.initialAttitude || profile.initialAttitude || "",
+    emotionalTone: profile.personality?.emotionalTone || profile.emotionalCore || "",
+    defensiveTriggers: profile.personality?.defensiveTriggers || "Juicio, presion, consejos rapidos o preguntas que reducen su experiencia a una sola causa.",
+    openingTriggers: profile.personality?.openingTriggers || "Validacion, preguntas concretas, calma y seguimiento de lo que acaba de decir.",
+    typicalPhrases: profile.personality?.typicalPhrases || profile.phrasesTheyUse || []
+  };
+  const clinicalNarrative = {
+    visibleProblem: profile.clinicalNarrative?.visibleProblem || profile.reasonForConsultation || "",
+    underlyingConflict: profile.clinicalNarrative?.underlyingConflict || profile.emotionalCore || "",
+    emotionalCore: profile.clinicalNarrative?.emotionalCore || profile.emotionalCore || "",
+    familyContext: profile.clinicalNarrative?.familyContext || profile.familyContext || "",
+    socialContext: profile.clinicalNarrative?.socialContext || profile.socialContext || "",
+    academicOrWorkContext: profile.clinicalNarrative?.academicOrWorkContext || profile.academicOrWorkContext || "",
+    protectiveFactors: profile.clinicalNarrative?.protectiveFactors || profile.protectiveFactors || "",
+    riskSignals: profile.clinicalNarrative?.riskSignals || profile.riskSignals || "",
+    whatTheyKnow: profile.clinicalNarrative?.whatTheyKnow || profile.whatThePatientKnows || "",
+    whatTheyAvoid: profile.clinicalNarrative?.whatTheyAvoid || profile.whatThePatientAvoids || "",
+    whatTheyRevealEarly: profile.clinicalNarrative?.whatTheyRevealEarly || firstOf(topics.motivo_consulta) || "",
+    whatTheyRevealLater: profile.clinicalNarrative?.whatTheyRevealLater || firstOf(topics.seguimiento_contextual) || profile.emotionalCore || ""
+  };
+  const disclosureLevels = {
+    ...commonProgressiveDisclosure,
+    ...(profile.disclosureLevels || profile.progressiveDisclosure || {})
+  };
+
   return {
     ...profile,
+    basicFacts,
+    personality,
+    clinicalNarrative,
+    topics,
+    disclosureLevels,
+    learningObjectives: profile.learningObjectives || learningObjectivesByProfile[profile.id] || [],
     responseGuidelines: [...commonResponseGuidelines, ...(profile.responseGuidelines || [])],
-    progressiveDisclosure: {
-      ...commonProgressiveDisclosure,
-      ...(profile.progressiveDisclosure || {})
-    }
+    progressiveDisclosure: disclosureLevels
   };
+}
+
+function firstOf(value) {
+  return Array.isArray(value) ? value.find(Boolean) || "" : value || "";
 }
 
 function seedAdvanced(name, age, difficulty, mainTheme, image, data) {

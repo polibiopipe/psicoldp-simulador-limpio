@@ -6,7 +6,11 @@ const intentTopicMap = {
   saludo: "saludo",
   presentacion_personal_abierta: "presentacion_personal_abierta",
   motivo_de_consulta: "motivo_consulta",
+  derivacion_llegada: "derivacion",
+  derivacion_llegada_consulta: "derivacion",
+  convivencia_familia: "convivencia_familia",
   vivienda_residencia: "convivencia",
+  colegio_estudios: "colegio_estudios",
   ocupacion_actividad: "estudios_trabajo",
   pregunta_escolar: "estudios_trabajo",
   pregunta_academica: "estudios_trabajo",
@@ -19,8 +23,19 @@ const intentTopicMap = {
   preocupacion_principal: "preocupacion",
   preferencias_valoracion: "ayuda",
   validacion_emocional: "validacion",
+  seguimiento_contextual_breve: "seguimiento_contextual_breve",
   seguimiento_emocional_contextual: "seguimiento_emocional_contextual",
   cierre: "cierre"
+};
+
+const topicAliases = {
+  convivencia_familia: "convivencia",
+  colegio_estudios: "estudios_trabajo",
+  seguimiento_contextual_breve: "seguimiento_contextual",
+  seguimiento_colegio_habla_poco: "seguimiento_contextual",
+  seguimiento_discusiones_computador: "familia",
+  seguimiento_sentirse_juzgado: "emociones",
+  seguimiento_emocional_contextual: "seguimiento_contextual"
 };
 
 export function selectCaseProfileResponse({
@@ -84,9 +99,13 @@ export function detectProfileTopic({ message, intent, intentResult, memory, prof
   if (isRiskQuestion(text)) return "riesgo";
   if (isTrulyAmbiguous(text) && !intentResult.explicitReferenceDetected) return "ambiguo_real";
   if (isCurrentStateQuestion(text)) return "estado_actual";
+  if (intent === "derivacion_llegada" || intent === "derivacion_llegada_consulta" || isDerivationQuestion(text)) return "derivacion";
   if (isMotiveQuestion(text)) return "motivo_consulta";
   if (isHelpExpectationQuestion(text)) return "ayuda";
-  if (intent === "seguimiento_emocional_contextual") return "seguimiento_emocional_contextual";
+  if (intent === "convivencia_familia") return "convivencia_familia";
+  if (intent === "colegio_estudios") return "colegio_estudios";
+  if (intent === "seguimiento_contextual_breve") return detectFollowUpTopic({ text, lastPatientMessage, profile, preferBriefFollowUp: true });
+  if (intent === "seguimiento_emocional_contextual") return detectEmotionalFollowUpTopic({ text, lastPatientMessage, profile });
   if (intent === "seguimiento_contextual_explicito" || intent === "seguimiento_contextual" || isExplicitFollowUp(text)) {
     return detectFollowUpTopic({ text, lastPatientMessage, profile, preferExplicitFollowUp: true });
   }
@@ -116,7 +135,8 @@ function getCandidatesForTopic({ profile, topic, memory, intentResult }) {
       })
     : topic;
 
-  const direct = profile.topics?.[specificTopic] || [];
+  const aliasTopic = topicAliases[specificTopic];
+  const direct = profile.topics?.[specificTopic] || profile.topics?.[aliasTopic] || [];
   if (direct.length) return direct;
 
   if (specificTopic !== "seguimiento_contextual" && profile.topics?.seguimiento_contextual?.length) {
@@ -129,8 +149,11 @@ function getCandidatesForTopic({ profile, topic, memory, intentResult }) {
 function buildConstructedCandidates(profile, topic, memory) {
   const baseByTopic = {
     motivo_consulta: profile.reasonForConsultation,
+    derivacion: profile.basicFacts?.referredBy || profile.reasonForConsultation,
     familia: profile.familyContext,
+    convivencia_familia: profile.familyContext,
     convivencia: profile.familyContext,
+    colegio_estudios: profile.academicOrWorkContext,
     estudios_trabajo: profile.academicOrWorkContext,
     amistades: profile.socialContext,
     emociones: profile.emotionalCore,
@@ -138,6 +161,8 @@ function buildConstructedCandidates(profile, topic, memory) {
     preocupacion: profile.emotionalCore,
     ayuda: profile.whatThePatientKnows,
     validacion: profile.emotionalCore,
+    seguimiento_contextual_breve: profile.emotionalCore,
+    seguimiento_emocional_contextual: profile.emotionalCore,
     seguimiento_contextual: profile.emotionalCore
   };
 
@@ -166,11 +191,25 @@ function pickProfileResponse({ caseId, topic, candidates, memory }) {
     id: makeProfileResponseId(caseId, topic, text, index)
   }));
 
-  const opennessOffset = memory?.opennessLevel === "apertura_alta"
-    ? 2
-    : memory?.opennessLevel === "apertura_media"
-      ? 1
-      : 0;
+  const directConcreteTopics = new Set([
+    "convivencia_familia",
+    "convivencia",
+    "colegio_estudios",
+    "hermanos",
+    "derivacion",
+    "seguimiento_no_es_tan_simple",
+    "seguimiento_colegio_habla_poco",
+    "seguimiento_discusiones_computador",
+    "seguimiento_sentirse_juzgado",
+    "seguimiento_emocional_contextual"
+  ]);
+  const opennessOffset = directConcreteTopics.has(topic)
+    ? 0
+    : memory?.opennessLevel === "apertura_alta"
+      ? 2
+      : memory?.opennessLevel === "apertura_media"
+        ? 1
+        : 0;
 
   const ordered = [...enriched.slice(opennessOffset), ...enriched.slice(0, opennessOffset)];
   const unused = ordered.find((candidate) => {
@@ -198,8 +237,29 @@ function detectFollowUpTopic({ text, lastPatientMessage, profile }) {
   const combined = `${text} ${lastPatientMessage}`;
   const topics = profile.topics || {};
 
+  if (profile.id === "tomas" && /discusion|discusiones|a que discusiones/.test(combined) && topics.seguimiento_discusiones_computador) {
+    return "seguimiento_discusiones_computador";
+  }
+
+  if (profile.id === "tomas" && /juzgado|juzgan|juzgar/.test(combined) && topics.seguimiento_sentirse_juzgado) {
+    return "seguimiento_sentirse_juzgado";
+  }
+
+  if (
+    profile.id === "tomas" &&
+    /^(por que|porque)$/.test(text.trim()) &&
+    /colegio|hablo poco|prefiero no decir|callado|callarme|quedarme callado/.test(lastPatientMessage) &&
+    topics.seguimiento_colegio_habla_poco
+  ) {
+    return "seguimiento_colegio_habla_poco";
+  }
+
   if (profile.id === "tomas" && /no es tan simple|no tan simple|simple/.test(combined) && topics.seguimiento_no_es_tan_simple) {
     return "seguimiento_no_es_tan_simple";
+  }
+
+  if (/^(por que|porque)$/.test(text.trim())) {
+    return "seguimiento_contextual";
   }
 
   if (isExplicitFollowUp(text)) {
@@ -225,13 +285,24 @@ function detectFollowUpTopic({ text, lastPatientMessage, profile }) {
   return "seguimiento_contextual";
 }
 
+function detectEmotionalFollowUpTopic({ text, lastPatientMessage, profile }) {
+  if (profile.id === "tomas" && /juzgado|juzgan|juzgar/.test(`${text} ${lastPatientMessage}`) && profile.topics?.seguimiento_sentirse_juzgado) {
+    return "seguimiento_sentirse_juzgado";
+  }
+
+  return "seguimiento_emocional_contextual";
+}
+
 function toResolvedIntent(topic, originalIntent) {
   const map = {
     estado_actual: "estado_actual",
     motivo_consulta: "motivo_de_consulta",
+    derivacion: "derivacion_llegada",
     familia: "familia",
     hermanos: "hermanos",
+    convivencia_familia: "convivencia_familia",
     convivencia: "convivencia",
+    colegio_estudios: "colegio_estudios",
     videojuegos: "videojuegos",
     estudios_trabajo: "estudios_trabajo",
     amistades: "amistades",
@@ -240,9 +311,13 @@ function toResolvedIntent(topic, originalIntent) {
     preocupacion: "preocupacion_principal",
     ayuda: "preferencias_valoracion",
     validacion: "validacion_emocional",
+    seguimiento_contextual_breve: "seguimiento_contextual_breve",
     seguimiento_emocional_contextual: "seguimiento_emocional_contextual",
     seguimiento_contextual: "seguimiento_contextual",
     seguimiento_no_es_tan_simple: "seguimiento_contextual",
+    seguimiento_colegio_habla_poco: "seguimiento_contextual_breve",
+    seguimiento_discusiones_computador: "seguimiento_contextual",
+    seguimiento_sentirse_juzgado: "seguimiento_emocional_contextual",
     cierre: "cierre",
     riesgo: "riesgo",
     ambiguo_real: "ambiguo_real"
@@ -258,6 +333,10 @@ function isMotiveQuestion(text) {
   return /\b(que te trajo|que te trae|por que viniste|por que estas aqui|por que estas aca|motivo de consulta|que paso para que llegaras|que te esta pasando|que sucede)\b/.test(text);
 }
 
+function isDerivationQuestion(text) {
+  return /\b(quien te pidio venir|quien pidio que vinieras|viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te derivo|quien te trajo|fue idea tuya|viniste por tu cuenta)\b/.test(text);
+}
+
 function isFamilyQuestion(text) {
   return /\b(cuentame de tu familia|como es tu familia|tu familia|con tu familia|familia)\b/.test(text);
 }
@@ -267,7 +346,7 @@ function isSiblingQuestion(text) {
 }
 
 function isResidenceQuestion(text) {
-  return /\b(donde vives|con quien vives|vives con|vives solo|vives sola|con quien compartes casa)\b/.test(text);
+  return /\b(donde vives|con quien vives|con quienes vives|quien vive contigo|quienes viven contigo|vives con|vives solo|vives sola|con quien compartes casa)\b/.test(text);
 }
 
 function isDigitalOrVideogameQuestion(text, profile) {
@@ -276,7 +355,7 @@ function isDigitalOrVideogameQuestion(text, profile) {
 }
 
 function isStudyOrWorkQuestion(text) {
-  return /\b(colegio|universidad|estudias|que estudias|trabajas|trabajo|pega|a que te dedicas|que haces actualmente|ocupacion)\b/.test(text);
+  return /\b(vas al colegio|colegio|universidad|estudias|que estudias|en que curso|que curso|trabajas|trabajo|pega|a que te dedicas|que haces actualmente|ocupacion)\b/.test(text);
 }
 
 function isDailyRoutineQuestion(text) {
