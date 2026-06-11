@@ -704,6 +704,13 @@ function createProfile(profile) {
     ...(profile.topics || {}),
     derivacion: profile.topics?.derivacion || [referredByByProfile[profile.id] || profile.reasonForConsultation].filter(Boolean)
   };
+  if (profile.id === "tomas") {
+    topics.motivo_consulta = [
+      "Creo que vine por mis papás. Ellos dicen que paso mucho tiempo en el computador y que casi no salgo.",
+      "Creo que la consulta es por el tema del computador. Mis papás dicen que juego mucho y que casi no salgo.",
+      "Mis papás quisieron que viniera porque están preocupados por el computador."
+    ];
+  }
   const basicFacts = {
     livesWith: profile.basicFacts?.livesWith || firstOf(topics.convivencia) || profile.familyContext || "",
     siblings: profile.basicFacts?.siblings || profile.siblings || firstOf(topics.hermanos) || "",

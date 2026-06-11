@@ -200,6 +200,7 @@ function pickProfileResponse({ caseId, topic, candidates, memory }) {
     "convivencia",
     "colegio_estudios",
     "hermanos",
+    "motivo_consulta",
     "derivacion",
     "seguimiento_no_es_tan_simple",
     "seguimiento_colegio_habla_poco",
@@ -340,7 +341,7 @@ function isCurrentStateQuestion(text) {
 }
 
 function isMotiveQuestion(text) {
-  return /\b(que te trajo|que te trae|por que viniste|por que estas aqui|por que estas aca|motivo de consulta|que paso para que llegaras|que te esta pasando|que sucede)\b/.test(text);
+  return /\b(que te trajo|que te trae|por que viniste|por que estas( hoy)? aqui|por qu estas( hoy)? aqui|por que estas( hoy)? aca|motivo de consulta|cual es tu consulta|que paso para que llegaras|que paso para que vinieras|que te esta pasando|que sucede)\b/.test(text);
 }
 
 function isDerivationQuestion(text) {

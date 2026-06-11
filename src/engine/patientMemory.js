@@ -47,6 +47,7 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
   if (intent === "colegio_estudios") trustLevel += 2;
   if (intent === "saludo_simple") trustLevel += 3;
   if (intent === "saludo") trustLevel += 3;
+  if (intent === "identidad_nombre") trustLevel += 1;
   if (intent === "cortesia_vinculo") trustLevel += 6;
   if (intent === "presentacion_estudiante") trustLevel += 4;
   if (intent === "encuadre" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta" || intent === "encuadre_mas_pregunta_abierta") trustLevel += 6;
@@ -142,6 +143,7 @@ function normalizeForEvasion(text) {
 
 function topicFromIntent(intent) {
   if (intent === "pregunta_familiar") return "familia";
+  if (intent === "identidad_nombre") return "identidad";
   if (intent === "familia") return "familia";
   if (intent === "hermanos") return "hermanos";
   if (intent === "convivencia") return "convivencia";

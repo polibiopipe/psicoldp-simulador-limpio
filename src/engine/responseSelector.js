@@ -4,6 +4,7 @@ import { forceCompositeOpenQuestionResponse } from "./compositeResponses.js";
 import { isEvasivePatientResponse } from "./patientMemory.js";
 
 const intentToFact = {
+  identidad_nombre: "name",
   nombre: "name",
   edad: "age",
   vivienda_residencia: "residence",
@@ -282,7 +283,10 @@ export function selectResponse({ caseId, intentResult, memory }) {
   let responseType = intent;
   let candidates = [];
 
-  if (intent === "presentacion_estudiante") {
+  if (intent === "identidad_nombre" || intent === "nombre") {
+    candidates = buildNameCandidates(facts);
+    responseType = "identidad_nombre";
+  } else if (intent === "presentacion_estudiante") {
     const buildPresentation = studentPresentationResponses[caseId] || ((name) => defaultStudentPresentation(facts, name));
     candidates = buildPresentation(intentResult.studentName || "");
     responseType = "presentacion_estudiante";
@@ -359,6 +363,10 @@ export function selectResponse({ caseId, intentResult, memory }) {
     responseType,
     fallbackUsed
   };
+}
+
+function buildNameCandidates(facts) {
+  return [`Me llamo ${facts.name}.`, `${facts.name}.`].filter(Boolean);
 }
 
 function factToResponse(intent, facts) {

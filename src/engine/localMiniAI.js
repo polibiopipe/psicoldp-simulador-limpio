@@ -20,6 +20,7 @@ export function generateLocalPatientResponse({
 }) {
   const workingMemory = buildPatientMemory({ caseId, history, difficulty, memory });
   const intentResult = detectIntent(studentMessage, history);
+  const textDetectedIntent = intentResult.intent;
   const compositeMessageDetected = isCompositeOpenQuestionMessage(studentMessage);
   if (compositeMessageDetected && intentResult.intent !== "encuadre_mas_pregunta_abierta") {
     intentResult.intent = "encuadre_mas_pregunta_abierta";
@@ -51,6 +52,22 @@ export function generateLocalPatientResponse({
 
   if (guidedResult) {
     applyGuidedIntentResult(intentResult, guidedResult);
+  }
+
+  if (textDetectedIntent === "identidad_nombre") {
+    intentResult.intent = "identidad_nombre";
+    intentResult.confidence = Math.max(intentResult.confidence || 0, 0.98);
+    intentResult.contextualTopic = null;
+    intentResult.matches = {
+      ...intentResult.matches,
+      identidad_nombre: true
+    };
+    intentResult.categories = {
+      ...intentResult.categories,
+      closedQuestion: true,
+      followUp: false,
+      empathicSummary: false
+    };
   }
 
   const profileResponse = selectCaseProfileResponse({
@@ -238,7 +255,7 @@ function categoriesForGuidedIntent(intent) {
       "preocupacion_principal",
       "preferencias_valoracion"
     ].includes(intent),
-    closedQuestion: ["nombre", "edad", "vivienda_residencia", "ocupacion_actividad", "derivacion_llegada", "derivacion_llegada_consulta"].includes(intent),
+    closedQuestion: ["identidad_nombre", "nombre", "edad", "vivienda_residencia", "ocupacion_actividad", "derivacion_llegada", "derivacion_llegada_consulta"].includes(intent),
     validation: intent === "validacion_emocional",
     judgment: false,
     rushedAdvice: false,

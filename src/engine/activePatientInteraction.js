@@ -3,6 +3,7 @@ import { normalizeText } from "../utils/textUtils.js";
 
 const concreteIntentBlocklist = new Set([
   "nombre",
+  "identidad_nombre",
   "edad",
   "convivencia",
   "convivencia_familia",

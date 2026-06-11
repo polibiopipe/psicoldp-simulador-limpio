@@ -27,7 +27,8 @@ const intentLexicon = {
     "quiero que este sea un espacio seguro",
     "vamos a conversar con calma"
   ],
-  nombre: ["cual es tu nombre", "como te llamas", "me dices tu nombre", "quien eres", "como prefieres que te diga"],
+  identidad_nombre: ["cual es tu nombre", "como te llamas", "dime tu nombre", "tu nombre", "quien eres"],
+  nombre: ["cual es tu nombre", "como te llamas", "me dices tu nombre", "quien eres", "como prefieres que te diga", "dime tu nombre", "tu nombre"],
   edad: ["cuantos anos tienes", "que edad tienes", "edad"],
   presentacion_personal_abierta: [
     "cuentame de ti",
@@ -88,6 +89,7 @@ const intentLexicon = {
     "que te sucede",
     "que esta pasando",
     "que te esta pasando",
+    "cual es tu consulta",
     "quien te derivo",
     "que paso para que llegaras"
   ],
@@ -195,20 +197,21 @@ const intentLexicon = {
 };
 
 const priority = [
+  "identidad_nombre",
+  "edad",
+  "convivencia_familia",
+  "vivienda_residencia",
+  "colegio_estudios",
   "saludo",
   "presentacion_estudiante",
   "encuadre_mas_pregunta_abierta",
   "encuadre_o_consentimiento",
   "cortesia_vinculo",
   "nombre",
-  "convivencia_familia",
-  "edad",
   "rol_entrevistador",
   "presentacion_personal_abierta",
-  "derivacion_llegada",
   "motivo_de_consulta",
-  "vivienda_residencia",
-  "colegio_estudios",
+  "derivacion_llegada",
   "ocupacion_actividad",
   "preocupacion_principal",
   "preferencias_valoracion",
@@ -318,11 +321,13 @@ export function detectIntent(studentMessage, history = []) {
     matches[intent] = terms.some((term) => text.includes(normalizeText(term)));
   }
 
+  matches.identidad_nombre = matches.identidad_nombre || detectsIdentityName(text);
   matches.presentacion_estudiante = matches.presentacion_estudiante || detectsStudentPresentation(text);
   matches.encuadre_o_consentimiento = matches.encuadre_o_consentimiento || detectsFraming(text);
   matches.encuadre_mas_pregunta_abierta =
     isCompositeOpenQuestionMessage(studentMessage) ||
     detectsCompoundFramingQuestion(text, matches);
+  matches.motivo_de_consulta = matches.motivo_de_consulta || detectsMotiveQuestion(text);
   matches.derivacion_llegada = matches.derivacion_llegada || detectsDerivationArrival(text);
   matches.ocupacion_actividad = matches.ocupacion_actividad || detectsOccupationActivity(text);
   matches.vivienda_residencia = matches.vivienda_residencia || detectsResidenceQuestion(text);
@@ -377,6 +382,7 @@ export function detectIntent(studentMessage, history = []) {
 
 function detectContextualTopic(text, history, explicitReferenceDetected = false) {
   if (intentLexicon.motivo_de_consulta.some((term) => text.includes(normalizeText(term)))) return null;
+  if (detectsIdentityName(text)) return null;
   if (detectsDerivationArrival(text)) return null;
   if (intentLexicon.presentacion_personal_abierta.some((term) => text.includes(normalizeText(term)))) return null;
   if (detectsStudentPresentation(text) || detectsFraming(text)) return null;
@@ -488,6 +494,16 @@ function detectsStudentPresentation(text) {
   );
 }
 
+function detectsIdentityName(text) {
+  return (
+    /\bcomo te llamas\b/.test(text) ||
+    /\bcual es tu nombre\b/.test(text) ||
+    /\bdime tu nombre\b/.test(text) ||
+    /\btu nombre\b/.test(text) ||
+    /\bquien eres\b/.test(text)
+  );
+}
+
 function detectsFraming(text) {
   return (
     /\bquiero explicarte\b/.test(text) ||
@@ -539,13 +555,27 @@ function detectsCompoundFramingQuestion(text, matches = {}) {
   return hasFramingOrSupport && hasOpenQuestion;
 }
 
+function detectsMotiveQuestion(text) {
+  return (
+    /\bque te (trae|trajo) (aqui|aca)\b/.test(text) ||
+    /\bpor que estas( hoy)? (aqui|aca)\b/.test(text) ||
+    /\bpor qu estas( hoy)? (aqui|aca)\b/.test(text) ||
+    /\bpor que viniste\b/.test(text) ||
+    /\bcual es tu consulta\b/.test(text) ||
+    /\bmotivo de consulta\b/.test(text) ||
+    /\bque paso para que (llegaras|vinieras)\b/.test(text)
+  );
+}
+
 function hasExplicitMotiveCue(text) {
   return (
     /\bsabes por que estas (aqui|aca)\b/.test(text) ||
-    /\bpor que estas (aqui|aca)\b/.test(text) ||
+    /\bpor que estas( hoy)? (aqui|aca)\b/.test(text) ||
+    /\bpor qu estas( hoy)? (aqui|aca)\b/.test(text) ||
     /\bpor que viniste\b/.test(text) ||
     /\bsabes por que viniste\b/.test(text) ||
     /\bmotivo( de consulta)?\b/.test(text) ||
+    /\bcual es tu consulta\b/.test(text) ||
     /\bque te trae\b/.test(text) ||
     /\bpor que te (derivaron|mandaron)\b/.test(text) ||
     /\bquien te derivo\b/.test(text) ||
@@ -652,7 +682,7 @@ function toLegacyCategories(intent, matches, text = "") {
     greeting: intent === "saludo",
     framing: intent === "rol_entrevistador" || intent === "cortesia_vinculo" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta_abierta",
     openQuestion: /^(encuadre_mas_pregunta_abierta|presentacion_personal_abierta|motivo_de_consulta|derivacion_llegada|preocupacion_principal|seguimiento_contextual_breve|seguimiento_emocional_contextual|seguimiento_contextual|seguimiento_contextual_explicito|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
-    closedQuestion: intent.startsWith("pregunta_") || intent === "colegio_estudios" || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "convivencia_familia" || intent === "nombre" || intent === "edad",
+    closedQuestion: intent.startsWith("pregunta_") || intent === "colegio_estudios" || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "convivencia_familia" || intent === "identidad_nombre" || intent === "nombre" || intent === "edad",
     validation: intent === "validacion_emocional",
     judgment: intent === "juicio_o_critica",
     rushedAdvice: intent === "consejo_apresurado",
