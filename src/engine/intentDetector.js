@@ -61,7 +61,16 @@ const intentLexicon = {
     "si algo te incomoda",
     "objetivo de esta entrevista",
     "lo que conversemos",
-    "fines educativos"
+    "fines educativos",
+    "queda entre tu y yo",
+    "quedara entre tu y yo",
+    "esto queda entre",
+    "lo que digas queda",
+    "salvo que estes en peligro",
+    "si estas en peligro",
+    "confidencialidad",
+    "confidencial",
+    "espacio de confianza"
   ],
   motivo_de_consulta: [
     "sabes por que estas aqui",
@@ -180,7 +189,7 @@ const intentLexicon = {
   ],
   juicio_o_critica: ["flojo", "adict", "exageras", "eso te hace mal", "tienes que cambiar", "estas mal", "eres el problema", "deberias dejar"],
   consejo_apresurado: ["deberias", "tienes que", "te recomiendo", "deja de", "lo mejor seria", "haz ejercicio", "organizate", "pon limites y listo"],
-  exploracion_emocional: ["que sientes", "como te sientes", "que te pasa", "que te sucede", "que es lo que sientes", "como lo vives", "que te cuesta mas", "que te cuesta contar", "que parte te duele", "te da miedo", "te da culpa", "te da rabia", "te da pena"],
+  exploracion_emocional: ["que sientes", "como te sientes", "que te pasa", "que te sucede", "que es lo que sientes", "como lo vives", "que te cuesta mas", "que te cuesta contar", "que parte te duele", "te da miedo", "te da culpa", "te da rabia", "te da pena", "tu sientes", "sientes que", "tu sientes que"],
   exploracion_contextual: ["como es en tu casa", "como es en tu trabajo", "como es en la universidad", "como es con tu familia", "como es con tus amigos", "que pasa ahi", "desde cuando pasa"],
   cierre: ["cerrar", "terminar", "finalizar", "antes de terminar", "gracias por conversar", "como quedas", "como te vas", "proxima sesion", "siguiente sesion", "seguir conversando", "retomar en otra sesion", "que podriamos seguir conversando"]
 };
@@ -283,7 +292,10 @@ const followUpCues = [
   "que no es tan simple",
   "por que no es tan simple",
   "eso que dijiste",
-  "lo que mencionaste"
+  "lo que mencionaste",
+  "que no estan viendo",
+  "tu que piensas",
+  "que piensas de eso"
 ];
 
 const continuityTerms = [
@@ -321,6 +333,10 @@ export function detectIntent(studentMessage, history = []) {
 
   if (matches.validacion_emocional && matches.motivo_de_consulta && !hasExplicitMotiveCue(text)) {
     matches.motivo_de_consulta = false;
+  }
+  if (/\bespacio de confianza\b/.test(text) && !/\b(objetivo|entrevista|confidencial|confidencialidad|queda entre|peligro|quiero explicarte)\b/.test(text)) {
+    matches.validacion_emocional = true;
+    matches.encuadre_o_consentimiento = false;
   }
   if (matches.preocupacion_principal && !hasExplicitMotiveCue(text)) {
     matches.motivo_de_consulta = false;
@@ -479,6 +495,11 @@ function detectsFraming(text) {
     /\b(este|esto) es un espacio\b/.test(text) ||
     /\bentrevista simulada\b/.test(text) ||
     /\bfines educativos\b/.test(text) ||
+    /\b(queda|quedara) entre tu y yo\b/.test(text) ||
+    /\besto queda entre\b/.test(text) ||
+    /\b(confidencial|confidencialidad)\b/.test(text) ||
+    /\bsalvo que estes en peligro\b/.test(text) ||
+    /\bespacio de confianza\b/.test(text) ||
     /\bpodemos conversar con calma\b/.test(text) ||
     /\bpuedes tomarte tu tiempo\b/.test(text) ||
     /\bsi algo te incomoda\b/.test(text)

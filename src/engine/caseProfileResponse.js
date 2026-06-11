@@ -35,6 +35,7 @@ const topicAliases = {
   seguimiento_colegio_habla_poco: "seguimiento_contextual",
   seguimiento_discusiones_computador: "familia",
   seguimiento_sentirse_juzgado: "emociones",
+  seguimiento_dificultad_social: "amistades",
   seguimiento_emocional_contextual: "seguimiento_contextual"
 };
 
@@ -108,6 +109,9 @@ export function detectProfileTopic({ message, intent, intentResult, memory, prof
   if (intent === "seguimiento_emocional_contextual") return detectEmotionalFollowUpTopic({ text, lastPatientMessage, profile });
   if (intent === "seguimiento_contextual_explicito" || intent === "seguimiento_contextual" || isExplicitFollowUp(text)) {
     return detectFollowUpTopic({ text, lastPatientMessage, profile, preferExplicitFollowUp: true });
+  }
+  if (profile.id === "tomas" && /(afuera|relacion|gente|hablar con nadie|hablar con otros|persona|presencial)/.test(`${text} ${lastPatientMessage}`) && profile.topics?.seguimiento_dificultad_social) {
+    return "seguimiento_dificultad_social";
   }
   if (isSiblingQuestion(text)) return "hermanos";
   if (isResidenceQuestion(text)) return "convivencia";
@@ -201,6 +205,7 @@ function pickProfileResponse({ caseId, topic, candidates, memory }) {
     "seguimiento_colegio_habla_poco",
     "seguimiento_discusiones_computador",
     "seguimiento_sentirse_juzgado",
+    "seguimiento_dificultad_social",
     "seguimiento_emocional_contextual"
   ]);
   const opennessOffset = directConcreteTopics.has(topic)
@@ -243,6 +248,10 @@ function detectFollowUpTopic({ text, lastPatientMessage, profile }) {
 
   if (profile.id === "tomas" && /juzgado|juzgan|juzgar/.test(combined) && topics.seguimiento_sentirse_juzgado) {
     return "seguimiento_sentirse_juzgado";
+  }
+
+  if (profile.id === "tomas" && /(afuera|relacion|gente|hablar con nadie|hablar con otros|persona|presencial)/.test(combined) && topics.seguimiento_dificultad_social) {
+    return "seguimiento_dificultad_social";
   }
 
   if (
@@ -318,6 +327,7 @@ function toResolvedIntent(topic, originalIntent) {
     seguimiento_colegio_habla_poco: "seguimiento_contextual_breve",
     seguimiento_discusiones_computador: "seguimiento_contextual",
     seguimiento_sentirse_juzgado: "seguimiento_emocional_contextual",
+    seguimiento_dificultad_social: "seguimiento_contextual",
     cierre: "cierre",
     riesgo: "riesgo",
     ambiguo_real: "ambiguo_real"

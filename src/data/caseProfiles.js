@@ -61,6 +61,64 @@ const referredByByProfile = {
   valentina: "Vine por mi cuenta, porque me sentí sobrepasada. Igual me costó admitir que necesitaba parar un poco."
 };
 
+const commonActiveInteractionPatterns = {
+  asksForClarification: ["No se si entendi bien... ¿me preguntas por lo que dije recien?"],
+  asksAboutConfidentiality: ["¿Eso significa que lo que diga no se va a contar tal cual a otras personas?"],
+  reactsToValidation: ["Eso que dices me ayuda un poco."],
+  resistsPressure: ["Dicho asi me cuesta un poco responder."],
+  givesOpinion: ["No se si lo veo tan simple."],
+  asksInterviewer: ["¿Tu como lo ves?"],
+  interviewDiscomfort: ["Me cuesta un poco hablar asi, pero puedo intentar."]
+};
+
+const activeInteractionPatternsByProfile = {
+  tomas: {
+    asksForClarification: ["No se si entendi... ¿me preguntas por mi casa o por lo del computador?"],
+    asksAboutConfidentiality: ["¿Y eso significa que mis papas no van a saber todo lo que diga?"],
+    reactsToValidation: ["Eso que dices me ayuda un poco, porque normalmente siento que ya vienen con una idea hecha."],
+    resistsPressure: ["No se... dicho asi suena como si estuviera haciendo algo malo."],
+    givesOpinion: ["No se si es que no quiera salir; es mas como que afuera no se bien que hacer."],
+    asksInterviewer: ["¿Usted cree que jugar mucho esta tan mal?"],
+    interviewDiscomfort: ["Me cuesta un poco hablar asi, pero igual puedo intentar."]
+  },
+  camila: {
+    asksForClarification: ["No se si entendi... ¿me preguntas por mi familia o por esto de decir que no?"],
+    asksAboutConfidentiality: ["¿Y esto queda como un espacio para hablarlo sin que parezca que estoy culpando a alguien?"],
+    reactsToValidation: ["Gracias. Me ayuda que no suene como que estoy siendo egoista."],
+    resistsPressure: ["Me cuesta responder si suena como que deberia cortar todo de golpe."],
+    givesOpinion: ["Creo que no es que no quiera ayudar; es que a veces me olvido de preguntarme si puedo."],
+    asksInterviewer: ["¿Esta mal que me canse si igual quiero a mi familia?"],
+    interviewDiscomfort: ["Me da un poco de culpa hablar tanto de mi."]
+  },
+  daniela: {
+    asksForClarification: ["No se si entendi... ¿me preguntas por mi hijo, por estudiar o por como estoy yo?"],
+    asksAboutConfidentiality: ["¿Y puedo hablar de esto sin que suene como que no quiero ser mama?"],
+    reactsToValidation: ["Gracias. Me ayuda que no lo tomes como que soy mala mama."],
+    resistsPressure: ["Me cuesta si suena como que deberia poder con todo no mas."],
+    givesOpinion: ["Creo que una puede amar mucho a su hijo y aun asi estar agotada."],
+    asksInterviewer: ["¿Es muy raro sentirse culpable por querer descansar?"],
+    interviewDiscomfort: ["Me cuesta decir esto en voz alta, porque enseguida me siento culpable."]
+  },
+  marcos: {
+    asksForClarification: ["No se si entendi... ¿me preguntas por la pega o por como llego a la casa?"],
+    asksAboutConfidentiality: ["¿Y esto queda aca? No me acomoda sentir que estoy ventilando cosas de mi casa."],
+    reactsToValidation: ["Eso me sirve, porque no quiero que parezca solo falta de actitud."],
+    resistsPressure: ["Si lo ponemos asi, suena como que yo no quisiera hacerme cargo."],
+    givesOpinion: ["No creo que sea solo cansancio de dormir poco; es mas como desgaste."],
+    asksInterviewer: ["¿Hablar de esto realmente sirve, o es solo cansancio acumulado?"],
+    interviewDiscomfort: ["No soy mucho de hablar de estas cosas, pero puedo seguir."]
+  },
+  valentina: {
+    asksForClarification: ["No se si entendi... ¿me preguntas por la universidad o por como me lo estoy tomando?"],
+    asksAboutConfidentiality: ["¿Y puedo decir esto sin que suene como que no soy capaz?"],
+    reactsToValidation: ["Gracias. Me ayuda que no lo tomes como simple desorganizacion."],
+    resistsPressure: ["Me cuesta si suena como que solo tengo que ordenarme mejor."],
+    givesOpinion: ["Yo se que deberia descansar, pero cuando paro siento que estoy perdiendo tiempo."],
+    asksInterviewer: ["¿Estoy exagerando, o tiene sentido sentirse tan sobrepasada?"],
+    interviewDiscomfort: ["Me da un poco de verguenza decir que no puedo con todo."]
+  }
+};
+
 export const caseProfiles = {
   tomas: createProfile({
     id: "tomas",
@@ -179,6 +237,10 @@ export const caseProfiles = {
       seguimiento_sentirse_juzgado: [
         "Me siento juzgado cuando ya vienen con la idea de que todo lo hago mal por estar en el computador. Ahí siento que no escuchan lo que me pasa.",
         "Cuando hablan como si el computador explicara todo, me siento juzgado. Es como si antes de escucharme ya tuvieran la respuesta."
+      ],
+      seguimiento_dificultad_social: [
+        "Si... pero dicho asi igual suena raro. No es que no quiera hablar con nadie, es que a veces no se como hacerlo.",
+        "Afuera me cuesta mas. En el juego por lo menos se que hacer; con gente en persona me quedo pensando demasiado."
       ],
       seguimiento_contextual: [
         "Creo que lo que trato de decir es que no juego solo por jugar. A veces ahí me siento menos raro que cuando estoy con gente.",
@@ -676,6 +738,11 @@ function createProfile(profile) {
     ...commonProgressiveDisclosure,
     ...(profile.disclosureLevels || profile.progressiveDisclosure || {})
   };
+  const activeInteractionPatterns = mergeInteractionPatterns(
+    commonActiveInteractionPatterns,
+    activeInteractionPatternsByProfile[profile.id],
+    profile.activeInteractionPatterns
+  );
 
   return {
     ...profile,
@@ -684,6 +751,7 @@ function createProfile(profile) {
     clinicalNarrative,
     topics,
     disclosureLevels,
+    activeInteractionPatterns,
     learningObjectives: profile.learningObjectives || learningObjectivesByProfile[profile.id] || [],
     responseGuidelines: [...commonResponseGuidelines, ...(profile.responseGuidelines || [])],
     progressiveDisclosure: disclosureLevels
@@ -692,6 +760,17 @@ function createProfile(profile) {
 
 function firstOf(value) {
   return Array.isArray(value) ? value.find(Boolean) || "" : value || "";
+}
+
+function mergeInteractionPatterns(...sources) {
+  const merged = {};
+  for (const source of sources) {
+    if (!source) continue;
+    for (const [key, values] of Object.entries(source)) {
+      merged[key] = Array.isArray(values) ? values : [];
+    }
+  }
+  return merged;
 }
 
 function seedAdvanced(name, age, difficulty, mainTheme, image, data) {

@@ -6,6 +6,7 @@ import { buildPatientMemory, getTrustStage, updatePatientMemory } from "./patien
 import { selectCaseProfileResponse } from "./caseProfileResponse.js";
 import { selectResponse } from "./responseSelector.js";
 import { composeFinalResponse } from "./responseComposer.js";
+import { applyActivePatientInteraction } from "./activePatientInteraction.js";
 
 export function generateLocalPatientResponse({
   caseId,
@@ -97,6 +98,16 @@ export function generateLocalPatientResponse({
     wasCompositeForced = true;
   }
 
+  const activeInteractionResult = applyActivePatientInteraction({
+    caseId,
+    responseText,
+    studentMessage,
+    intentResult,
+    memory: workingMemory,
+    selectedResponse
+  });
+  responseText = activeInteractionResult.responseText;
+
   const memoryUpdate = updatePatientMemory({
     memory: workingMemory,
     intent: intentResult.intent,
@@ -134,6 +145,7 @@ export function generateLocalPatientResponse({
     memory: memoryUpdate,
     fallbackUsed: selectedResponse.fallbackUsed,
     wasCompositeForced,
+    activeInteraction: activeInteractionResult.activeInteraction,
     guided: guidedResult
       ? {
           selectedInterventionType: guidedResult.selectedInterventionType,

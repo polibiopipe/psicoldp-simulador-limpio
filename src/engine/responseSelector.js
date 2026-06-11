@@ -546,6 +546,12 @@ function selectConcreteLine(facts, memory, offset = 0) {
 
 function readableTopic(topic) {
   const labels = {
+    motivo_consulta: "por que vine",
+    seguimiento_contextual: "lo que dije recien",
+    seguimiento_contextual_breve: "lo que dije recien",
+    seguimiento_contextual_explicito: "lo que dije recien",
+    seguimiento_emocional_contextual: "lo que siento",
+    encuadre_o_consentimiento: "como sera la entrevista",
     motivo_de_consulta: "por qué vine",
     vivienda: "dónde vivo",
     ocupacion: "lo que hago",
