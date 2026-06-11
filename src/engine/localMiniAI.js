@@ -54,17 +54,39 @@ export function generateLocalPatientResponse({
     applyGuidedIntentResult(intentResult, guidedResult);
   }
 
-  if (textDetectedIntent === "identidad_nombre") {
-    intentResult.intent = "identidad_nombre";
+  const textConcreteIntentOverrides = new Set([
+    "identidad_nombre",
+    "edad",
+    "convivencia_familia",
+    "vivienda_residencia",
+    "hermanos",
+    "colegio_estudios",
+    "derivacion_llegada",
+    "motivo_de_consulta",
+    "amistades_red_social"
+  ]);
+
+  if (textConcreteIntentOverrides.has(textDetectedIntent)) {
+    const concreteClosedIntents = new Set([
+      "identidad_nombre",
+      "edad",
+      "convivencia_familia",
+      "vivienda_residencia",
+      "hermanos",
+      "colegio_estudios",
+      "derivacion_llegada"
+    ]);
+    intentResult.intent = textDetectedIntent;
     intentResult.confidence = Math.max(intentResult.confidence || 0, 0.98);
     intentResult.contextualTopic = null;
     intentResult.matches = {
       ...intentResult.matches,
-      identidad_nombre: true
+      [textDetectedIntent]: true
     };
     intentResult.categories = {
       ...intentResult.categories,
-      closedQuestion: true,
+      ...categoriesForGuidedIntent(textDetectedIntent),
+      closedQuestion: concreteClosedIntents.has(textDetectedIntent),
       followUp: false,
       empathicSummary: false
     };
@@ -253,7 +275,8 @@ function categoriesForGuidedIntent(intent) {
       "seguimiento_contextual_explicito",
       "exploracion_emocional",
       "preocupacion_principal",
-      "preferencias_valoracion"
+      "preferencias_valoracion",
+      "amistades_red_social"
     ].includes(intent),
     closedQuestion: ["identidad_nombre", "nombre", "edad", "vivienda_residencia", "ocupacion_actividad", "derivacion_llegada", "derivacion_llegada_consulta"].includes(intent),
     validation: intent === "validacion_emocional",
@@ -261,7 +284,7 @@ function categoriesForGuidedIntent(intent) {
     rushedAdvice: false,
     emotionalExploration: ["exploracion_emocional", "seguimiento_contextual", "seguimiento_contextual_explicito", "validacion_emocional"].includes(intent),
     familyExploration: intent === "exploracion_contextual" || intent === "vivienda_residencia",
-    contextExploration: ["contexto_familiar_social", "exploracion_contextual", "vivienda_residencia", "ocupacion_actividad", "derivacion_llegada", "derivacion_llegada_consulta"].includes(intent),
+    contextExploration: ["contexto_familiar_social", "exploracion_contextual", "vivienda_residencia", "ocupacion_actividad", "derivacion_llegada", "derivacion_llegada_consulta", "amistades_red_social"].includes(intent),
     closure: intent === "cierre",
     goodClosure: intent === "cierre",
     continuityAgreement: intent === "cierre",
@@ -269,6 +292,7 @@ function categoriesForGuidedIntent(intent) {
     empathicSummary: intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito" || intent === "validacion_emocional",
     followUp: intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito",
     preferencesExploration: intent === "preferencias_valoracion",
-    concernExploration: intent === "preocupacion_principal" || intent === "motivo_de_consulta" || intent === "derivacion_llegada" || intent === "derivacion_llegada_consulta"
+    concernExploration: intent === "preocupacion_principal" || intent === "motivo_de_consulta" || intent === "derivacion_llegada" || intent === "derivacion_llegada_consulta",
+    supportExploration: intent === "amistades_red_social"
   };
 }

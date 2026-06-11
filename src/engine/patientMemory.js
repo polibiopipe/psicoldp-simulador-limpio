@@ -45,6 +45,7 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
   if (intent === "estado_actual") trustLevel += 2;
   if (intent === "convivencia_familia") trustLevel += 2;
   if (intent === "colegio_estudios") trustLevel += 2;
+  if (intent === "amistades_red_social") trustLevel += 2;
   if (intent === "saludo_simple") trustLevel += 3;
   if (intent === "saludo") trustLevel += 3;
   if (intent === "identidad_nombre") trustLevel += 1;
@@ -149,6 +150,7 @@ function topicFromIntent(intent) {
   if (intent === "convivencia") return "convivencia";
   if (intent === "pregunta_social") return "social";
   if (intent === "amistades") return "social";
+  if (intent === "amistades_red_social") return "social";
   if (intent === "pregunta_escolar") return "colegio";
   if (intent === "pregunta_academica") return "universidad";
   if (intent === "pregunta_laboral") return "trabajo";

@@ -695,9 +695,10 @@ function detectConcreteQuestionIntent(studentMessage = "") {
   const text = normalizeText(studentMessage);
   if (/\b(cual es tu nombre|como te llamas|me dices tu nombre|quien eres)\b/.test(text)) return "nombre";
   if (/\b(cuantos anos tienes|que edad tienes|edad)\b/.test(text)) return "edad";
-  if (/\b(viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te trajo|fue idea tuya|viniste por tu cuenta|te enviaron tus padres|te mandaron tus padres)\b/.test(text)) return "derivacion_llegada_consulta";
+  if (/\b(quien te mando|quien te pidio venir|quien pidio que vinieras|quien quiso que vinieras|como llegaste aqui|como llegaste aca|que haces aqui|y tu que haces aqui|viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te trajo|tus papas te trajeron|tus padres te trajeron|tu mama te trajo|tu papa te trajo|fue idea tuya|viniste por tu cuenta|te enviaron tus padres|te mandaron tus padres)\b/.test(text)) return "derivacion_llegada_consulta";
   if (/\b(donde vives|con quien vives|vives solo|vives sola|vives con alguien|vives con tus papas|vives con tu familia|vives con tu pareja)\b/.test(text)) return "vivienda_residencia";
   if (/\b(a que te dedicas|en que trabajas|cual es tu trabajo|trabajas|estudias o trabajas|que haces actualmente|que haces durante el dia)\b/.test(text)) return "ocupacion_actividad";
+  if (/\b(no tienes amigos|tienes amigos|teni amigos|tenis amigos|tienes amigas|tienes amistades|tienes companeros|amistades|amigos|amigas|companeros|con quien hablas|hablas con gente|tienes grupo|sales con alguien)\b/.test(text)) return "amistades_red_social";
   return null;
 }
 
@@ -729,10 +730,10 @@ const expectedIntentsForType = {
   pregunta_abierta: ["respuesta_general", "motivo_de_consulta", "preocupacion_principal", "exploracion_emocional"],
   validacion_emocional: ["validacion_emocional"],
   seguimiento: ["seguimiento_contextual", "seguimiento_contextual_explicito", "exploracion_emocional"],
-  contexto_familiar_social: ["pregunta_familiar", "pregunta_social", "exploracion_contextual", "vivienda_residencia"],
+  contexto_familiar_social: ["pregunta_familiar", "pregunta_social", "amistades_red_social", "exploracion_contextual", "vivienda_residencia"],
   ocupacion_vivienda: ["ocupacion_actividad", "vivienda_residencia", "pregunta_laboral", "pregunta_academica", "pregunta_escolar"],
   exploracion_emocional: ["exploracion_emocional", "preocupacion_principal"],
-  recursos_personales: ["preferencias_valoracion", "pregunta_social"],
+  recursos_personales: ["preferencias_valoracion", "pregunta_social", "amistades_red_social"],
   cierre_sesion: ["cierre"]
 };
 

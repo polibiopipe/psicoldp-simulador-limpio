@@ -16,6 +16,7 @@ const intentTopicMap = {
   pregunta_academica: "estudios_trabajo",
   pregunta_laboral: "estudios_trabajo",
   pregunta_familiar: "familia",
+  amistades_red_social: "amistades_red_social",
   pregunta_social: "amistades",
   pregunta_videojuegos: "videojuegos",
   pregunta_habitos: "rutina_diaria",
@@ -36,6 +37,11 @@ const topicAliases = {
   seguimiento_discusiones_computador: "familia",
   seguimiento_sentirse_juzgado: "emociones",
   seguimiento_dificultad_social: "amistades",
+  derivacion_motivo_informal: "derivacion",
+  derivacion_como_llego: "derivacion",
+  derivacion_quien_mando: "derivacion",
+  amistades_red_social: "amistades",
+  amistades_red_social_negacion: "amistades",
   seguimiento_emocional_contextual: "seguimiento_contextual"
 };
 
@@ -100,11 +106,16 @@ export function detectProfileTopic({ message, intent, intentResult, memory, prof
   if (isRiskQuestion(text)) return "riesgo";
   if (isTrulyAmbiguous(text) && !intentResult.explicitReferenceDetected) return "ambiguo_real";
   if (isCurrentStateQuestion(text)) return "estado_actual";
+  if (profile.id === "tomas" && isInformalWhyHereQuestion(text)) return "derivacion_motivo_informal";
+  if (profile.id === "tomas" && isHowArrivedQuestion(text)) return "derivacion_como_llego";
+  if (profile.id === "tomas" && isWhoSentQuestion(text)) return "derivacion_quien_mando";
   if (intent === "derivacion_llegada" || intent === "derivacion_llegada_consulta" || isDerivationQuestion(text)) return "derivacion";
   if (isMotiveQuestion(text)) return "motivo_consulta";
   if (isHelpExpectationQuestion(text)) return "ayuda";
   if (intent === "convivencia_familia") return "convivencia_familia";
   if (intent === "colegio_estudios") return "colegio_estudios";
+  if (isNegativeFriendQuestion(text)) return "amistades_red_social_negacion";
+  if (intent === "amistades_red_social") return "amistades_red_social";
   if (intent === "seguimiento_contextual_breve") return detectFollowUpTopic({ text, lastPatientMessage, profile, preferBriefFollowUp: true });
   if (intent === "seguimiento_emocional_contextual") return detectEmotionalFollowUpTopic({ text, lastPatientMessage, profile });
   if (intent === "seguimiento_contextual_explicito" || intent === "seguimiento_contextual" || isExplicitFollowUp(text)) {
@@ -202,6 +213,12 @@ function pickProfileResponse({ caseId, topic, candidates, memory }) {
     "hermanos",
     "motivo_consulta",
     "derivacion",
+    "derivacion_motivo_informal",
+    "derivacion_como_llego",
+    "derivacion_quien_mando",
+    "amistades_red_social",
+    "amistades_red_social_negacion",
+    "amistades",
     "seguimiento_no_es_tan_simple",
     "seguimiento_colegio_habla_poco",
     "seguimiento_discusiones_computador",
@@ -308,6 +325,11 @@ function toResolvedIntent(topic, originalIntent) {
     estado_actual: "estado_actual",
     motivo_consulta: "motivo_de_consulta",
     derivacion: "derivacion_llegada",
+    derivacion_motivo_informal: "derivacion_llegada",
+    derivacion_como_llego: "derivacion_llegada",
+    derivacion_quien_mando: "derivacion_llegada",
+    amistades_red_social: "amistades_red_social",
+    amistades_red_social_negacion: "amistades_red_social",
     familia: "familia",
     hermanos: "hermanos",
     convivencia_familia: "convivencia_familia",
@@ -345,7 +367,19 @@ function isMotiveQuestion(text) {
 }
 
 function isDerivationQuestion(text) {
-  return /\b(quien te pidio venir|quien pidio que vinieras|viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te derivo|quien te trajo|fue idea tuya|viniste por tu cuenta)\b/.test(text);
+  return /\b(quien te mando|quien te pidio venir|quien pidio que vinieras|quien quiso que vinieras|como llegaste aqui|como llegaste aca|que haces aqui|y tu que haces aqui|viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te derivo|quien te trajo|tus papas te trajeron|tus padres te trajeron|tu mama te trajo|tu papa te trajo|fue idea tuya|viniste por tu cuenta)\b/.test(text);
+}
+
+function isInformalWhyHereQuestion(text) {
+  return /\b(y tu )?que haces (aqui|aca)\b/.test(text);
+}
+
+function isHowArrivedQuestion(text) {
+  return /\bcomo llegaste (aqui|aca)\b/.test(text);
+}
+
+function isWhoSentQuestion(text) {
+  return /\b(quien te mando|quien te pidio venir|quien pidio que vinieras|quien quiso que vinieras|quien te trajo|tus papas te trajeron|tus padres te trajeron|tu mama te trajo|tu papa te trajo)\b/.test(text);
 }
 
 function isFamilyQuestion(text) {
@@ -374,7 +408,11 @@ function isDailyRoutineQuestion(text) {
 }
 
 function isFriendQuestion(text) {
-  return /\b(tienes amigos|tienes amigas|amistades|amigos|amigas|companeros|compañeros|te juntas|sales con alguien)\b/.test(text);
+  return /\b(no tienes amigos|tienes amigos|teni amigos|tenis amigos|tienes amigas|tienes amistades|tienes companeros|amistades|amigos|amigas|companeros|compañeros|con quien hablas|hablas con gente|te juntas|tienes grupo|sales con alguien)\b/.test(text);
+}
+
+function isNegativeFriendQuestion(text) {
+  return /\bno tienes amigos\b/.test(text);
 }
 
 function isEmotionQuestion(text) {

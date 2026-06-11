@@ -94,8 +94,14 @@ const intentLexicon = {
     "que paso para que llegaras"
   ],
   derivacion_llegada: [
+    "quien te mando",
     "quien te pidio venir",
     "quien pidio que vinieras",
+    "quien quiso que vinieras",
+    "como llegaste aqui",
+    "como llegaste aca",
+    "que haces aqui",
+    "y tu que haces aqui",
     "viniste solo",
     "viniste sola",
     "te enviaron",
@@ -104,6 +110,10 @@ const intentLexicon = {
     "te derivo",
     "te derivaron",
     "quien te trajo",
+    "tus papas te trajeron",
+    "tus padres te trajeron",
+    "tu mama te trajo",
+    "tu papa te trajo",
     "fue idea tuya",
     "viniste por tu cuenta"
   ],
@@ -160,6 +170,20 @@ const intentLexicon = {
   pregunta_academica: ["estudias", "universidad", "carrera", "ramos", "que estudias", "clases", "rendimiento"],
   pregunta_laboral: ["trabajas", "trabajo", "pega", "laboral", "en que trabajas", "oficina", "jefatura"],
   pregunta_familiar: ["vives con", "con quien vives", "tus papas", "tus padres", "familia", "hijos", "hija", "pareja", "separacion", "mama", "papa"],
+  amistades_red_social: [
+    "tienes amigos",
+    "teni amigos",
+    "tenis amigos",
+    "tienes amistades",
+    "tienes companeros",
+    "no tienes amigos",
+    "con quien hablas",
+    "sales con alguien",
+    "tienes grupo",
+    "tienes amigos en el colegio",
+    "tienes amigos online",
+    "hablas con gente"
+  ],
   pregunta_social: ["tienes amigos", "tienes amigas", "amigos", "companeros", "sales", "te juntas", "hablas con alguien"],
   pregunta_videojuegos: ["juegas videojuegos", "videojuegos", "juegas mucho", "juegas harto", "computador", "que juegos", "redes sociales", "redes", "celular", "instagram", "tiktok"],
   pregunta_habitos: ["duermes", "comes", "descansas", "audifonos", "rutina", "que haces cuando", "como duermes"],
@@ -210,8 +234,8 @@ const priority = [
   "nombre",
   "rol_entrevistador",
   "presentacion_personal_abierta",
-  "motivo_de_consulta",
   "derivacion_llegada",
+  "motivo_de_consulta",
   "ocupacion_actividad",
   "preocupacion_principal",
   "preferencias_valoracion",
@@ -219,6 +243,7 @@ const priority = [
   "pregunta_academica",
   "pregunta_laboral",
   "pregunta_familiar",
+  "amistades_red_social",
   "pregunta_social",
   "pregunta_videojuegos",
   "pregunta_habitos",
@@ -329,6 +354,7 @@ export function detectIntent(studentMessage, history = []) {
     detectsCompoundFramingQuestion(text, matches);
   matches.motivo_de_consulta = matches.motivo_de_consulta || detectsMotiveQuestion(text);
   matches.derivacion_llegada = matches.derivacion_llegada || detectsDerivationArrival(text);
+  matches.amistades_red_social = matches.amistades_red_social || detectsFriendNetworkQuestion(text);
   matches.ocupacion_actividad = matches.ocupacion_actividad || detectsOccupationActivity(text);
   matches.vivienda_residencia = matches.vivienda_residencia || detectsResidenceQuestion(text);
   matches.convivencia_familia = matches.vivienda_residencia;
@@ -384,6 +410,7 @@ function detectContextualTopic(text, history, explicitReferenceDetected = false)
   if (intentLexicon.motivo_de_consulta.some((term) => text.includes(normalizeText(term)))) return null;
   if (detectsIdentityName(text)) return null;
   if (detectsDerivationArrival(text)) return null;
+  if (detectsFriendNetworkQuestion(text)) return null;
   if (intentLexicon.presentacion_personal_abierta.some((term) => text.includes(normalizeText(term)))) return null;
   if (detectsStudentPresentation(text) || detectsFraming(text)) return null;
   if (detectsResidenceQuestion(text)) return null;
@@ -622,14 +649,34 @@ function detectsOccupationActivity(text) {
 
 function detectsDerivationArrival(text) {
   return (
+    /\bquien te mando\b/.test(text) ||
     /\bquien te pidio venir\b/.test(text) ||
     /\bquien pidio que vinieras\b/.test(text) ||
+    /\bquien quiso que vinieras\b/.test(text) ||
+    /\bcomo llegaste (aqui|aca)\b/.test(text) ||
+    /\b(y tu )?que haces (aqui|aca)\b/.test(text) ||
     /\bviniste (solo|sola)\b/.test(text) ||
     /\bte (enviaron|mandaron|trajeron|derivo|derivaron)\b/.test(text) ||
     /\bquien te derivo\b/.test(text) ||
     /\bquien te trajo\b/.test(text) ||
+    /\btus (papas|padres) te trajeron\b/.test(text) ||
+    /\btu (mama|papa) te trajo\b/.test(text) ||
     /\bfue idea tuya\b/.test(text) ||
     /\bviniste por tu cuenta\b/.test(text)
+  );
+}
+
+function detectsFriendNetworkQuestion(text) {
+  return (
+    /\b(no )?tienes amigos\b/.test(text) ||
+    /\bteni(s)? amigos\b/.test(text) ||
+    /\btienes amistades\b/.test(text) ||
+    /\btienes companeros\b/.test(text) ||
+    /\bcon quien hablas\b/.test(text) ||
+    /\bsales con alguien\b/.test(text) ||
+    /\btienes grupo\b/.test(text) ||
+    /\btienes amigos (en el colegio|online)\b/.test(text) ||
+    /\bhablas con gente\b/.test(text)
   );
 }
 
@@ -691,8 +738,8 @@ function toLegacyCategories(intent, matches, text = "") {
     academicExploration: intent === "colegio_estudios" || intent === "pregunta_escolar" || intent === "pregunta_academica" || intent === "ocupacion_actividad",
     workExploration: intent === "pregunta_laboral" || intent === "ocupacion_actividad",
     digitalExploration: intent === "pregunta_videojuegos",
-    supportExploration: intent === "pregunta_social",
-    contextExploration: intent.startsWith("pregunta_") || intent === "colegio_estudios" || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "convivencia_familia" || intent === "derivacion_llegada" || intent === "seguimiento_contextual_breve" || intent === "seguimiento_emocional_contextual" || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito" || intent === "exploracion_contextual",
+    supportExploration: intent === "pregunta_social" || intent === "amistades_red_social",
+    contextExploration: intent.startsWith("pregunta_") || intent === "colegio_estudios" || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "convivencia_familia" || intent === "derivacion_llegada" || intent === "amistades_red_social" || intent === "seguimiento_contextual_breve" || intent === "seguimiento_emocional_contextual" || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito" || intent === "exploracion_contextual",
     closure: intent === "cierre",
     goodClosure: intent === "cierre" && matches.validacion_emocional,
     continuityAgreement,

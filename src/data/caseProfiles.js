@@ -711,6 +711,37 @@ function createProfile(profile) {
       "Mis papás quisieron que viniera porque están preocupados por el computador."
     ];
   }
+  if (profile.id === "tomas") {
+    topics.derivacion = [
+      "Creo que vine por mis papás... ellos están preocupados porque dicen que paso mucho tiempo en el computador.",
+      "Me trajeron mis papás. Ellos están preocupados por lo del computador.",
+      "Mis papás. Ellos fueron los que quisieron que viniera.",
+      "Mi mamá y mi papá. Yo no fui el que pidió venir."
+    ];
+    topics.derivacion_motivo_informal = [
+      "Creo que vine por mis papás... ellos están preocupados porque dicen que paso mucho tiempo en el computador.",
+      "Mis papás quisieron que viniera porque están preocupados por lo del computador."
+    ];
+    topics.derivacion_como_llego = [
+      "Me trajeron mis papás. Ellos están preocupados por lo del computador.",
+      "Vine porque mis papás quisieron que viniera. Ellos están preocupados por lo del computador."
+    ];
+    topics.derivacion_quien_mando = [
+      "Mis papás. Ellos fueron los que quisieron que viniera.",
+      "Mi mamá y mi papá. Yo no fui el que pidió venir."
+    ];
+    topics.amistades_red_social = [
+      "Tengo algunos, pero más online. En persona me cuesta más.",
+      "No muchos en persona. Hablo más con gente cuando juego.",
+      "Tengo gente con la que juego, pero amigos cercanos en persona... no tantos.",
+      "En el colegio hablo poco. Online se me hace más fácil hablar."
+    ];
+    topics.amistades_red_social_negacion = [
+      "Sí tengo, pero no muchos cercanos. Me cuesta más en persona; online se me hace más fácil.",
+      "Tengo gente con la que juego, pero amigos cercanos en persona... no tantos."
+    ];
+  }
+
   const basicFacts = {
     livesWith: profile.basicFacts?.livesWith || firstOf(topics.convivencia) || profile.familyContext || "",
     siblings: profile.basicFacts?.siblings || profile.siblings || firstOf(topics.hermanos) || "",
