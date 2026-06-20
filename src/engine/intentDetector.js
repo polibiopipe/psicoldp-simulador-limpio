@@ -78,6 +78,10 @@ const intentLexicon = {
     "sabes por que estas aca",
     "por que estas aqui",
     "por que estas aca",
+    "que haces aqui",
+    "que haces aca",
+    "y tu que haces aqui",
+    "y tu que haces aca",
     "por que viniste",
     "sabes por que viniste",
     "motivo",
@@ -100,8 +104,6 @@ const intentLexicon = {
     "quien quiso que vinieras",
     "como llegaste aqui",
     "como llegaste aca",
-    "que haces aqui",
-    "y tu que haces aqui",
     "viniste solo",
     "viniste sola",
     "te enviaron",
@@ -612,6 +614,7 @@ function detectsMotiveQuestion(text) {
     /\bque te (trae|trajo) (aqui|aca)\b/.test(text) ||
     /\bpor que estas( hoy)? (aqui|aca)\b/.test(text) ||
     /\bpor qu estas( hoy)? (aqui|aca)\b/.test(text) ||
+    /\b(y tu )?que haces (aqui|aca)\b/.test(text) ||
     /\bpor que viniste\b/.test(text) ||
     /\bcual es tu consulta\b/.test(text) ||
     /\bmotivo de consulta\b/.test(text) ||
@@ -624,6 +627,7 @@ function hasExplicitMotiveCue(text) {
     /\bsabes por que estas (aqui|aca)\b/.test(text) ||
     /\bpor que estas( hoy)? (aqui|aca)\b/.test(text) ||
     /\bpor qu estas( hoy)? (aqui|aca)\b/.test(text) ||
+    /\b(y tu )?que haces (aqui|aca)\b/.test(text) ||
     /\bpor que viniste\b/.test(text) ||
     /\bsabes por que viniste\b/.test(text) ||
     /\bmotivo( de consulta)?\b/.test(text) ||
@@ -679,7 +683,6 @@ function detectsDerivationArrival(text) {
     /\bquien pidio que vinieras\b/.test(text) ||
     /\bquien quiso que vinieras\b/.test(text) ||
     /\bcomo llegaste (aqui|aca)\b/.test(text) ||
-    /\b(y tu )?que haces (aqui|aca)\b/.test(text) ||
     /\bviniste (solo|sola)\b/.test(text) ||
     /\bte (enviaron|mandaron|trajeron|derivo|derivaron)\b/.test(text) ||
     /\bquien te derivo\b/.test(text) ||

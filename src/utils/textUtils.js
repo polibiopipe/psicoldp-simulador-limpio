@@ -40,8 +40,10 @@ function normalizeInformalSpanish(text) {
   const replacements = {
     pq: ["por", "que"],
     xq: ["por", "que"],
+    porque: ["por", "que"],
     q: ["que"],
     k: ["que"],
+    qui: ["aqui"],
     incomdo: ["incomodo"],
     incomoda: ["incomoda"],
     incomodo: ["incomodo"],

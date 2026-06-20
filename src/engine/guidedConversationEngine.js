@@ -424,12 +424,12 @@ export function resolveGuidedIntent({ selectedInterventionType, studentMessage =
   if (hasFramingCue(text)) return "encuadre";
   if (hasValidationCue(text)) return "validacion_emocional";
   if (hasClosingCue(text)) return "cierre";
+  if (hasMotiveCue(text)) return "motivo_de_consulta";
 
   const concreteIntent = detectConcreteQuestionIntent(studentMessage);
   if (concreteIntent) return concreteIntent;
 
   if (hasFollowUpCue(text, conversationHistory)) return "seguimiento_contextual";
-  if (hasMotiveCue(text)) return "motivo_de_consulta";
   if (hasFamilyContextCue(text)) return "contexto_familiar_social";
 
   if (selectedInterventionType === "saludo_encuadre") {
@@ -695,7 +695,7 @@ function detectConcreteQuestionIntent(studentMessage = "") {
   const text = normalizeText(studentMessage);
   if (/\b(cual es tu nombre|como te llamas|me dices tu nombre|quien eres)\b/.test(text)) return "nombre";
   if (/\b(cuantos anos tienes|que edad tienes|edad)\b/.test(text)) return "edad";
-  if (/\b(quien te mando|quien te pidio venir|quien pidio que vinieras|quien quiso que vinieras|como llegaste aqui|como llegaste aca|que haces aqui|y tu que haces aqui|viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te trajo|tus papas te trajeron|tus padres te trajeron|tu mama te trajo|tu papa te trajo|fue idea tuya|viniste por tu cuenta|te enviaron tus padres|te mandaron tus padres)\b/.test(text)) return "derivacion_llegada_consulta";
+  if (/\b(quien te mando|quien te pidio venir|quien pidio que vinieras|quien quiso que vinieras|como llegaste aqui|como llegaste aca|viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te trajo|tus papas te trajeron|tus padres te trajeron|tu mama te trajo|tu papa te trajo|fue idea tuya|viniste por tu cuenta|te enviaron tus padres|te mandaron tus padres)\b/.test(text)) return "derivacion_llegada_consulta";
   if (/\b(donde vives|con quien vives|vives solo|vives sola|vives con alguien|vives con tus papas|vives con tu familia|vives con tu pareja)\b/.test(text)) return "vivienda_residencia";
   if (/\b(a que te dedicas|en que trabajas|cual es tu trabajo|trabajas|estudias o trabajas|que haces actualmente|que haces durante el dia)\b/.test(text)) return "ocupacion_actividad";
   if (/\b(no tienes amigos|tienes amigos|teni amigos|tenis amigos|tienes amigas|tienes amistades|tienes companeros|amistades|amigos|amigas|companeros|con quien hablas|hablas con gente|tienes grupo|sales con alguien)\b/.test(text)) return "amistades_red_social";
@@ -779,12 +779,12 @@ function hasFollowUpCue(text = "", conversationHistory = []) {
   const hasPreviousPatientMessage = Boolean(conversationHistory.at(-1)?.answer);
   return (
     hasPreviousPatientMessage &&
-    /\b(a que te refieres|a que te refieres con|que quieres decir|cuentame mas|como asi|eso tiene que ver|por que dices|que pasa cuando|que pasa con eso|que significa|en que sentido|no es tan simple|cuando sientes|cuando dices|y que pasa)\b/.test(text)
+    /\b(a que te refieres|a que te refieres con|que quieres decir|cuentame mas|explicame|como lo ves tu|que lugar tiene el computador|por que juegas|como asi|eso tiene que ver|por que dices|que pasa cuando|que pasa con eso|que significa|en que sentido|no es tan simple|cuando sientes|cuando dices|y que pasa)\b/.test(text)
   );
 }
 
 function hasMotiveCue(text = "") {
-  return /\b(que te trae|por que viniste|por que estas aca|por que estas aqui|motivo|que te preocupa|que paso para que vinieras|que esta pasando)\b/.test(text);
+  return /\b(que te trae|por que viniste|por que estas aca|por que estas aqui|(y tu )?que haces (aqui|aca)|cual es tu consulta|motivo|que te preocupa|que paso para que vinieras|que esta pasando)\b/.test(text);
 }
 
 function hasFamilyContextCue(text = "") {

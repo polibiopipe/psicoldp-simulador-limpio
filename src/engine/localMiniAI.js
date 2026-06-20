@@ -167,7 +167,7 @@ export function generateLocalPatientResponse({
     selectedCaseId: caseId,
     detectedIntent: intentResult.intent,
     detectedQuestionType: intentResult.profileTopic || intentResult.contextualTopic || intentResult.intent,
-    resolvedIntent: intentResult.intent,
+    resolvedIntent: debugResolvedIntent(intentResult.intent, profileResponse?.profileTopic),
     detectedTopic: profileResponse?.profileTopic || intentResult.contextualTopic || null,
     caseId,
     responseType: selectedResponse.responseType,
@@ -250,6 +250,11 @@ export function generateLocalPatientResponse({
     trustStage: getTrustStage(memoryUpdate.trustLevel),
     guidedResult
   };
+}
+
+function debugResolvedIntent(intent, profileTopic) {
+  if (intent === "motivo_de_consulta" || profileTopic === "motivo_consulta") return "motivo_consulta";
+  return intent;
 }
 
 function ensureValidationAcknowledgement(responseText, caseId) {

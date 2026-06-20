@@ -113,6 +113,13 @@ export function detectProfileTopic({ message, intent, intentResult, memory, prof
   if (intent === "cierre" || isClosureMessage(text)) return "cierre";
   if (intent === "validacion_emocional") return "validacion";
   if (isRiskQuestion(text)) return "riesgo";
+  if (
+    profile.id === "tomas"
+    && isMotiveDeepeningQuestion(text)
+    && /computador|jugar|juego|papas|padres|vine|trajeron/.test(lastPatientMessage)
+  ) {
+    return "seguimiento_motivo_profundizacion";
+  }
   if (isTrulyAmbiguous(text) && !intentResult.explicitReferenceDetected) return "ambiguo_real";
   if (isCurrentStateQuestion(text)) return "estado_actual";
   if (profile.id === "tomas" && isInformalWhyHereQuestion(text)) return "derivacion_motivo_informal";
@@ -259,6 +266,7 @@ function pickProfileResponse({ caseId, topic, candidates, memory }) {
     "amistades_red_social_negacion",
     "amistades",
     "seguimiento_no_es_tan_simple",
+    "seguimiento_motivo_profundizacion",
     "seguimiento_descanso_culpa",
     "seguimiento_llegada_casa",
     "seguimiento_limites",
@@ -406,7 +414,7 @@ function toResolvedIntent(topic, originalIntent) {
     estado_actual: "estado_actual",
     motivo_consulta: "motivo_de_consulta",
     derivacion: "derivacion_llegada",
-    derivacion_motivo_informal: "derivacion_llegada",
+    derivacion_motivo_informal: "motivo_de_consulta",
     derivacion_como_llego: "derivacion_llegada",
     derivacion_quien_mando: "derivacion_llegada",
     amistades_red_social: "amistades_red_social",
@@ -428,6 +436,7 @@ function toResolvedIntent(topic, originalIntent) {
     seguimiento_emocional_contextual: "seguimiento_emocional_contextual",
     seguimiento_contextual: "seguimiento_contextual",
     seguimiento_no_es_tan_simple: "seguimiento_contextual",
+    seguimiento_motivo_profundizacion: "seguimiento_contextual",
     seguimiento_descanso_culpa: "seguimiento_contextual",
     seguimiento_llegada_casa: "seguimiento_contextual",
     seguimiento_limites: "seguimiento_contextual",
@@ -448,11 +457,11 @@ function isCurrentStateQuestion(text) {
 }
 
 function isMotiveQuestion(text) {
-  return /\b(que te trajo|que te trae|por que viniste|por que estas( hoy)? aqui|por qu estas( hoy)? aqui|por que estas( hoy)? aca|motivo de consulta|cual es tu consulta|que paso para que llegaras|que paso para que vinieras|que te esta pasando|que sucede)\b/.test(text);
+  return /\b(que te trajo|que te trae|por que viniste|por que estas( hoy)? aqui|por qu estas( hoy)? aqui|por que estas( hoy)? aca|(y tu )?que haces (aqui|aca)|motivo de consulta|cual es tu consulta|que paso para que llegaras|que paso para que vinieras|que te esta pasando|que sucede)\b/.test(text);
 }
 
 function isDerivationQuestion(text) {
-  return /\b(quien te mando|quien te pidio venir|quien pidio que vinieras|quien quiso que vinieras|como llegaste aqui|como llegaste aca|que haces aqui|y tu que haces aqui|viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te derivo|quien te trajo|tus papas te trajeron|tus padres te trajeron|tu mama te trajo|tu papa te trajo|fue idea tuya|viniste por tu cuenta)\b/.test(text);
+  return /\b(quien te mando|quien te pidio venir|quien pidio que vinieras|quien quiso que vinieras|como llegaste aqui|como llegaste aca|viniste solo|viniste sola|te enviaron|te mandaron|te trajeron|te derivo|te derivaron|quien te derivo|quien te trajo|tus papas te trajeron|tus padres te trajeron|tu mama te trajo|tu papa te trajo|fue idea tuya|viniste por tu cuenta)\b/.test(text);
 }
 
 function isInformalWhyHereQuestion(text) {
@@ -518,6 +527,10 @@ function isRiskQuestion(text) {
 
 function isExplicitFollowUp(text) {
   return /\b(me dijiste que|dijiste que|mencionaste que|cuando dices|cuando dijiste|a que te refieres|que quieres decir|cuentame mas|que significa|en que sentido|que no es tan simple)\b/.test(text);
+}
+
+function isMotiveDeepeningQuestion(text) {
+  return /\b(explicame|como lo ves tu|que quieres decir|que no es tan simple|por que juegas|que lugar tiene el computador para ti|que significa eso para ti)\b/.test(text);
 }
 
 function isClosureMessage(text) {

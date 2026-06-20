@@ -842,6 +842,10 @@ function createProfile(profile) {
       "Sí tengo, pero no muchos cercanos. Me cuesta más en persona; online se me hace más fácil.",
       "Tengo gente con la que juego, pero amigos cercanos en persona... no tantos."
     ];
+    topics.seguimiento_motivo_profundizacion = [
+      "No es solo jugar por jugar. A veces en el computador siento que sé qué hacer, y afuera me cuesta más.",
+      "El computador no es solo entretención. Ahí sé cómo moverme; con gente en persona me quedo pensando demasiado."
+    ];
   }
 
   const basicFacts = {
