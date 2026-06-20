@@ -25,7 +25,7 @@ export function CaseBrief({
 
         <div className="brief-content">
           <header className="section-header">
-            <span className="eyebrow">VivoLab · Entrevista Inicial</span>
+            <span className="eyebrow">Escucha Viva · Entrevista Psicológica Formativa</span>
             <h1>{caseItem.name}</h1>
             <span className="case-practice-label">Paciente ficticio para práctica formativa.</span>
             <p>{caseItem.motive}</p>

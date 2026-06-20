@@ -8,10 +8,10 @@ export function EthicalNotice({ compact = false }) {
         <div className="compact-brand-lockup">
           <img
             className="platform-logo-small"
-            src="/vivolab-logo.png"
-            alt="VivoLab, simuladores formativos. Una iniciativa de Núcleo Vivo"
+            src="/escucha-viva-logo.png"
+            alt="Escucha Viva, simuladores formativos. Una iniciativa de Núcleo Vivo"
           />
-          <span>Entrevista Inicial</span>
+          <span>Entrevista Psicológica Formativa</span>
         </div>
       )}
       <ShieldCheck aria-hidden="true" />

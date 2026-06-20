@@ -20,11 +20,11 @@ export function CaseSelector({
   return (
     <section className="screen">
       <header className="section-header">
-        <span className="eyebrow">VivoLab · Entrevista Inicial</span>
+        <span className="eyebrow">Escucha Viva · Simuladores formativos</span>
         <h1>Casos disponibles</h1>
         <p>
-          Elige un caso ficticio y practica la entrevista inicial a tu ritmo, con
-          objetivos formativos claros.
+          Elige un caso ficticio y practica distintas sesiones de una entrevista
+          psicológica formativa, con objetivos claros y a tu propio ritmo.
         </p>
       </header>
 

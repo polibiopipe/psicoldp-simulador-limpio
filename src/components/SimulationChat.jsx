@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
-import { RotateCcw, Send, SquareCheckBig, Users } from "lucide-react";
+import { MonitorPlay, RotateCcw, Send, SquareCheckBig, Users } from "lucide-react";
 import { PatientCard } from "./PatientCard.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
 import { VoiceDictationButton } from "./VoiceDictationButton.jsx";
+import { SimulatedVideoSession } from "./SimulatedVideoSession.jsx";
 import {
   getStageSuggestions,
   guidedInterventionTypes,
@@ -24,6 +25,9 @@ export function SimulationChat({
   const [question, setQuestion] = useState("");
   const [selectedInterventionType, setSelectedInterventionType] = useState("");
   const [showStageSuggestions, setShowStageSuggestions] = useState(false);
+  const [showVideoSession, setShowVideoSession] = useState(() =>
+    typeof window === "undefined" ? true : window.matchMedia("(min-width: 761px)").matches
+  );
   const [validationFeedback, setValidationFeedback] = useState("");
   const conversationRef = useRef(null);
   const visibleHistory = history.filter(isDisplayableEntry);
@@ -105,7 +109,7 @@ export function SimulationChat({
       <section className="chat-panel">
         <header className="chat-header">
           <div>
-            <span className="eyebrow">VivoLab · Entrevista Inicial</span>
+            <span className="eyebrow">Escucha Viva · Entrevista Psicológica Formativa</span>
             <div className="chat-title-line">
               <h1>{caseItem.name}</h1>
               <span className="session-context">
@@ -114,6 +118,15 @@ export function SimulationChat({
             </div>
           </div>
           <div className="chat-actions">
+            <button
+              className="secondary-action video-view-toggle"
+              type="button"
+              aria-pressed={showVideoSession}
+              onClick={() => setShowVideoSession((current) => !current)}
+            >
+              <MonitorPlay aria-hidden="true" />
+              {showVideoSession ? "Ocultar vista" : "Vista simulada"}
+            </button>
             <button className="secondary-action" type="button" onClick={onChangeCase}>
               <Users aria-hidden="true" />
               Caso
@@ -142,31 +155,41 @@ export function SimulationChat({
           </div>
         </details>
 
-        <div className="conversation" aria-live="polite" ref={conversationRef}>
-          {visibleHistory.length === 0 ? (
-            <div className="empty-state">
-              <p>{caseItem.openingLine}</p>
-              <span>
-                Puedes comenzar con calma: presenta el encuadre y abre la conversación
-                con una pregunta respetuosa.
-              </span>
-            </div>
-          ) : (
-            visibleHistory.map((entry) => (
-              <div className="exchange" key={entry.id}>
-                {!entry.isSessionPrelude && (
-                  <div className="message student-message">
-                    <span>Estudiante</span>
-                    <p>{entry.question}</p>
-                  </div>
-                )}
-                <div className="message patient-message">
-                  <span>{entry.isSessionPrelude ? `Inicio Sesión ${sessionNumber}` : caseItem.name}</span>
-                  <p>{entry.answer}</p>
-                </div>
-              </div>
-            ))
+        <div className={`interview-experience${showVideoSession ? " with-video" : " chat-only"}`}>
+          {showVideoSession && (
+            <SimulatedVideoSession
+              caseItem={caseItem}
+              sessionNumber={sessionNumber}
+              onFinish={onFinish}
+            />
           )}
+
+          <div className="conversation" aria-live="polite" ref={conversationRef}>
+            {visibleHistory.length === 0 ? (
+              <div className="empty-state">
+                <p>{caseItem.openingLine}</p>
+                <span>
+                  Puedes comenzar con calma: presenta el encuadre y abre la conversación
+                  con una pregunta respetuosa.
+                </span>
+              </div>
+            ) : (
+              visibleHistory.map((entry) => (
+                <div className="exchange" key={entry.id}>
+                  {!entry.isSessionPrelude && (
+                    <div className="message student-message">
+                      <span>Estudiante</span>
+                      <p>{entry.question}</p>
+                    </div>
+                  )}
+                  <div className="message patient-message">
+                    <span>{entry.isSessionPrelude ? `Inicio Sesión ${sessionNumber}` : caseItem.name}</span>
+                    <p>{entry.answer}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         <form className="question-form" onSubmit={submitQuestion}>

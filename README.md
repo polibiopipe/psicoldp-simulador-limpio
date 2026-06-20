@@ -1,6 +1,6 @@
-# VivoLab · Entrevista Inicial
+# Escucha Viva · Simuladores formativos
 
-VivoLab es una plataforma de simuladores formativos, iniciativa de Nucleo Vivo. Este modulo permite practicar entrevistas psicologicas iniciales con pacientes virtuales ficticios y recibir retroalimentacion formativa sobre el desempeno.
+Escucha Viva es una plataforma de simuladores formativos, iniciativa de Nucleo Vivo. Su modulo Entrevista Psicologica Formativa permite practicar un proceso de cuatro sesiones con pacientes virtuales ficticios y recibir retroalimentacion orientada al aprendizaje.
 
 Este simulador tiene fines exclusivamente educativos. No reemplaza atencion psicologica real, no realiza diagnosticos definitivos, no entrega tratamiento clinico y no debe usarse con datos reales de pacientes.
 

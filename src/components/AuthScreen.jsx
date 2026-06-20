@@ -58,8 +58,9 @@ export function AuthScreen() {
   return (
     <section className="screen auth-screen">
       <div className="auth-card">
-        <span className="eyebrow">Acceso a VivoLab</span>
-        <h1>VivoLab · Entrevista Inicial</h1>
+        <span className="eyebrow">Simuladores formativos</span>
+        <h1>Escucha Viva</h1>
+        <span className="auth-module-label">Módulo: Entrevista Psicológica Formativa</span>
         <p>
           Ingresa para continuar tus prácticas y conservar el recorrido de tus
           entrevistas simuladas.

@@ -1599,7 +1599,7 @@ textarea:focus {
   }
 }
 
-/* VivoLab brand architecture */
+/* Escucha Viva brand architecture */
 .brand-logo {
   width: 320px;
   height: 98px;
@@ -1835,24 +1835,25 @@ textarea:focus {
 
 /* Human-centered visual tone */
 :root {
-  --nv-navy: #173d46;
-  --nv-primary: #1b716d;
-  --nv-primary-hover: #145b58;
-  --nv-teal-accent: #438f87;
-  --nv-bg: #f8f3ea;
-  --nv-bg-secondary: #f0f4ef;
-  --nv-surface: #fffdf9;
-  --nv-heading: #263a3e;
-  --nv-text: #354548;
-  --nv-muted: #687473;
-  --nv-border: #ded9cf;
-  --nv-divider: #ebe5dc;
-  --nv-accent: #c79a55;
-  --nv-terracotta: #b97860;
-  --nv-sage: #dce9df;
-  --nv-shadow-card: 0 10px 28px rgba(78, 58, 39, 0.065), 0 2px 6px rgba(49, 68, 63, 0.035);
-  --nv-shadow-soft: 0 20px 52px rgba(70, 51, 35, 0.1), 0 3px 10px rgba(41, 72, 67, 0.045);
-  --nv-focus: 0 0 0 3px rgba(67, 143, 135, 0.2);
+  --nv-navy: #102a43;
+  --nv-primary: #007c7a;
+  --nv-primary-hover: #006563;
+  --nv-teal-accent: #18a6a1;
+  --nv-bg: #f6f1e8;
+  --nv-bg-secondary: #fff9f0;
+  --nv-surface: #ffffff;
+  --nv-heading: #102027;
+  --nv-text: #24363b;
+  --nv-muted: #5f6f73;
+  --nv-border: #e0d6c7;
+  --nv-divider: #eee4d7;
+  --nv-accent: #c79a3b;
+  --nv-terracotta: #d9855b;
+  --nv-sage: #dff1eb;
+  --nv-warm-accent: #f1d6b8;
+  --nv-shadow-card: 0 10px 28px rgba(69, 47, 27, 0.075), 0 2px 6px rgba(0, 89, 87, 0.04);
+  --nv-shadow-soft: 0 22px 56px rgba(70, 45, 24, 0.12), 0 4px 14px rgba(0, 92, 89, 0.055);
+  --nv-focus: 0 0 0 3px rgba(24, 166, 161, 0.22);
 }
 
 body,
@@ -1864,31 +1865,31 @@ body,
 .case-card button,
 .icon-action {
   background: var(--nv-primary);
-  box-shadow: 0 8px 20px rgba(27, 113, 109, 0.18);
+  box-shadow: 0 9px 22px rgba(0, 124, 122, 0.22);
 }
 
 .primary-action:hover,
 .case-card button:hover,
 .icon-action:hover {
   background: var(--nv-primary-hover);
-  box-shadow: 0 10px 24px rgba(27, 113, 109, 0.22);
+  box-shadow: 0 12px 28px rgba(0, 124, 122, 0.28);
 }
 
 .secondary-action,
 .danger-action,
 .landing-secondary,
 .voice-dictation-button {
-  border-color: var(--nv-border);
+  border-color: #bdd7d3;
   border-radius: 10px;
-  background: rgba(255, 253, 249, 0.92);
+  background: rgba(255, 249, 240, 0.96);
 }
 
 .secondary-action:hover,
 .danger-action:hover,
 .landing-secondary:hover,
 .voice-dictation-button:hover {
-  border-color: #c9c2b6;
-  background: #f5f1e9;
+  border-color: #8abeb9;
+  background: #f8ead8;
 }
 
 .danger-action {
@@ -1918,7 +1919,7 @@ body,
 }
 
 .hero-tagline {
-  color: #31575a;
+  color: #194e53;
   font-weight: 680;
 }
 
@@ -1949,9 +1950,9 @@ body,
 }
 
 .current-module {
-  border-color: #ded3c2;
+  border-color: #e2cfb4;
   border-left-color: var(--nv-accent);
-  background: #fbf6ed;
+  background: var(--nv-bg-secondary);
   box-shadow: 0 4px 14px rgba(108, 78, 48, 0.045);
 }
 
@@ -1985,7 +1986,7 @@ body,
 
 .preview-bubble.student,
 .student-message {
-  background: #287a76;
+  background: var(--nv-primary);
 }
 
 .preview-progress,
@@ -2597,5 +2598,436 @@ textarea:hover {
 
   .landing-page > .feature-grid .feature-card:last-child {
     border-bottom: 0;
+  }
+}
+
+/* Escucha Viva final identity */
+.brand-logo {
+  width: 154px;
+  height: 154px;
+  border: 1px solid rgba(199, 154, 59, 0.2);
+  border-radius: var(--nv-radius);
+  object-fit: contain;
+  object-position: center;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(74, 49, 25, 0.07);
+}
+
+.platform-logo-small {
+  width: 94px;
+  height: 94px;
+  border: 1px solid rgba(199, 154, 59, 0.18);
+  border-radius: var(--nv-radius-sm);
+  object-fit: contain;
+  object-position: center;
+  background: #ffffff;
+}
+
+.landing-header {
+  min-height: 168px;
+}
+
+.ethical-notice.compact {
+  min-height: 108px;
+}
+
+.compact-brand-lockup > span {
+  max-width: 190px;
+  line-height: 1.35;
+}
+
+.auth-module-label {
+  display: inline-flex;
+  width: fit-content;
+  margin: -2px 0 14px;
+  border-left: 3px solid var(--nv-accent);
+  padding: 5px 9px;
+  color: var(--nv-primary);
+  background: var(--nv-bg-secondary);
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.hero-content > .eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid rgba(0, 124, 122, 0.16);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--nv-primary);
+  background: rgba(223, 241, 235, 0.72);
+}
+
+.hero-title {
+  color: var(--nv-heading);
+}
+
+.landing-primary,
+.case-card button {
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.landing-primary:hover,
+.case-card button:hover {
+  transform: translateY(-2px);
+}
+
+.hero-visual-stage::before {
+  border-color: #dfbf99;
+  background: var(--nv-warm-accent);
+}
+
+.hero-visual-stage .simulator-preview-card {
+  border-color: #decdb8;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.hero-patient-stack article {
+  border-color: #ddc5a7;
+  background: rgba(255, 249, 240, 0.98);
+}
+
+.hero-trust-badge {
+  border-color: #ddb87d;
+  color: #6b492a;
+  background: rgba(255, 240, 215, 0.98);
+}
+
+.landing-page > .feature-grid {
+  gap: 14px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.landing-page > .feature-grid .feature-card,
+.landing-page > .feature-grid .feature-card:last-child {
+  border: 1px solid var(--nv-border);
+  border-radius: var(--nv-radius);
+  padding: 18px 20px;
+  background: var(--nv-surface);
+  box-shadow: var(--nv-shadow-card);
+}
+
+.landing-page > .feature-grid .feature-card:nth-child(1) {
+  border-top: 3px solid var(--nv-teal-accent);
+}
+
+.landing-page > .feature-grid .feature-card:nth-child(2) {
+  border-top: 3px solid var(--nv-accent);
+}
+
+.landing-page > .feature-grid .feature-card:nth-child(3) {
+  border-top: 3px solid var(--nv-terracotta);
+}
+
+.writing-guidance-card {
+  background: var(--nv-bg-secondary);
+}
+
+@media (max-width: 720px) {
+  .brand-logo {
+    width: 126px;
+    height: 126px;
+  }
+
+  .landing-header {
+    min-height: 0;
+  }
+
+  .platform-logo-small {
+    width: 84px;
+    height: 84px;
+  }
+
+  .ethical-notice.compact {
+    min-height: 0;
+  }
+
+  .landing-page > .feature-grid {
+    gap: 10px;
+  }
+
+  .landing-page > .feature-grid .feature-card,
+  .landing-page > .feature-grid .feature-card:last-child {
+    border: 1px solid var(--nv-border);
+    border-top-width: 3px;
+    padding: 18px;
+  }
+}
+
+@media (max-width: 460px) {
+  .brand-logo {
+    width: 116px;
+    height: 116px;
+  }
+
+  .platform-logo-small {
+    width: 76px;
+    height: 76px;
+  }
+
+  .compact-brand-lockup > span {
+    max-width: none;
+  }
+}
+
+/* Simulated video session */
+.video-view-toggle[aria-pressed="true"] {
+  border-color: rgba(0, 124, 122, 0.42);
+  color: var(--nv-primary);
+  background: #e7f4f1;
+}
+
+.interview-experience {
+  flex: 1 1 auto;
+  display: grid;
+  min-height: 340px;
+  height: clamp(340px, 42vh, 430px);
+  border-bottom: 1px solid var(--nv-divider);
+  background: var(--nv-bg-secondary);
+}
+
+.interview-experience.with-video {
+  grid-template-columns: minmax(300px, 0.9fr) minmax(360px, 1.1fr);
+  gap: 12px;
+  padding: 12px;
+}
+
+.interview-experience.chat-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.interview-experience > .conversation {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  border: 1px solid var(--nv-divider);
+  border-radius: var(--nv-radius);
+  padding: 20px;
+  background: #fcfbf7;
+}
+
+.interview-experience.chat-only > .conversation {
+  border-width: 0;
+  border-radius: 0;
+  padding: 24px clamp(16px, 3vw, 32px) 30px;
+}
+
+.simulated-video-session {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 9px;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--nv-radius);
+  padding: 12px;
+  color: #ffffff;
+  background: #063f46;
+  box-shadow: 0 14px 34px rgba(16, 42, 67, 0.16);
+}
+
+.video-session-status {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  font-size: 0.7rem;
+  font-weight: 740;
+}
+
+.video-session-status > span,
+.video-session-status time {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.video-session-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #67d3ad;
+  box-shadow: 0 0 0 3px rgba(103, 211, 173, 0.15);
+}
+
+.video-session-status svg {
+  width: 14px;
+  height: 14px;
+  color: #f2c96d;
+}
+
+.video-patient-stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--nv-radius-sm);
+  background: #eadfd1;
+}
+
+.video-patient-stage img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.video-patient-caption {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  gap: 5px 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  border-radius: var(--nv-radius-sm);
+  padding: 7px 9px;
+  color: #ffffff;
+  background: rgba(16, 42, 67, 0.88);
+}
+
+.video-patient-caption strong {
+  font-size: 0.82rem;
+}
+
+.video-patient-caption span {
+  color: #dceae7;
+  font-size: 0.65rem;
+}
+
+.video-student-tile {
+  position: absolute;
+  z-index: 2;
+  top: 45px;
+  right: 20px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 102px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: var(--nv-radius-sm);
+  padding: 7px 9px;
+  color: var(--nv-heading);
+  background: rgba(255, 249, 240, 0.94);
+  box-shadow: 0 8px 20px rgba(16, 42, 67, 0.18);
+}
+
+.video-student-tile > svg {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  padding: 5px;
+  color: var(--nv-primary);
+  background: #dff1eb;
+}
+
+.video-student-tile strong,
+.video-student-tile span {
+  display: block;
+}
+
+.video-student-tile strong {
+  font-size: 0.72rem;
+}
+
+.video-student-tile span {
+  margin-top: 1px;
+  color: var(--nv-muted);
+  font-size: 0.6rem;
+}
+
+.video-session-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-session-controls button {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  padding: 0;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.video-session-controls button:disabled {
+  cursor: default;
+  opacity: 0.74;
+}
+
+.video-session-controls button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.video-session-controls .video-finish-control {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: var(--nv-terracotta);
+  box-shadow: 0 6px 16px rgba(129, 55, 31, 0.28);
+}
+
+.video-session-controls svg {
+  width: 17px;
+  height: 17px;
+}
+
+.video-session-controls button span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.video-session-disclaimer {
+  margin: 0;
+  color: #d6e6e3;
+  font-size: 0.61rem;
+  line-height: 1.3;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .interview-experience.with-video {
+    grid-template-columns: minmax(260px, 0.8fr) minmax(330px, 1.2fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .chat-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .interview-experience {
+    height: auto;
+  }
+
+  .interview-experience.with-video {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 8px;
+  }
+
+  .simulated-video-session {
+    height: 260px;
+  }
+
+  .interview-experience.with-video > .conversation {
+    height: 300px;
+  }
+
+  .interview-experience.chat-only > .conversation {
+    height: clamp(280px, 42vh, 380px);
   }
 }

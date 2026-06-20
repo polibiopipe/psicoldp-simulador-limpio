@@ -18,8 +18,8 @@ export function Home({ onStart, onViewHistory }) {
       <header className="landing-header">
         <img
           className="brand-logo"
-          src="/vivolab-logo.png"
-          alt="VivoLab, simuladores formativos"
+          src="/escucha-viva-logo.png"
+          alt="Escucha Viva, simuladores formativos"
         />
         <div className="parent-brand-lockup">
           <span>Una iniciativa de</span>
@@ -29,15 +29,16 @@ export function Home({ onStart, onViewHistory }) {
 
       <div className="hero-section">
         <div className="hero-content">
-          <span className="eyebrow">Plataforma de simuladores formativos</span>
-          <h1 className="hero-title">VivoLab</h1>
+          <span className="eyebrow">Simuladores formativos</span>
+          <h1 className="hero-title">Escucha Viva</h1>
           <p className="hero-tagline">
-            Entrena entrevistas iniciales en un entorno formativo, ético y humano.
+            Entrena habilidades de entrevista psicológica en un entorno formativo,
+            ético y humano.
           </p>
           <div className="current-module">
             <BookOpenCheck aria-hidden="true" />
             <span>Módulo actual</span>
-            <strong>Entrevista Inicial</strong>
+            <strong>Entrevista Psicológica Formativa</strong>
           </div>
           <p className="hero-subtitle">
             Practica entrevistas psicológicas iniciales con pacientes virtuales ficticios,
@@ -46,19 +47,19 @@ export function Home({ onStart, onViewHistory }) {
 
           <div className="hero-value-list" aria-label="Valores de la experiencia formativa">
             <span><ShieldCheck aria-hidden="true" /> Práctica segura</span>
-            <span><Sprout aria-hidden="true" /> Aprendizaje progresivo</span>
+            <span><Sprout aria-hidden="true" /> Entrena tu escucha</span>
             <span><HeartHandshake aria-hidden="true" /> Formación humana</span>
-            <span><Compass aria-hidden="true" /> Escucha y criterio</span>
+            <span><Compass aria-hidden="true" /> Aprende con criterio</span>
           </div>
 
           <div className="hero-actions">
             <button className="primary-action landing-primary" type="button" onClick={onStart}>
-              Comenzar entrevista
+              Comenzar simulación
               <ArrowRight aria-hidden="true" />
             </button>
             <button className="secondary-action landing-secondary" type="button" onClick={onStart}>
               <Play aria-hidden="true" />
-              Ver cómo funciona
+              Ver casos disponibles
             </button>
             <button className="secondary-action landing-secondary landing-history-action" type="button" onClick={onViewHistory}>
               <FolderClock aria-hidden="true" />
@@ -76,7 +77,7 @@ export function Home({ onStart, onViewHistory }) {
                 <span />
                 <span />
               </div>
-              <strong>VivoLab · Entrevista Inicial</strong>
+              <strong>Escucha Viva · Entrevista Psicológica Formativa</strong>
             </div>
 
             <div className="preview-patient">
@@ -154,15 +155,15 @@ export function Home({ onStart, onViewHistory }) {
         </article>
         <article className="feature-card">
           <ShieldCheck aria-hidden="true" />
-          <h2>Respuestas más humanas</h2>
-          <p>Desarrolla habilidades con empatía, ética y foco en la persona.</p>
+          <h2>Práctica segura</h2>
+          <p>Entrena habilidades de entrevista en un entorno ético y controlado.</p>
         </article>
       </div>
 
       <article className="writing-guidance-card">
         <MessageSquareText aria-hidden="true" />
         <div>
-          <h2>Entrena una forma de preguntar más clara y humana</h2>
+          <h2>Practica con calma. Aprende con criterio.</h2>
           <p>
             Tómate un momento para formular preguntas respetuosas, precisas y abiertas.
             La calidad de una entrevista también se construye en la manera de escuchar
