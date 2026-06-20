@@ -61,7 +61,7 @@ export function AuthScreen() {
         <span className="eyebrow">Acceso a VivoLab</span>
         <h1>VivoLab · Entrevista Inicial</h1>
         <p>
-          Ingresa con tu correo y contrasena para guardar el historial de tus
+          Ingresa para continuar tus prácticas y conservar el recorrido de tus
           entrevistas simuladas.
         </p>
 

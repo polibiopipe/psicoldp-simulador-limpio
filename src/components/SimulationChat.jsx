@@ -147,7 +147,8 @@ export function SimulationChat({
             <div className="empty-state">
               <p>{caseItem.openingLine}</p>
               <span>
-                Sugerencia: parte por encuadre, propósito educativo y una pregunta abierta.
+                Puedes comenzar con calma: presenta el encuadre y abre la conversación
+                con una pregunta respetuosa.
               </span>
             </div>
           ) : (
@@ -171,8 +172,8 @@ export function SimulationChat({
         <form className="question-form" onSubmit={submitQuestion}>
           <label htmlFor="student-question">Intervención del estudiante</label>
           <p className="writing-support">
-            Redacta tu pregunta con claridad. Usa puntuación y evita mensajes demasiado
-            ambiguos.
+            Escribe con calma y claridad. Una pregunta cuidadosa puede abrir una
+            conversación más profunda.
           </p>
           <div className="guided-intervention-panel">
             <label htmlFor="intervention-type">Tipo de intervención</label>

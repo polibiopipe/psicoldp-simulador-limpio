@@ -23,7 +23,8 @@ export function CaseSelector({
         <span className="eyebrow">VivoLab · Entrevista Inicial</span>
         <h1>Casos disponibles</h1>
         <p>
-          Selecciona un caso ficticio para practicar habilidades de entrevista inicial.
+          Elige un caso ficticio y practica la entrevista inicial a tu ritmo, con
+          objetivos formativos claros.
         </p>
       </header>
 
