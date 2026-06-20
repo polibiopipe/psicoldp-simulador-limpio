@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { Clock3, MicOff, MoreHorizontal, PhoneOff, UserRound, VideoOff } from "lucide-react";
+import {
+  Clock3,
+  LampDesk,
+  Leaf,
+  MicOff,
+  MoreHorizontal,
+  PhoneOff,
+  UserRound,
+  VideoOff
+} from "lucide-react";
 
 const avatarStateLabels = {
   idle: "En espera",
@@ -17,7 +26,6 @@ export function AvatarSessionView({
   onFinish
 }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const caseImage = caseItem.image || "/casos/placeholder.png";
 
   useEffect(() => {
     setElapsedSeconds(0);
@@ -47,16 +55,7 @@ export function AvatarSessionView({
         </div>
       </div>
 
-      <div className="video-patient-stage">
-        <img src={caseImage} alt={`Retrato ficticio de ${caseItem.name}`} />
-        <div className="video-patient-caption">
-          <div>
-            <strong>{caseItem.name}</strong>
-            <span>{caseItem.age} · Paciente ficticio</span>
-          </div>
-          <small>{caseItem.shortTitle}</small>
-        </div>
-      </div>
+      <AvatarRoomFrame caseItem={caseItem} />
 
       <aside className="video-student-tile" aria-label="Participante estudiante sin cámara real">
         <UserRound aria-hidden="true" />
@@ -95,6 +94,44 @@ export function AvatarSessionView({
       </p>
     </section>
   );
+}
+
+function AvatarRoomFrame({ caseItem }) {
+  const caseImage = caseItem.image || "/casos/placeholder.png";
+  const stageImage = getStageImage(caseImage);
+
+  return (
+    <div className="video-patient-stage avatar-room-frame">
+      <div className="avatar-room-background" aria-hidden="true">
+        <span className="room-window" />
+        <LampDesk className="room-lamp" />
+        <Leaf className="room-plant" />
+      </div>
+      <img
+        className="avatar-stage-portrait"
+        src={stageImage}
+        alt={`Retrato ficticio de ${caseItem.name}`}
+        onError={(event) => {
+          event.currentTarget.onerror = null;
+          event.currentTarget.src = caseImage;
+        }}
+      />
+      <div className="video-patient-caption">
+        <div>
+          <strong>{caseItem.name}</strong>
+          <span>{caseItem.age} · Paciente ficticio</span>
+        </div>
+        <small>{caseItem.shortTitle}</small>
+      </div>
+    </div>
+  );
+}
+
+function getStageImage(imagePath) {
+  if (!imagePath.startsWith("/casos/") || imagePath.includes("/stage/") || imagePath.includes("placeholder")) {
+    return imagePath;
+  }
+  return imagePath.replace("/casos/", "/casos/stage-cutout/");
 }
 
 function formatTimer(totalSeconds) {
