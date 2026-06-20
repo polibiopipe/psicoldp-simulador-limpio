@@ -66,7 +66,9 @@ export function CaseSelector({
               )}
             </div>
             <div className="case-card-top">
-              <span>{caseItem.difficulty}</span>
+              <span className={`case-level case-level-${caseItem.difficulty.toLowerCase()}`}>
+                {caseItem.difficulty}
+              </span>
             </div>
             <h2>{caseItem.name}</h2>
             <strong>{caseItem.shortTitle}</strong>
