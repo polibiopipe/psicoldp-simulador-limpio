@@ -119,6 +119,99 @@ const activeInteractionPatternsByProfile = {
   }
 };
 
+const validationElaborationByProfile = {
+  tomas: [
+    "Creo que lo que más me cuesta es que en mi casa ya parten pensando que el computador explica todo.",
+    "A veces me encierro a jugar porque ahí no tengo que pensar tanto qué decir.",
+    "En persona me quedo pensando demasiado y al final prefiero callarme.",
+    "Cuando siento que me van a retar, dejo de explicar lo que me pasa y me voy a mi pieza.",
+    "Con la gente del colegio me cuesta entrar en la conversación, aunque sí quiera estar ahí."
+  ],
+  valentina: [
+    "Cuando descanso, mi cabeza sigue haciendo listas de todo lo que debería estar avanzando.",
+    "Me da miedo bajar el ritmo y sentir que estoy decepcionando a los demás.",
+    "No es solo la cantidad de cosas; es que nunca siento que lo que hago sea suficiente.",
+    "Termino una tarea y casi de inmediato empiezo a pensar en la siguiente.",
+    "Me cuesta disfrutar un descanso porque estoy calculando cuánto tiempo podría estar aprovechando."
+  ],
+  marcos: [
+    "Me doy cuenta de que llego sin paciencia y termino respondiendo mal por cosas chicas.",
+    "No es solo sueño; es como si siguiera trabajando por dentro incluso cuando ya llegué a la casa.",
+    "Antes sentía más sentido en lo que hacía. Ahora cumplo, pero me siento bastante apagado.",
+    "Me preocupa que mi pareja reciba una versión mía que está siempre corta de paciencia.",
+    "A veces el fin de semana tampoco logro desconectarme porque sigo pensando en pendientes."
+  ],
+  camila: [
+    "Muchas veces digo que sí antes de preguntarme si realmente puedo ayudar.",
+    "Me da miedo que poner un límite haga que los demás piensen que ya no me importan.",
+    "A veces siento rabia por estar siempre disponible y después me culpo por sentirla.",
+    "No siempre me piden ayuda directamente; muchas veces yo misma me adelanto a ofrecerla.",
+    "Cuando intento descansar, sigo mirando mensajes por si alguien necesita algo."
+  ],
+  daniela: [
+    "Incluso cuando alguien me ayuda, siento que debería estar aprovechando ese rato para hacer otra cosa.",
+    "Me da culpa necesitar descanso, como si cansarme significara que estoy fallando.",
+    "Extraño tener un rato para mí sin sentir que estoy dejando de lado a mi hijo o mis estudios.",
+    "A veces postergo cosas de la universidad y después siento que no estoy cumpliendo en ninguna parte.",
+    "Me cuesta pedir ayuda porque siento que debería poder organizarme sola."
+  ]
+};
+
+const closureResponsesByProfile = {
+  tomas: [
+    "Gracias... igual me cuesta hablar de esto, pero me sirve que no lo tomes como un reto. Nos vemos.",
+    "Ya, está bien. Me costó hablar, pero podemos seguir otro día.",
+    "Gracias por escuchar. Nos vemos en la próxima sesión."
+  ],
+  valentina: [
+    "Gracias. Me sirvió ordenar un poco lo que hablamos. Nos vemos en la próxima sesión.",
+    "Está bien. Quedaron cosas dando vueltas, pero prefiero retomarlas otro día.",
+    "Gracias por escucharme. Podemos continuar con calma la próxima vez."
+  ],
+  marcos: [
+    "Gracias. No soy mucho de hablar de esto, pero me sirvió ordenarlo. Nos vemos.",
+    "Está bien. Podemos dejarlo hasta acá y retomarlo en la próxima sesión.",
+    "Gracias por la conversación. Me voy un poco más claro que cuando llegué."
+  ],
+  camila: [
+    "Gracias. Me sirvió hablar sin sentir que estaba siendo egoísta. Nos vemos.",
+    "Está bien. Podemos seguir conversándolo con calma la próxima vez.",
+    "Gracias por escucharme. Por hoy prefiero dejarlo hasta acá."
+  ],
+  daniela: [
+    "Gracias. Me ayudó poder decirlo sin sentirme juzgada. Nos vemos en la próxima sesión.",
+    "Está bien. Prefiero dejarlo hasta acá por hoy y seguir otro día.",
+    "Gracias por escucharme. Me voy un poco más tranquila."
+  ]
+};
+
+const contextualFollowUpsByProfile = {
+  valentina: {
+    seguimiento_descanso_culpa: [
+      "Cuando intento descansar, empiezo a pensar en todo lo que todavía no termino y me cuesta soltarlo.",
+      "Puedo estar sentada sin hacer nada, pero mi cabeza sigue armando listas y diciéndome que estoy perdiendo tiempo."
+    ]
+  },
+  marcos: {
+    seguimiento_llegada_casa: [
+      "Llego con la cabeza llena de pendientes y con muy poca paciencia para conversar.",
+      "Apenas entro a la casa quiero que nadie me pida nada, y después me da culpa reaccionar así."
+    ]
+  },
+  camila: {
+    seguimiento_limites: [
+      "Cuando intento decir que no, enseguida pienso que la otra persona se va a molestar conmigo.",
+      "Muchas veces termino diciendo que sí para evitar la culpa, aunque ya sepa que no me da la energía."
+    ]
+  },
+  daniela: {
+    seguimiento_culpa_descanso: [
+      "Que si descanso siento que estoy dejando de hacer algo por mi hijo o por mis estudios.",
+      "Aunque esté agotada, una parte de mí insiste en que debería seguir y aprovechar cada minuto."
+    ]
+  }
+};
+
 export const caseProfiles = {
   tomas: createProfile({
     id: "tomas",
@@ -704,6 +797,15 @@ function createProfile(profile) {
     ...(profile.topics || {}),
     derivacion: profile.topics?.derivacion || [referredByByProfile[profile.id] || profile.reasonForConsultation].filter(Boolean)
   };
+  if (validationElaborationByProfile[profile.id]) {
+    topics.validacion_elaboracion = validationElaborationByProfile[profile.id];
+  }
+  if (closureResponsesByProfile[profile.id]) {
+    topics.cierre = closureResponsesByProfile[profile.id];
+  }
+  if (contextualFollowUpsByProfile[profile.id]) {
+    Object.assign(topics, contextualFollowUpsByProfile[profile.id]);
+  }
   if (profile.id === "tomas") {
     topics.motivo_consulta = [
       "Creo que vine por mis papás. Ellos dicen que paso mucho tiempo en el computador y que casi no salgo.",

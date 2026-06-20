@@ -1,5 +1,6 @@
 import { patientFacts } from "../data/patientFacts.js";
 import { forceCompositeOpenQuestionResponse, isIncompleteCompositeResponse } from "./compositeResponses.js";
+import { isSemanticallyRepeated } from "./conversationQuality.js";
 
 const forbiddenClinicalTerms = [
   "ansiedad social",
@@ -45,7 +46,7 @@ export function composeFinalResponse({ selectedResponse, memory }) {
   response = enforceFirstPerson(response, memory.caseId);
   response = enforceFirstPersonAliases(response, memory.caseId);
   response = limitSentences(response, memory.opennessLevel, selectedResponse.responseType);
-  response = avoidExactRepetition(response, memory.lastPatientMessage, memory.caseId);
+  response = avoidRepeatedIdea(response, memory, selectedResponse.responseType);
   response = ensurePunctuation(response);
 
   if (
@@ -152,6 +153,50 @@ function limitSentences(response, opennessLevel, responseType) {
           : 2;
   const sentences = response.split(/(?<=[.!?])\s+/).filter(Boolean);
   return sentences.slice(0, maxSentences).join(" ");
+}
+
+function avoidRepeatedIdea(response, memory, responseType) {
+  const previousResponses = memory.usedResponseTexts || memory.recentPatientMessages || [];
+  if (!previousResponses.length || isRepeatableResponseType(responseType)) return response;
+  if (!isSemanticallyRepeated(response, previousResponses, 0.72)) return response;
+
+  const alternatives = {
+    tomas: [
+      "A veces me cierro porque siento que ya vienen con una idea hecha de mí.",
+      "En persona pienso demasiado qué decir y al final prefiero quedarme callado."
+    ],
+    valentina: [
+      "Incluso cuando paro, mi cabeza sigue repasando todo lo que falta.",
+      "Me cuesta descansar porque enseguida siento que debería estar avanzando."
+    ],
+    marcos: [
+      "Sigo cumpliendo, pero cada vez llego con menos paciencia para mi casa.",
+      "La pega termina y yo sigo con los pendientes dando vueltas."
+    ],
+    camila: [
+      "Digo que sí muy rápido y recién después noto que ya estaba agotada.",
+      "Poner un límite me da miedo porque siento que alguien podría molestarse conmigo."
+    ],
+    daniela: [
+      "Necesitar un rato para mí me da culpa, aunque sé que estoy cansada.",
+      "A veces recibo ayuda y aun así siento que debería estar haciendo algo más."
+    ]
+  };
+
+  return (alternatives[memory.caseId] || [])
+    .find((candidate) => !isSemanticallyRepeated(candidate, previousResponses, 0.68))
+    || response;
+}
+
+function isRepeatableResponseType(responseType = "") {
+  return [
+    "identidad_nombre",
+    "nombre",
+    "edad",
+    "vivienda_residencia",
+    "ocupacion_actividad",
+    "cierre"
+  ].some((type) => responseType === type || responseType.startsWith(`${type}:`) || responseType.includes(`case_profile:${type}`));
 }
 
 function avoidExactRepetition(response, lastPatientMessage, caseId) {

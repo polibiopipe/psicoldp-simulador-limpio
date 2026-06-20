@@ -1,5 +1,6 @@
 import { caseProfiles } from "../data/caseProfiles.js";
 import { normalizeText } from "../utils/textUtils.js";
+import { isSemanticallyRepeated, selectLeastSimilarCandidate } from "./conversationQuality.js";
 
 const intentTopicMap = {
   saludo_simple: "saludo",
@@ -30,6 +31,12 @@ const intentTopicMap = {
 };
 
 const topicAliases = {
+  motivo_de_consulta: "motivo_consulta",
+  preocupacion_principal: "preocupacion",
+  exploracion_emocional: "emociones",
+  pregunta_familiar: "familia",
+  pregunta_social: "amistades",
+  pregunta_videojuegos: "videojuegos",
   convivencia_familia: "convivencia",
   colegio_estudios: "estudios_trabajo",
   seguimiento_contextual_breve: "seguimiento_contextual",
@@ -103,6 +110,8 @@ export function detectProfileTopic({ message, intent, intentResult, memory, prof
 
   if (!text) return null;
 
+  if (intent === "cierre" || isClosureMessage(text)) return "cierre";
+  if (intent === "validacion_emocional") return "validacion";
   if (isRiskQuestion(text)) return "riesgo";
   if (isTrulyAmbiguous(text) && !intentResult.explicitReferenceDetected) return "ambiguo_real";
   if (isCurrentStateQuestion(text)) return "estado_actual";
@@ -142,6 +151,10 @@ function getCandidatesForTopic({ profile, topic, memory, intentResult }) {
     return buildAmbiguousCandidates(profile, memory);
   }
 
+  if (topic === "validacion") {
+    return buildValidationElaborationCandidates(profile);
+  }
+
   const specificTopic = topic === "seguimiento_contextual"
     ? detectFollowUpTopic({
         text: intentResult.normalizedText || "",
@@ -159,6 +172,24 @@ function getCandidatesForTopic({ profile, topic, memory, intentResult }) {
   }
 
   return buildConstructedCandidates(profile, specificTopic, memory);
+}
+
+function buildValidationElaborationCandidates(profile) {
+  const acknowledgements = profile.topics?.validacion || [];
+  const elaborations = profile.topics?.validacion_elaboracion
+    || profile.topics?.seguimiento_contextual
+    || profile.topics?.emociones
+    || [];
+
+  if (!elaborations.length) return acknowledgements;
+
+  const candidates = elaborations.map((elaboration, index) => {
+    const acknowledgement = acknowledgements[index % Math.max(acknowledgements.length, 1)]
+      || "Gracias. Me ayuda que lo digas así.";
+    return combineNaturally(acknowledgement, elaboration);
+  });
+
+  return candidates;
 }
 
 function buildConstructedCandidates(profile, topic, memory) {
@@ -189,7 +220,14 @@ function buildConstructedCandidates(profile, topic, memory) {
   return [primary, follow].filter(Boolean);
 }
 
-function buildAmbiguousCandidates(profile, memory) {
+function buildAmbiguousCandidates(_profile, memory) {
+  if (memory?.lastPatientMessage) {
+    return ["No sé si entendí bien... ¿me preguntas por lo que dije recién?"];
+  }
+  return ["No sé si entendí bien... ¿podrías preguntármelo de otra forma?"];
+}
+
+function buildLegacyAmbiguousCandidates(profile, memory) {
   if (memory?.lastPatientMessage) {
     return [
       "No estoy seguro de haber entendido bien. ¿Te refieres a lo que veníamos hablando?",
@@ -201,6 +239,7 @@ function buildAmbiguousCandidates(profile, memory) {
 
 function pickProfileResponse({ caseId, topic, candidates, memory }) {
   const normalizedLast = normalizeForCompare(memory?.lastPatientMessage || "");
+  const previousResponses = memory?.usedResponseTexts || memory?.recentPatientMessages || [];
   const enriched = candidates.map((text, index) => ({
     text,
     id: makeProfileResponseId(caseId, topic, text, index)
@@ -220,6 +259,10 @@ function pickProfileResponse({ caseId, topic, candidates, memory }) {
     "amistades_red_social_negacion",
     "amistades",
     "seguimiento_no_es_tan_simple",
+    "seguimiento_descanso_culpa",
+    "seguimiento_llegada_casa",
+    "seguimiento_limites",
+    "seguimiento_culpa_descanso",
     "seguimiento_colegio_habla_poco",
     "seguimiento_discusiones_computador",
     "seguimiento_sentirse_juzgado",
@@ -237,28 +280,66 @@ function pickProfileResponse({ caseId, topic, candidates, memory }) {
   const ordered = [...enriched.slice(opennessOffset), ...enriched.slice(0, opennessOffset)];
   const unused = ordered.find((candidate) => {
     const sameAsLast = normalizeForCompare(candidate.text) === normalizedLast;
-    return !sameAsLast && !memory?.usedResponseIds?.includes(candidate.id);
+    const repeatsIdea = shouldAllowRepeatedFact(topic)
+      ? false
+      : isSemanticallyRepeated(candidate.text, previousResponses);
+    return !sameAsLast && !repeatsIdea && !memory?.usedResponseIds?.includes(candidate.id);
   });
 
   if (unused) return unused;
 
-  const notSame = ordered.find((candidate) => normalizeForCompare(candidate.text) !== normalizedLast);
-  if (notSame) {
+  const leastSimilar = selectLeastSimilarCandidate(
+    ordered.filter((candidate) => normalizeForCompare(candidate.text) !== normalizedLast),
+    previousResponses
+  );
+  if (leastSimilar) {
     return {
-      text: addNaturalVariation(notSame.text),
-      id: makeProfileResponseId(caseId, `${topic}_variation`, notSame.text, memory?.turnCount || 0)
+      text: leastSimilar.text,
+      id: makeProfileResponseId(caseId, `${topic}_continuation`, leastSimilar.text, memory?.turnCount || 0)
     };
   }
 
   return {
-    text: addNaturalVariation(enriched[0].text),
-    id: makeProfileResponseId(caseId, `${topic}_variation`, enriched[0].text, memory?.turnCount || 0)
+    text: enriched[0].text,
+    id: makeProfileResponseId(caseId, `${topic}_continuation`, enriched[0].text, memory?.turnCount || 0)
   };
+}
+
+function shouldAllowRepeatedFact(topic) {
+  return [
+    "identidad_nombre",
+    "edad",
+    "convivencia_familia",
+    "convivencia",
+    "hermanos",
+    "colegio_estudios",
+    "estudios_trabajo",
+    "derivacion",
+    "derivacion_motivo_informal",
+    "derivacion_como_llego",
+    "derivacion_quien_mando"
+  ].includes(topic);
 }
 
 function detectFollowUpTopic({ text, lastPatientMessage, profile }) {
   const combined = `${text} ${lastPatientMessage}`;
   const topics = profile.topics || {};
+
+  if (profile.id === "valentina" && /descans|parar|culpa/.test(text) && topics.seguimiento_descanso_culpa) {
+    return "seguimiento_descanso_culpa";
+  }
+
+  if (profile.id === "marcos" && /llegas|llego|casa|paciencia/.test(text) && topics.seguimiento_llegada_casa) {
+    return "seguimiento_llegada_casa";
+  }
+
+  if (profile.id === "camila" && /decir que no|limite|limites/.test(text) && topics.seguimiento_limites) {
+    return "seguimiento_limites";
+  }
+
+  if (profile.id === "daniela" && /culpa|descans|cansad/.test(text) && topics.seguimiento_culpa_descanso) {
+    return "seguimiento_culpa_descanso";
+  }
 
   if (profile.id === "tomas" && /discusion|discusiones|a que discusiones/.test(combined) && topics.seguimiento_discusiones_computador) {
     return "seguimiento_discusiones_computador";
@@ -347,6 +428,10 @@ function toResolvedIntent(topic, originalIntent) {
     seguimiento_emocional_contextual: "seguimiento_emocional_contextual",
     seguimiento_contextual: "seguimiento_contextual",
     seguimiento_no_es_tan_simple: "seguimiento_contextual",
+    seguimiento_descanso_culpa: "seguimiento_contextual",
+    seguimiento_llegada_casa: "seguimiento_contextual",
+    seguimiento_limites: "seguimiento_contextual",
+    seguimiento_culpa_descanso: "seguimiento_contextual",
     seguimiento_colegio_habla_poco: "seguimiento_contextual_breve",
     seguimiento_discusiones_computador: "seguimiento_contextual",
     seguimiento_sentirse_juzgado: "seguimiento_emocional_contextual",
@@ -435,6 +520,10 @@ function isExplicitFollowUp(text) {
   return /\b(me dijiste que|dijiste que|mencionaste que|cuando dices|cuando dijiste|a que te refieres|que quieres decir|cuentame mas|que significa|en que sentido|que no es tan simple)\b/.test(text);
 }
 
+function isClosureMessage(text) {
+  return /\b(nos vemos|hasta la proxima|dejemos hasta aqui|dejarlo hasta aqui|terminemos por hoy|cerrar por hoy|proxima sesion|retomar en otra sesion|continuar otro dia|gracias por conversar|hoy pudimos conversar)\b/.test(text);
+}
+
 function isTrulyAmbiguous(text) {
   return /^(y|y eso|eso|como|por que|que cosa|explicate|no entiendo|como asi|mmm)$/.test(text);
 }
@@ -444,6 +533,16 @@ function addNaturalVariation(text) {
   if (/^creo que/i.test(text)) return text.replace(/^creo que/i, "Quizás lo diría así: creo que");
   if (/^no sé/i.test(text)) return text.replace(/^no sé/i, "No sé bien");
   return `Lo diría de otra forma: ${lowerFirst(text)}`;
+}
+
+function combineNaturally(first, second) {
+  if (!first) return second;
+  if (!second) return first;
+  const normalizedFirst = normalizeForCompare(first);
+  const normalizedSecond = normalizeForCompare(second);
+  if (normalizedFirst.includes(normalizedSecond)) return first;
+  if (normalizedSecond.includes(normalizedFirst)) return second;
+  return `${first.trim()} ${second.trim()}`;
 }
 
 function lowerFirst(text) {

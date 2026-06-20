@@ -2,6 +2,7 @@ import { patientFacts } from "../data/patientFacts.js";
 import { patientResponses } from "../data/patientResponses.js";
 import { forceCompositeOpenQuestionResponse } from "./compositeResponses.js";
 import { isEvasivePatientResponse } from "./patientMemory.js";
+import { isSemanticallyRepeated, selectLeastSimilarCandidate } from "./conversationQuality.js";
 
 const intentToFact = {
   identidad_nombre: "name",
@@ -297,8 +298,13 @@ export function selectResponse({ caseId, intentResult, memory }) {
     candidates = framingResponses[caseId] || ["Entiendo. Está bien, podemos conversar con calma."];
     responseType = "encuadre_o_consentimiento";
   } else if (intent === "desconocida") {
-    candidates = buildClarificationCandidates(facts, memory);
-    responseType = "clarificacion_desconocida";
+    if (intentResult.ambiguityDetected) {
+      candidates = buildClarificationCandidates(facts, memory);
+      responseType = "clarificacion_desconocida";
+    } else {
+      candidates = buildContextualContinuationCandidates(facts, memory);
+      responseType = "respuesta_contextual";
+    }
   } else if (intent === "seguimiento_contextual_explicito") {
     const topic = intentResult.contextualTopic || memory.lastTopic || "default";
     candidates = buildExplicitFollowUpCandidates({ caseId, facts, responses, intentResult, memory });
@@ -356,7 +362,7 @@ export function selectResponse({ caseId, intentResult, memory }) {
     responseType = candidates === responses.respuesta_general ? "respuesta_general" : "fallback_desconocido";
   }
 
-  const selected = pickUnused(candidates, memory.usedResponseIds, caseId, responseType, memory.turnCount);
+  const selected = pickUnused(candidates, memory, caseId, responseType);
   return {
     response: selected.text,
     responseId: selected.id,
@@ -531,6 +537,18 @@ function buildConcreteCandidates(facts, responses) {
   ].filter(Boolean);
 }
 
+function buildContextualContinuationCandidates(facts, memory) {
+  const previousResponses = memory.usedResponseTexts || memory.recentPatientMessages || [];
+  const candidates = [
+    facts.followUpBridge,
+    ...(facts.concreteDisclosures || []),
+    facts.concreteConcern,
+    facts.concern
+  ].filter(Boolean);
+  const fresh = candidates.filter((candidate) => !isSemanticallyRepeated(candidate, previousResponses));
+  return fresh.length ? fresh : candidates;
+}
+
 function buildClarificationCandidates(facts, memory) {
   const topicLine = memory.lastTopic && memory.lastTopic !== "desconocida"
     ? `No estoy seguro de haber entendido bien. ¿Te refieres a lo que veníamos hablando sobre ${readableTopic(memory.lastTopic)}?`
@@ -595,18 +613,44 @@ function withLead(lead, text) {
   return `${lead} ${clean.charAt(0).toLowerCase()}${clean.slice(1)}`;
 }
 
-function pickUnused(candidates, usedResponseIds, caseId, responseType, turnCount) {
+function pickUnused(candidates, memory, caseId, responseType) {
   const normalized = candidates.map((text, index) => ({
     text,
     id: makeResponseId(caseId, responseType, text, index)
   }));
-  const unused = normalized.filter((candidate) => !usedResponseIds.includes(candidate.id));
+  const usedResponseIds = memory.usedResponseIds || [];
+  const previousResponses = memory.usedResponseTexts || memory.recentPatientMessages || [];
+  const allowRepeatedFact = isRepeatableFactResponse(responseType);
+  const unused = normalized.filter((candidate) => {
+    const repeatsIdea = allowRepeatedFact
+      ? false
+      : isSemanticallyRepeated(candidate.text, previousResponses);
+    return !usedResponseIds.includes(candidate.id) && !repeatsIdea;
+  });
   if (unused.length) return unused[0];
 
+  const leastSimilar = selectLeastSimilarCandidate(normalized, previousResponses);
+  if (leastSimilar) {
+    return {
+      text: leastSimilar.text,
+      id: makeResponseId(caseId, `${responseType}:continuation`, leastSimilar.text, memory.turnCount || 0)
+    };
+  }
+
   return {
-    text: makeVariation(normalized[Math.abs(turnCount) % normalized.length].text),
-    id: makeResponseId(caseId, `${responseType}:variation`, normalized[0].text, turnCount)
+    text: memory.voice?.fallback || "No sé bien cómo responder eso.",
+    id: makeResponseId(caseId, `${responseType}:fallback`, "fallback", memory.turnCount || 0)
   };
+}
+
+function isRepeatableFactResponse(responseType) {
+  return [
+    "identidad_nombre",
+    "nombre",
+    "edad",
+    "vivienda_residencia",
+    "ocupacion_actividad"
+  ].some((type) => responseType === type || responseType.startsWith(`fact:${type}`));
 }
 
 function makeVariation(text) {

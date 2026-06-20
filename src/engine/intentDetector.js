@@ -217,7 +217,7 @@ const intentLexicon = {
   consejo_apresurado: ["deberias", "tienes que", "te recomiendo", "deja de", "lo mejor seria", "haz ejercicio", "organizate", "pon limites y listo"],
   exploracion_emocional: ["que sientes", "como te sientes", "que te pasa", "que te sucede", "que es lo que sientes", "como lo vives", "que te cuesta mas", "que te cuesta contar", "que parte te duele", "te da miedo", "te da culpa", "te da rabia", "te da pena", "tu sientes", "sientes que", "tu sientes que"],
   exploracion_contextual: ["como es en tu casa", "como es en tu trabajo", "como es en la universidad", "como es con tu familia", "como es con tus amigos", "que pasa ahi", "desde cuando pasa"],
-  cierre: ["cerrar", "terminar", "finalizar", "antes de terminar", "gracias por conversar", "como quedas", "como te vas", "proxima sesion", "siguiente sesion", "seguir conversando", "retomar en otra sesion", "que podriamos seguir conversando"]
+  cierre: ["cerrar", "terminar", "finalizar", "antes de terminar", "para cerrar", "gracias por conversar", "como quedas", "como te vas", "nos vemos", "hasta la proxima", "dejemos hasta aqui", "dejarlo hasta aqui", "terminemos por hoy", "proxima sesion", "siguiente sesion", "seguir conversando", "retomar en otra sesion", "que podriamos seguir conversando"]
 };
 
 const priority = [
@@ -361,6 +361,12 @@ export function detectIntent(studentMessage, history = []) {
   matches.colegio_estudios = detectsSchoolStudyQuestion(text);
   matches.preocupacion_principal = matches.preocupacion_principal || detectsMainConcernQuestion(text);
   matches.respuesta_general = isGeneralOpenPrompt(text);
+  matches.reformulacion_empatica = detectsEmpathicReformulation(text);
+  matches.validacion_emocional = matches.validacion_emocional || matches.reformulacion_empatica;
+  const strongClosureDetected = detectsStrongClosure(text);
+  matches.cierre = matches.cierre || strongClosureDetected;
+  const supportiveStatementDetected = matches.validacion_emocional
+    && !detectsQuestionRequest(studentMessage, text);
 
   if (matches.validacion_emocional && matches.motivo_de_consulta && !hasExplicitMotiveCue(text)) {
     matches.motivo_de_consulta = false;
@@ -388,7 +394,11 @@ export function detectIntent(studentMessage, history = []) {
   matches.seguimiento_contextual_explicito = Boolean(explicitReferenceDetected && history.at(-1)?.answer);
   matches.seguimiento_contextual = Boolean(contextualTopic) && !matches.seguimiento_contextual_explicito;
 
-  const intent = priority.find((candidate) => matches[candidate]) || "desconocida";
+  const intent = strongClosureDetected
+    ? "cierre"
+    : supportiveStatementDetected
+      ? "validacion_emocional"
+      : priority.find((candidate) => matches[candidate]) || "desconocida";
   const confidence = intent === "desconocida" ? 0.25 : contextualTopic ? 0.86 : 0.92;
   const ambiguityDetected = emotionalFollowUpDetected || briefWhyFollowUpDetected ? false : isAmbiguousContextualMessage(text, explicitReferenceDetected);
 
@@ -400,6 +410,8 @@ export function detectIntent(studentMessage, history = []) {
     explicitReferenceDetected,
     ambiguityDetected,
     detectedEmotionInLastPatientMessage,
+    reformulationDetected: matches.reformulacion_empatica,
+    supportiveStatementDetected,
     studentName: extractStudentName(text),
     matches,
     categories: toLegacyCategories(intent, matches, text)
@@ -506,6 +518,19 @@ function isGeneralOpenPrompt(text) {
     "como ha sido",
     "que ha pasado"
   ].some((term) => text.includes(term));
+}
+
+function detectsStrongClosure(text) {
+  return /\b(nos vemos|hasta la proxima|dejemos hasta aqui|dejarlo hasta aqui|lo dejamos hasta aqui|podemos dejarlo hasta aqui|terminemos por hoy|cerrar por hoy|para cerrar|antes de terminar|proxima sesion|siguiente sesion|retomar en otra sesion|continuar otro dia|gracias por conversar|hoy pudimos conversar|como te vas|como quedas)\b/.test(text);
+}
+
+function detectsEmpathicReformulation(text) {
+  return /\b(entiendo que|comprendo que|si te entiendo bien|por lo que dices|por lo que cuentas|parece que|te escucho decir|suena a que|no es solo.+sino|no es solamente)\b/.test(text);
+}
+
+function detectsQuestionRequest(originalMessage, text) {
+  if (/[¿?]/.test(String(originalMessage))) return true;
+  return /\b(cuentame|podrias contarme|puedes contarme|a que te refieres|que quieres decir|como ocurre|como pasa|por que|quien|donde|cuando)\b/.test(text);
 }
 
 function detectsStudentPresentation(text) {
@@ -731,6 +756,7 @@ function toLegacyCategories(intent, matches, text = "") {
     openQuestion: /^(encuadre_mas_pregunta_abierta|presentacion_personal_abierta|motivo_de_consulta|derivacion_llegada|preocupacion_principal|seguimiento_contextual_breve|seguimiento_emocional_contextual|seguimiento_contextual|seguimiento_contextual_explicito|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
     closedQuestion: intent.startsWith("pregunta_") || intent === "colegio_estudios" || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "convivencia_familia" || intent === "identidad_nombre" || intent === "nombre" || intent === "edad",
     validation: intent === "validacion_emocional",
+    reformulation: Boolean(matches.reformulacion_empatica),
     judgment: intent === "juicio_o_critica",
     rushedAdvice: intent === "consejo_apresurado",
     emotionalExploration: intent === "exploracion_emocional" || intent === "seguimiento_contextual_breve" || intent === "seguimiento_emocional_contextual" || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito",

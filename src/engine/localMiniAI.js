@@ -63,7 +63,9 @@ export function generateLocalPatientResponse({
     "colegio_estudios",
     "derivacion_llegada",
     "motivo_de_consulta",
-    "amistades_red_social"
+    "amistades_red_social",
+    "validacion_emocional",
+    "cierre"
   ]);
 
   if (textConcreteIntentOverrides.has(textDetectedIntent)) {
@@ -126,6 +128,9 @@ export function generateLocalPatientResponse({
     : selectResponse({ caseId, intentResult, memory: workingMemory });
 
   let responseText = composeFinalResponse({ selectedResponse, memory: workingMemory });
+  if (intentResult.intent === "validacion_emocional") {
+    responseText = ensureValidationAcknowledgement(responseText, caseId);
+  }
   let wasCompositeForced = false;
   const isCompositeIntent = intentResult.intent === "encuadre_mas_pregunta_abierta" || compositeMessageDetected;
 
@@ -170,6 +175,9 @@ export function generateLocalPatientResponse({
     opennessLevel: workingMemory.opennessLevel,
     evasiveCount: workingMemory.evasiveCount || 0,
     lastPatientMessage: workingMemory.lastPatientMessage,
+    recentTurns: workingMemory.recentTurns,
+    lastSubstantiveTopic: workingMemory.lastSubstantiveTopic,
+    reformulationDetected: Boolean(intentResult.reformulationDetected),
     detectedEmotionInLastPatientMessage: intentResult.detectedEmotionInLastPatientMessage || null,
     lastTopic: intentResult.contextualTopic || workingMemory.lastTopic,
     selectedResponseId: selectedResponse.responseId,
@@ -181,6 +189,7 @@ export function generateLocalPatientResponse({
     profileResponseUsed: Boolean(profileResponse),
     usedCaseFacts: Boolean(profileResponse),
     usedResponseIds: workingMemory.usedResponseIds,
+    usedIdeaSignatures: workingMemory.usedIdeaSignatures,
     memory: memoryUpdate,
     fallbackUsed: selectedResponse.fallbackUsed,
     wasCompositeForced,
@@ -241,6 +250,21 @@ export function generateLocalPatientResponse({
     trustStage: getTrustStage(memoryUpdate.trustLevel),
     guidedResult
   };
+}
+
+function ensureValidationAcknowledgement(responseText, caseId) {
+  if (/\b(gracias|me ayuda|me alivia|me sirve|me hace sentido|eso ayuda)\b/i.test(responseText)) {
+    return responseText;
+  }
+
+  const acknowledgements = {
+    tomas: "Eso me ayuda un poco.",
+    valentina: "Gracias. Me ayuda que lo digas así.",
+    marcos: "Sí, tiene sentido que lo plantees así.",
+    camila: "Gracias. Me ayuda que lo mires así.",
+    daniela: "Gracias. Me alivia poder decirlo así."
+  };
+  return `${acknowledgements[caseId] || "Gracias. Me ayuda que lo digas así."} ${responseText}`;
 }
 
 function isDevRuntime() {

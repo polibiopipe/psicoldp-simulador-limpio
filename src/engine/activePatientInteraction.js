@@ -1,5 +1,6 @@
 import { caseProfiles } from "../data/caseProfiles.js";
 import { normalizeText } from "../utils/textUtils.js";
+import { isSemanticallyRepeated } from "./conversationQuality.js";
 
 const concreteIntentBlocklist = new Set([
   "nombre",
@@ -11,7 +12,10 @@ const concreteIntentBlocklist = new Set([
   "hermanos",
   "colegio_estudios",
   "ocupacion_actividad",
-  "rutina_diaria"
+  "rutina_diaria",
+  "amistades_red_social",
+  "validacion_emocional",
+  "cierre"
 ]);
 
 export function applyActivePatientInteraction({
@@ -41,7 +45,8 @@ export function applyActivePatientInteraction({
     normalizedMessage,
     intent,
     memory,
-    responseText
+    responseText,
+    ambiguityDetected: Boolean(intentResult?.ambiguityDetected)
   });
 
   if (!candidate) {
@@ -64,6 +69,7 @@ export function applyActivePatientInteraction({
 }
 
 function shouldSkipActiveInteraction({ intent, responseType, responseText }) {
+  if (intent === "cierre" || responseType.includes("cierre")) return true;
   if (concreteIntentBlocklist.has(intent)) return true;
   if (responseType.includes("case_profile:convivencia")) return true;
   if (responseType.includes("case_profile:hermanos")) return true;
@@ -74,7 +80,7 @@ function shouldSkipActiveInteraction({ intent, responseType, responseText }) {
   return false;
 }
 
-function selectActiveInteraction({ patterns, normalizedMessage, intent, memory, responseText }) {
+function selectActiveInteraction({ patterns, normalizedMessage, intent, memory, responseText, ambiguityDetected }) {
   const lowOpenness = memory?.opennessLevel === "apertura_baja";
   const mediumOrHigh = memory?.opennessLevel === "apertura_media" || memory?.opennessLevel === "apertura_alta";
 
@@ -86,7 +92,7 @@ function selectActiveInteraction({ patterns, normalizedMessage, intent, memory, 
     return pickPattern("resistsPressure", patterns, memory);
   }
 
-  if (intent === "ambiguo_real" || intent === "desconocida") {
+  if ((intent === "ambiguo_real" || intent === "desconocida") && ambiguityDetected) {
     return pickPattern("asksForClarification", patterns, memory);
   }
 
@@ -95,6 +101,7 @@ function selectActiveInteraction({ patterns, normalizedMessage, intent, memory, 
   }
 
   if (intent === "encuadre_o_consentimiento" || intent === "encuadre") {
+    if (alreadyAcknowledgesValidation(responseText)) return null;
     return lowOpenness
       ? pickPattern("interviewDiscomfort", patterns, memory)
       : pickPattern("reactsToValidation", patterns, memory);
@@ -128,8 +135,11 @@ function shouldOccasionallyInteract(memory) {
 function pickPattern(type, patterns, memory) {
   const options = patterns[type] || [];
   if (!options.length) return null;
-  const index = Math.max(0, memory?.turnCount || 0) % options.length;
-  return { type, text: options[index] };
+  const previousResponses = memory?.usedResponseTexts || memory?.recentPatientMessages || [];
+  const offset = Math.max(0, memory?.turnCount || 0) % options.length;
+  const ordered = [...options.slice(offset), ...options.slice(0, offset)];
+  const text = ordered.find((option) => !isSemanticallyRepeated(option, previousResponses, 0.72));
+  return text ? { type, text } : null;
 }
 
 function combineResponse(responseText, addition) {

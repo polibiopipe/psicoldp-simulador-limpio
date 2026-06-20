@@ -1,4 +1,5 @@
 import { patientVoices } from "../data/patientVoices.js";
+import { buildIdeaSignature } from "./conversationQuality.js";
 
 const difficultyShift = {
   introductorio: 8,
@@ -8,7 +9,9 @@ const difficultyShift = {
 
 export function buildPatientMemory({ caseId, history = [], difficulty = "intermedio", memory }) {
   const voice = patientVoices[caseId] || patientVoices.tomas;
-  const trustLevel = history.at(-1)?.patientState?.trustLevel ?? clamp((voice.initialTrust ?? 35) + (difficultyShift[difficulty] ?? 0));
+  const trustLevel = history.at(-1)?.patientState?.trustLevel
+    ?? memory?.trustLevel
+    ?? clamp((voice.initialTrust ?? 35) + (difficultyShift[difficulty] ?? 0));
   const evasiveCount = countRecentEvasiveResponses(history);
   const exploredTopics = new Set();
   for (const turn of history) {
@@ -16,26 +19,55 @@ export function buildPatientMemory({ caseId, history = [], difficulty = "interme
     if (category) exploredTopics.add(category);
   }
 
+  const historyResponseTexts = history.map((turn) => turn.answer).filter(Boolean);
+  const usedResponseTexts = Array.from(new Set([
+    ...(memory?.usedResponseTexts || []),
+    ...historyResponseTexts
+  ]));
+  const usedResponseIds = Array.from(new Set([
+    ...(memory?.usedResponseIds || []),
+    ...history.map((turn) => turn.responseId).filter(Boolean)
+  ]));
+  const recentTurns = history.length
+    ? history.slice(-5).map(toMemoryTurn)
+    : (memory?.recentTurns || []).slice(-5);
+  const lastPatientMessage = history.at(-1)?.answer || memory?.lastPatientMessage || "";
+  const lastStudentMessage = history.at(-1)?.question || memory?.lastStudentMessage || "";
+  const lastIntent = history.at(-1)?.responseCategory || memory?.lastIntent || null;
+  const lastTopic = history.at(-1)?.analysis?.contextualTopic
+    || history.at(-1)?.responseCategory
+    || memory?.lastTopic
+    || null;
+  const lastSubstantiveTopic = findLastSubstantiveTopic(recentTurns) || memory?.lastSubstantiveTopic || lastTopic;
+  const recentValidationCount = recentTurns.filter((turn) => turn.validation).length;
+
   return {
+    ...(memory || {}),
     caseId,
-    turnCount: history.length,
+    turnCount: history.length || memory?.turnCount || 0,
     trustLevel,
     opennessLevel: getOpennessLevel(trustLevel),
     voice,
-    usedResponseIds: history.map((turn) => turn.responseId).filter(Boolean),
+    usedResponseIds,
+    usedResponseTexts,
+    usedIdeaSignatures: Array.from(new Set(usedResponseTexts.map(buildIdeaSignature).filter(Boolean))),
+    recentTurns,
+    recentPatientMessages: recentTurns.map((turn) => turn.patientMessage).filter(Boolean),
+    recentStudentMessages: recentTurns.map((turn) => turn.studentMessage).filter(Boolean),
+    recentValidationCount,
     evasiveCount,
-    lastPatientMessage: history.at(-1)?.answer || "",
-    lastStudentMessage: history.at(-1)?.question || "",
-    lastIntent: history.at(-1)?.responseCategory || null,
-    lastTopic: history.at(-1)?.analysis?.contextualTopic || history.at(-1)?.responseCategory || null,
+    lastPatientMessage,
+    lastStudentMessage,
+    lastIntent,
+    lastTopic,
+    lastSubstantiveTopic,
     exploredTopics: Array.from(exploredTopics),
-    hadValidation: history.some((turn) => turn.analysis?.categories?.validation),
-    hadJudgment: history.some((turn) => turn.analysis?.categories?.judgment),
-    hadRushedAdvice: history.some((turn) => turn.analysis?.categories?.rushedAdvice),
-    hadFraming: history.some((turn) => turn.analysis?.categories?.framing),
-    hadClosure: history.some((turn) => turn.analysis?.categories?.closure),
-    hadFollowUp: history.some((turn) => turn.responseCategory === "seguimiento_contextual" || turn.responseCategory === "seguimiento_contextual_explicito" || turn.responseCategory === "seguimiento_contextual_breve" || turn.responseCategory === "seguimiento_emocional_contextual"),
-    ...(memory || {})
+    hadValidation: Boolean(memory?.hadValidation || history.some((turn) => turn.analysis?.categories?.validation)),
+    hadJudgment: Boolean(memory?.hadJudgment || history.some((turn) => turn.analysis?.categories?.judgment)),
+    hadRushedAdvice: Boolean(memory?.hadRushedAdvice || history.some((turn) => turn.analysis?.categories?.rushedAdvice)),
+    hadFraming: Boolean(memory?.hadFraming || history.some((turn) => turn.analysis?.categories?.framing)),
+    hadClosure: Boolean(memory?.hadClosure || history.some((turn) => turn.analysis?.categories?.closure)),
+    hadFollowUp: Boolean(memory?.hadFollowUp || history.some((turn) => turn.responseCategory === "seguimiento_contextual" || turn.responseCategory === "seguimiento_contextual_explicito" || turn.responseCategory === "seguimiento_contextual_breve" || turn.responseCategory === "seguimiento_emocional_contextual"))
   };
 }
 
@@ -65,6 +97,19 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
   const lastTopic = intentResult?.contextualTopic || topicFromIntent(intent) || memory.lastTopic;
   const exploredTopics = Array.from(new Set([...(memory.exploredTopics || []), intent, lastTopic].filter(Boolean)));
   const evasiveCount = isEvasivePatientResponse(responseText) ? (memory.evasiveCount || 0) + 1 : 0;
+  const recentTurns = [
+    ...(memory.recentTurns || []),
+    {
+      studentMessage,
+      patientMessage: responseText,
+      intent,
+      topic: lastTopic,
+      responseId,
+      validation: intent === "validacion_emocional",
+      closure: intent === "cierre"
+    }
+  ].slice(-5);
+  const usedResponseTexts = Array.from(new Set([...(memory.usedResponseTexts || []), responseText].filter(Boolean)));
 
   return {
     ...memory,
@@ -72,11 +117,18 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
     trustLevel: nextTrust,
     opennessLevel: getOpennessLevel(nextTrust),
     usedResponseIds: responseId ? [...memory.usedResponseIds, responseId] : memory.usedResponseIds,
+    usedResponseTexts,
+    usedIdeaSignatures: Array.from(new Set(usedResponseTexts.map(buildIdeaSignature).filter(Boolean))),
+    recentTurns,
+    recentPatientMessages: recentTurns.map((turn) => turn.patientMessage).filter(Boolean),
+    recentStudentMessages: recentTurns.map((turn) => turn.studentMessage).filter(Boolean),
+    recentValidationCount: recentTurns.filter((turn) => turn.validation).length,
     evasiveCount,
     lastPatientMessage: responseText,
     lastStudentMessage: studentMessage,
     lastIntent: intent,
     lastTopic,
+    lastSubstantiveTopic: isSubstantiveTopic(lastTopic) ? lastTopic : memory.lastSubstantiveTopic,
     exploredTopics,
     hadValidation: memory.hadValidation || intent === "validacion_emocional",
     hadJudgment: memory.hadJudgment || intent === "juicio_o_critica",
@@ -105,6 +157,43 @@ export function isEvasivePatientResponse(responseText = "") {
   ];
 
   return evasivePatterns.some((pattern) => normalized.includes(pattern));
+}
+
+function toMemoryTurn(turn) {
+  const intent = turn.responseCategory || turn.analysis?.intent || turn.analysis?.detectedIntent || null;
+  const topic = turn.analysis?.contextualTopic || turn.analysis?.profileTopic || intent;
+  return {
+    studentMessage: turn.question || "",
+    patientMessage: turn.answer || "",
+    intent,
+    topic,
+    responseId: turn.responseId || null,
+    validation: Boolean(turn.analysis?.categories?.validation || intent === "validacion_emocional"),
+    closure: Boolean(turn.analysis?.categories?.closure || intent === "cierre")
+  };
+}
+
+function findLastSubstantiveTopic(recentTurns) {
+  return [...recentTurns]
+    .reverse()
+    .map((turn) => turn.topic || turn.intent)
+    .find(isSubstantiveTopic) || null;
+}
+
+function isSubstantiveTopic(topic) {
+  if (!topic) return false;
+  return ![
+    "saludo",
+    "saludo_simple",
+    "presentacion_estudiante",
+    "encuadre",
+    "encuadre_o_consentimiento",
+    "validacion",
+    "validacion_emocional",
+    "cierre",
+    "desconocida",
+    "ambiguo_real"
+  ].includes(topic);
 }
 
 export function getOpennessLevel(trustLevel) {
