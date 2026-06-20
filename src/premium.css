@@ -2847,6 +2847,18 @@ textarea:hover {
   align-items: center;
 }
 
+.video-session-status > div {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+}
+
+.video-turn-count {
+  color: #c9ded9;
+  font-size: 0.63rem;
+  font-weight: 650;
+}
+
 .video-session-status i {
   width: 7px;
   height: 7px;
@@ -2876,6 +2888,8 @@ textarea:hover {
   height: 100%;
   object-fit: contain;
   object-position: center;
+  transform-origin: center 58%;
+  transition: filter 260ms ease, opacity 260ms ease, transform 260ms ease;
 }
 
 .video-patient-caption {
@@ -2894,12 +2908,26 @@ textarea:hover {
 }
 
 .video-patient-caption strong {
+  display: block;
   font-size: 0.82rem;
 }
 
 .video-patient-caption span {
+  display: block;
+  margin-top: 2px;
   color: #dceae7;
   font-size: 0.65rem;
+}
+
+.video-patient-caption small {
+  max-width: 120px;
+  overflow: hidden;
+  color: #f2d89a;
+  font-size: 0.6rem;
+  line-height: 1.25;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .video-student-tile {
@@ -2997,6 +3025,106 @@ textarea:hover {
   font-size: 0.61rem;
   line-height: 1.3;
   text-align: center;
+}
+
+.avatar-session-view {
+  transition: border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
+}
+
+.avatar-session-view .video-patient-stage {
+  box-shadow: inset 0 0 34px rgba(16, 42, 67, 0.08);
+}
+
+.avatar-session-view.state-idle .video-patient-stage img {
+  animation: avatar-breathe 5.6s ease-in-out infinite;
+}
+
+.avatar-session-view.state-listening {
+  border-color: rgba(24, 166, 161, 0.5);
+  box-shadow: 0 14px 34px rgba(0, 124, 122, 0.2);
+}
+
+.avatar-session-view.state-listening .video-patient-stage img {
+  animation: avatar-listening 4.2s ease-in-out infinite;
+}
+
+.avatar-session-view.state-thinking {
+  border-color: rgba(199, 154, 59, 0.58);
+}
+
+.avatar-session-view.state-thinking .video-patient-stage img {
+  animation: avatar-thinking 2.4s ease-in-out infinite;
+}
+
+.avatar-session-view.state-speaking {
+  border-color: rgba(217, 133, 91, 0.62);
+  box-shadow: 0 16px 38px rgba(217, 133, 91, 0.18);
+}
+
+.avatar-session-view.state-speaking .video-patient-stage img {
+  animation: avatar-speaking 1.8s ease-in-out infinite;
+}
+
+.avatar-session-view.state-closed {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #314d50;
+}
+
+.avatar-session-view.state-closed .video-patient-stage img {
+  opacity: 0.82;
+  filter: saturate(0.58);
+}
+
+.avatar-session-view.state-listening .avatar-state-label i {
+  background: var(--nv-teal-accent);
+}
+
+.avatar-session-view.state-thinking .avatar-state-label i {
+  background: #f2c96d;
+}
+
+.avatar-session-view.state-speaking .avatar-state-label i {
+  background: #ff9d71;
+  box-shadow: 0 0 0 4px rgba(255, 157, 113, 0.16);
+}
+
+.avatar-session-view.state-closed .avatar-state-label i {
+  background: #afbfbd;
+  box-shadow: none;
+}
+
+.chat-panel textarea:disabled,
+.chat-panel .icon-action:disabled,
+.chat-panel .voice-dictation-button:disabled {
+  cursor: wait;
+  opacity: 0.64;
+}
+
+@keyframes avatar-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.012) translateY(-1px); }
+}
+
+@keyframes avatar-listening {
+  0%, 100% { transform: scale(1.006) translateX(0); }
+  50% { transform: scale(1.018) translateX(1px); }
+}
+
+@keyframes avatar-thinking {
+  0%, 100% { transform: scale(1.006) translateX(0); }
+  50% { transform: scale(1.014) translateX(-2px); }
+}
+
+@keyframes avatar-speaking {
+  0%, 100% { transform: scale(1.008) translateY(0); }
+  50% { transform: scale(1.02) translateY(-1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-session-view .video-patient-stage img {
+    animation: none !important;
+    transition: none;
+  }
 }
 
 @media (max-width: 900px) {

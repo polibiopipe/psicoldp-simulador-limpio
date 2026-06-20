@@ -8,7 +8,7 @@ const permissionMessage =
 const noSpeechMessage =
   "No se detectó voz. Intenta nuevamente o escribe tu intervención.";
 
-export function VoiceDictationButton({ onTranscript, onStatusChange }) {
+export function VoiceDictationButton({ disabled = false, onTranscript, onStatusChange }) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
   const recognitionRef = useRef(null);
@@ -121,6 +121,7 @@ export function VoiceDictationButton({ onTranscript, onStatusChange }) {
     <button
       className={`voice-dictation-button${isListening ? " listening" : ""}${!isSupported ? " unavailable" : ""}`}
       type="button"
+      disabled={disabled}
       title="Dictar por voz"
       aria-label="Dictar intervención por voz"
       aria-pressed={isListening}

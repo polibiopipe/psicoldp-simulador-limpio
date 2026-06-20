@@ -4,7 +4,7 @@ import { PatientCard } from "./PatientCard.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
 import { VoiceDictationButton } from "./VoiceDictationButton.jsx";
-import { SimulatedVideoSession } from "./SimulatedVideoSession.jsx";
+import { AvatarSessionView } from "./AvatarSessionView.jsx";
 import {
   getStageSuggestions,
   guidedInterventionTypes,
@@ -26,10 +26,17 @@ export function SimulationChat({
   const [selectedInterventionType, setSelectedInterventionType] = useState("");
   const [showStageSuggestions, setShowStageSuggestions] = useState(false);
   const [showVideoSession, setShowVideoSession] = useState(() =>
-    typeof window === "undefined" ? true : window.matchMedia("(min-width: 761px)").matches
+    typeof window === "undefined" || typeof window.matchMedia !== "function"
+      ? true
+      : window.matchMedia("(min-width: 761px)").matches
   );
+  const [avatarState, setAvatarState] = useState("idle");
   const [validationFeedback, setValidationFeedback] = useState("");
   const conversationRef = useRef(null);
+  const previousHistoryLengthRef = useRef(history.length);
+  const avatarIdleTimerRef = useRef(null);
+  const responseTimerRef = useRef(null);
+  const closeTimerRef = useRef(null);
   const visibleHistory = history.filter(isDisplayableEntry);
   const interviewTurns = visibleHistory.filter((entry) => !entry.isSessionPrelude);
   const currentStage = resolveConversationStage({
@@ -54,6 +61,26 @@ export function SimulationChat({
     });
   }, [history.length]);
 
+  useEffect(() => {
+    if (history.length <= previousHistoryLengthRef.current) {
+      previousHistoryLengthRef.current = history.length;
+      return;
+    }
+
+    previousHistoryLengthRef.current = history.length;
+    window.clearTimeout(avatarIdleTimerRef.current);
+    setAvatarState("speaking");
+    avatarIdleTimerRef.current = window.setTimeout(() => {
+      setAvatarState((current) => current === "speaking" ? "idle" : current);
+    }, 1800);
+  }, [history.length]);
+
+  useEffect(() => () => {
+    window.clearTimeout(avatarIdleTimerRef.current);
+    window.clearTimeout(responseTimerRef.current);
+    window.clearTimeout(closeTimerRef.current);
+  }, []);
+
   function submitQuestion(event) {
     event.preventDefault();
     const validation = validateStudentMessage(question);
@@ -67,25 +94,44 @@ export function SimulationChat({
       setValidationFeedback(validation.suggestion);
       return;
     }
+    if (avatarState === "thinking" || avatarState === "closed") return;
+
     const studentMessage = question.trim();
-    const patientResponse = onAsk(studentMessage, selectedInterventionType);
-    console.log("MESSAGE_SENT", {
-      studentMessage,
-      patientResponse
-    });
-    setQuestion("");
-    setValidationFeedback("");
+    setAvatarState("thinking");
+    window.clearTimeout(responseTimerRef.current);
+    responseTimerRef.current = window.setTimeout(() => {
+      const patientResponse = onAsk(studentMessage, selectedInterventionType);
+      console.log("MESSAGE_SENT", {
+        studentMessage,
+        patientResponse
+      });
+      setQuestion("");
+      setValidationFeedback("");
+    }, 520);
   }
 
   function updateQuestion(value) {
     setQuestion(value);
     if (validationFeedback) setValidationFeedback("");
+    if (avatarState !== "thinking" && avatarState !== "closed") {
+      setAvatarState(value.trim() ? "listening" : "idle");
+    }
   }
 
   function appendDictatedText(text) {
+    if (avatarState === "thinking" || avatarState === "closed") return;
     const transcript = text.trim();
     if (!transcript) return;
     setQuestion((current) => [current.trimEnd(), transcript].filter(Boolean).join(" "));
+    setAvatarState("listening");
+  }
+
+  function finishSimulation() {
+    if (avatarState === "closed") return;
+    window.clearTimeout(avatarIdleTimerRef.current);
+    window.clearTimeout(responseTimerRef.current);
+    setAvatarState("closed");
+    closeTimerRef.current = window.setTimeout(onFinish, 520);
   }
 
   return (
@@ -138,7 +184,7 @@ export function SimulationChat({
             <button
               className="primary-action"
               type="button"
-              onClick={onFinish}
+              onClick={finishSimulation}
             >
               <SquareCheckBig aria-hidden="true" />
               Terminar
@@ -157,10 +203,12 @@ export function SimulationChat({
 
         <div className={`interview-experience${showVideoSession ? " with-video" : " chat-only"}`}>
           {showVideoSession && (
-            <SimulatedVideoSession
+            <AvatarSessionView
+              avatarState={avatarState}
               caseItem={caseItem}
               sessionNumber={sessionNumber}
-              onFinish={onFinish}
+              turnCount={interviewTurns.length}
+              onFinish={finishSimulation}
             />
           )}
 
@@ -237,16 +285,23 @@ export function SimulationChat({
           <div className="input-row">
             <textarea
               id="student-question"
+              disabled={avatarState === "thinking" || avatarState === "closed"}
               value={question}
               onChange={(event) => updateQuestion(event.target.value)}
               placeholder="Ej.: Antes de comenzar, quisiera explicarte el objetivo de esta entrevista. ¿Qué te gustaría que entienda de lo que estás viviendo?"
               rows={3}
             />
             <VoiceDictationButton
+              disabled={avatarState === "thinking" || avatarState === "closed"}
               onTranscript={appendDictatedText}
               onStatusChange={setValidationFeedback}
             />
-            <button className="icon-action" type="submit" aria-label="Enviar intervención">
+            <button
+              className="icon-action"
+              type="submit"
+              aria-label="Enviar intervención"
+              disabled={avatarState === "thinking" || avatarState === "closed"}
+            >
               <Send aria-hidden="true" />
             </button>
           </div>
