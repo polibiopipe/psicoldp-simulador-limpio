@@ -39,39 +39,6 @@ export function Home({ onStart, onViewHistory }) {
             </button>
           </div>
 
-          <div className="feature-grid">
-            <article className="feature-card">
-              <BookOpenCheck aria-hidden="true" />
-              <h2>Casos ficticios</h2>
-              <p>Escenarios diseñados para practicar entrevista inicial.</p>
-            </article>
-            <article className="feature-card">
-              <Sparkles aria-hidden="true" />
-              <h2>Feedback formativo</h2>
-              <p>Retroalimentación educativa sobre tu desempeño.</p>
-            </article>
-            <article className="feature-card">
-              <ShieldCheck aria-hidden="true" />
-              <h2>Entorno ético</h2>
-              <p>Sin diagnósticos, tratamiento ni datos reales.</p>
-            </article>
-          </div>
-
-          <article className="writing-guidance-card">
-            <MessageSquareText aria-hidden="true" />
-            <div>
-              <h2>Practica también tu forma de preguntar</h2>
-              <p>
-                Antes de comenzar, intenta formular tus preguntas con claridad, buena
-                redacción y signos de puntuación. Una buena entrevista también se
-                construye desde preguntas respetuosas, precisas y bien formuladas.
-              </p>
-              <span>
-                Este espacio también puede ayudarte a practicar la escritura profesional
-                que luego necesitarás en registros e informes psicológicos.
-              </span>
-            </div>
-          </article>
         </div>
 
         <aside className="simulator-preview-card" aria-label="Vista previa del simulador">
@@ -117,6 +84,40 @@ export function Home({ onStart, onViewHistory }) {
           </div>
         </aside>
       </div>
+
+      <div className="feature-grid">
+        <article className="feature-card">
+          <BookOpenCheck aria-hidden="true" />
+          <h2>Casos ficticios</h2>
+          <p>Escenarios diseñados para practicar entrevista inicial.</p>
+        </article>
+        <article className="feature-card">
+          <Sparkles aria-hidden="true" />
+          <h2>Feedback formativo</h2>
+          <p>Retroalimentación educativa sobre tu desempeño.</p>
+        </article>
+        <article className="feature-card">
+          <ShieldCheck aria-hidden="true" />
+          <h2>Entorno ético</h2>
+          <p>Sin diagnósticos, tratamiento ni datos reales.</p>
+        </article>
+      </div>
+
+      <article className="writing-guidance-card">
+        <MessageSquareText aria-hidden="true" />
+        <div>
+          <h2>Practica también tu forma de preguntar</h2>
+          <p>
+            Antes de comenzar, intenta formular tus preguntas con claridad, buena
+            redacción y signos de puntuación. Una buena entrevista también se
+            construye desde preguntas respetuosas, precisas y bien formuladas.
+          </p>
+          <span>
+            Este espacio también puede ayudarte a practicar la escritura profesional
+            que luego necesitarás en registros e informes psicológicos.
+          </span>
+        </div>
+      </article>
     </section>
   );
 }
