@@ -168,7 +168,7 @@ const intentLexicon = {
     "que te ayudaria",
     "quieres que te ayude"
   ],
-  pregunta_escolar: ["vas al colegio", "vas a clases", "estas en el colegio", "sigues en el colegio", "colegio", "curso"],
+  pregunta_escolar: ["vas al colegio", "vas a la escuela", "vas a clases", "estas en el colegio", "estas en la escuela", "sigues en el colegio", "colegio", "escuela", "curso"],
   pregunta_academica: ["estudias", "universidad", "carrera", "ramos", "que estudias", "clases", "rendimiento"],
   pregunta_laboral: ["trabajas", "trabajo", "pega", "laboral", "en que trabajas", "oficina", "jefatura"],
   pregunta_familiar: ["vives con", "con quien vives", "tus papas", "tus padres", "familia", "hijos", "hija", "pareja", "separacion", "mama", "papa"],
@@ -219,7 +219,7 @@ const intentLexicon = {
   consejo_apresurado: ["deberias", "tienes que", "te recomiendo", "deja de", "lo mejor seria", "haz ejercicio", "organizate", "pon limites y listo"],
   exploracion_emocional: ["que sientes", "como te sientes", "que te pasa", "que te sucede", "que es lo que sientes", "como lo vives", "que te cuesta mas", "que te cuesta contar", "que parte te duele", "te da miedo", "te da culpa", "te da rabia", "te da pena", "tu sientes", "sientes que", "tu sientes que"],
   exploracion_contextual: ["como es en tu casa", "como es en tu trabajo", "como es en la universidad", "como es con tu familia", "como es con tus amigos", "que pasa ahi", "desde cuando pasa"],
-  cierre: ["cerrar", "terminar", "finalizar", "antes de terminar", "para cerrar", "gracias por conversar", "como quedas", "como te vas", "nos vemos", "hasta la proxima", "dejemos hasta aqui", "dejarlo hasta aqui", "terminemos por hoy", "proxima sesion", "siguiente sesion", "seguir conversando", "retomar en otra sesion", "que podriamos seguir conversando"]
+  cierre: ["adios", "cerrar", "cerramos por hoy", "terminar", "terminamos la sesion", "finalizar", "antes de terminar", "para cerrar", "gracias por conversar", "gracias por venir", "como quedas", "como te vas", "nos vemos", "hasta la proxima", "dejemos hasta aqui", "dejarlo hasta aqui", "terminemos por hoy", "proxima sesion", "siguiente sesion", "seguir conversando", "retomar en otra sesion", "que podriamos seguir conversando"]
 };
 
 const priority = [
@@ -343,6 +343,7 @@ const continuityTerms = [
 export function detectIntent(studentMessage, history = []) {
   const text = normalizeText(studentMessage);
   const matches = {};
+  const hardConcreteIntent = detectHardConcreteIntent(text);
 
   for (const [intent, terms] of Object.entries(intentLexicon)) {
     matches[intent] = terms.some((term) => text.includes(normalizeText(term)));
@@ -398,7 +399,9 @@ export function detectIntent(studentMessage, history = []) {
 
   const intent = strongClosureDetected
     ? "cierre"
-    : supportiveStatementDetected
+    : hardConcreteIntent
+      ? hardConcreteIntent
+      : supportiveStatementDetected
       ? "validacion_emocional"
       : priority.find((candidate) => matches[candidate]) || "desconocida";
   const confidence = intent === "desconocida" ? 0.25 : contextualTopic ? 0.86 : 0.92;
@@ -414,10 +417,26 @@ export function detectIntent(studentMessage, history = []) {
     detectedEmotionInLastPatientMessage,
     reformulationDetected: matches.reformulacion_empatica,
     supportiveStatementDetected,
+    hardConcreteIntent,
     studentName: extractStudentName(text),
     matches,
     categories: toLegacyCategories(intent, matches, text)
   };
+}
+
+function detectHardConcreteIntent(text) {
+  if (detectsIdentityName(text)) return "identidad_nombre";
+  if (/\b(edad|cuantos anos|que edad tienes)\b/.test(text)) return "edad";
+  if (detectsResidenceQuestion(text)) return "convivencia_familia";
+  if (/\b(tienes hermanos|hermanos|hermanas|eres hijo unico|eres hija unica)\b/.test(text)) return "hermanos";
+  if (detectsSchoolStudyQuestion(text)) return "colegio_estudios";
+  if (detectsDerivationArrival(text)) return "derivacion_llegada";
+  if (detectsMotiveQuestion(text)) return "motivo_de_consulta";
+  if (detectsFriendNetworkQuestion(text)) return "amistades_red_social";
+  if (/\b(cuentame de tu familia|como es tu familia|tu familia|familia)\b/.test(text)) return "pregunta_familiar";
+  if (/\b(a que juegas|que te gusta jugar|videojuegos|computador|por que juegas|que juegos|juegas videojuegos)\b/.test(text)) return "pregunta_videojuegos";
+  if (/\b(como te sientes|que sientes|estas triste|estas incomodo|te da pena|te preocupa)\b/.test(text)) return "exploracion_emocional";
+  return null;
 }
 
 function detectContextualTopic(text, history, explicitReferenceDetected = false) {
@@ -523,7 +542,7 @@ function isGeneralOpenPrompt(text) {
 }
 
 function detectsStrongClosure(text) {
-  return /\b(nos vemos|hasta la proxima|dejemos hasta aqui|dejarlo hasta aqui|lo dejamos hasta aqui|podemos dejarlo hasta aqui|terminemos por hoy|cerrar por hoy|para cerrar|antes de terminar|proxima sesion|siguiente sesion|retomar en otra sesion|continuar otro dia|gracias por conversar|hoy pudimos conversar|como te vas|como quedas)\b/.test(text);
+  return /\b(adios|nos vemos|hasta la proxima|dejemos hasta aqui|dejarlo hasta aqui|lo dejamos hasta aqui|podemos dejarlo hasta aqui|cerramos por hoy|terminemos por hoy|terminamos la sesion|cerrar por hoy|para cerrar|antes de terminar|proxima sesion|siguiente sesion|retomar en otra sesion|continuar otro dia|gracias por conversar|gracias por venir|hoy pudimos conversar|como te vas|como quedas)\b/.test(text);
 }
 
 function detectsEmpathicReformulation(text) {
@@ -727,8 +746,10 @@ function detectsResidenceQuestion(text) {
 function detectsSchoolStudyQuestion(text) {
   return (
     /\bvas al colegio\b/.test(text) ||
+    /\bvas a la escuela\b/.test(text) ||
     /\bvas a clases\b/.test(text) ||
     /\bestas en el colegio\b/.test(text) ||
+    /\bestas en la escuela\b/.test(text) ||
     /\bsigues en el colegio\b/.test(text) ||
     /\bestudias\b/.test(text) ||
     /\ben que curso estas\b/.test(text) ||

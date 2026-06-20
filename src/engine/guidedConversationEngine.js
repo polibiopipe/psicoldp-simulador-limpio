@@ -772,7 +772,7 @@ function hasStudentPresentationCue(text = "") {
 }
 
 function hasClosingCue(text = "") {
-  return /\b(dejarlo hasta aqui|retomarlo|proxima sesion|otra sesion|cerrar|terminar por hoy|hasta aqui|continuar otro dia|podemos dejarlo)\b/.test(text);
+  return /\b(adios|nos vemos|hasta la proxima|dejarlo hasta aqui|retomarlo|proxima sesion|otra sesion|cerrar|cerramos por hoy|terminar por hoy|terminamos la sesion|gracias por venir|hasta aqui|continuar otro dia|podemos dejarlo)\b/.test(text);
 }
 
 function hasFollowUpCue(text = "", conversationHistory = []) {

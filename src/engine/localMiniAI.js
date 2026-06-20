@@ -64,6 +64,9 @@ export function generateLocalPatientResponse({
     "derivacion_llegada",
     "motivo_de_consulta",
     "amistades_red_social",
+    "pregunta_familiar",
+    "pregunta_videojuegos",
+    "exploracion_emocional",
     "validacion_emocional",
     "cierre"
   ]);

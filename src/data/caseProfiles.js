@@ -814,6 +814,11 @@ function createProfile(profile) {
     ];
   }
   if (profile.id === "tomas") {
+    topics.cierre = [
+      "Ya... gracias. Igual me cuesta hablar, pero puedo intentarlo de nuevo la próxima vez.",
+      "Gracias por escuchar. Podemos dejarlo hasta aquí por hoy.",
+      "Ya, está bien. Nos vemos en la próxima sesión."
+    ];
     topics.derivacion = [
       "Creo que vine por mis papás... ellos están preocupados porque dicen que paso mucho tiempo en el computador.",
       "Me trajeron mis papás. Ellos están preocupados por lo del computador.",
@@ -845,6 +850,10 @@ function createProfile(profile) {
     topics.seguimiento_motivo_profundizacion = [
       "No es solo jugar por jugar. A veces en el computador siento que sé qué hacer, y afuera me cuesta más.",
       "El computador no es solo entretención. Ahí sé cómo moverme; con gente en persona me quedo pensando demasiado."
+    ];
+    topics.emociones = [
+      "No sé... me cuesta explicarlo. A veces me siento incómodo o como fuera de lugar.",
+      "A veces me da lata sentir que ya decidieron lo que me pasa antes de escucharme."
     ];
   }
 

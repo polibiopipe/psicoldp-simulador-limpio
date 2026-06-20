@@ -120,6 +120,20 @@ export function detectProfileTopic({ message, intent, intentResult, memory, prof
   ) {
     return "seguimiento_motivo_profundizacion";
   }
+  if (isResidenceQuestion(text)) return intent === "convivencia_familia" ? "convivencia_familia" : "convivencia";
+  if (isSiblingQuestion(text)) return "hermanos";
+  if (isStudyOrWorkQuestion(text)) return intent === "colegio_estudios" ? "colegio_estudios" : "estudios_trabajo";
+  if (profile.id === "tomas" && isHowArrivedQuestion(text)) return "derivacion_como_llego";
+  if (profile.id === "tomas" && isWhoSentQuestion(text)) return "derivacion_quien_mando";
+  if (intent === "derivacion_llegada" || intent === "derivacion_llegada_consulta" || isDerivationQuestion(text)) return "derivacion";
+  if (profile.id === "tomas" && isInformalWhyHereQuestion(text)) return "derivacion_motivo_informal";
+  if (isMotiveQuestion(text)) return "motivo_consulta";
+  if (isNegativeFriendQuestion(text)) return "amistades_red_social_negacion";
+  if (intent === "amistades_red_social" || isFriendQuestion(text)) return "amistades_red_social";
+  if (isFamilyQuestion(text)) return "familia";
+  if (isDigitalOrVideogameQuestion(text, profile)) return "videojuegos";
+  if (isCurrentStateQuestion(text)) return "estado_actual";
+  if (isEmotionQuestion(text)) return "emociones";
   if (isTrulyAmbiguous(text) && !intentResult.explicitReferenceDetected) return "ambiguo_real";
   if (isCurrentStateQuestion(text)) return "estado_actual";
   if (profile.id === "tomas" && isInformalWhyHereQuestion(text)) return "derivacion_motivo_informal";
@@ -265,6 +279,9 @@ function pickProfileResponse({ caseId, topic, candidates, memory }) {
     "amistades_red_social",
     "amistades_red_social_negacion",
     "amistades",
+    "videojuegos",
+    "emociones",
+    "cierre",
     "seguimiento_no_es_tan_simple",
     "seguimiento_motivo_profundizacion",
     "seguimiento_descanso_culpa",
@@ -494,7 +511,7 @@ function isDigitalOrVideogameQuestion(text, profile) {
 }
 
 function isStudyOrWorkQuestion(text) {
-  return /\b(vas al colegio|colegio|universidad|estudias|que estudias|en que curso|que curso|trabajas|trabajo|pega|a que te dedicas|que haces actualmente|ocupacion)\b/.test(text);
+  return /\b(vas al colegio|vas a la escuela|colegio|escuela|universidad|estudias|que estudias|en que curso|que curso|trabajas|trabajo|pega|a que te dedicas|que haces actualmente|ocupacion)\b/.test(text);
 }
 
 function isDailyRoutineQuestion(text) {
@@ -534,7 +551,7 @@ function isMotiveDeepeningQuestion(text) {
 }
 
 function isClosureMessage(text) {
-  return /\b(nos vemos|hasta la proxima|dejemos hasta aqui|dejarlo hasta aqui|terminemos por hoy|cerrar por hoy|proxima sesion|retomar en otra sesion|continuar otro dia|gracias por conversar|hoy pudimos conversar)\b/.test(text);
+  return /\b(adios|nos vemos|hasta la proxima|dejemos hasta aqui|dejarlo hasta aqui|cerramos por hoy|terminemos por hoy|terminamos la sesion|cerrar por hoy|proxima sesion|retomar en otra sesion|continuar otro dia|gracias por conversar|gracias por venir|hoy pudimos conversar)\b/.test(text);
 }
 
 function isTrulyAmbiguous(text) {

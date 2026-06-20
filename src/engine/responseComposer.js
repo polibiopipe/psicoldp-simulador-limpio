@@ -195,6 +195,14 @@ function isRepeatableResponseType(responseType = "") {
     "edad",
     "vivienda_residencia",
     "ocupacion_actividad",
+    "convivencia_familia",
+    "convivencia",
+    "hermanos",
+    "colegio_estudios",
+    "estudios_trabajo",
+    "amistades_red_social",
+    "amistades_red_social_negacion",
+    "videojuegos",
     "cierre"
   ].some((type) => responseType === type || responseType.startsWith(`${type}:`) || responseType.includes(`case_profile:${type}`));
 }

@@ -14,6 +14,12 @@ const concreteIntentBlocklist = new Set([
   "ocupacion_actividad",
   "rutina_diaria",
   "amistades_red_social",
+  "pregunta_familiar",
+  "familia",
+  "pregunta_videojuegos",
+  "videojuegos",
+  "motivo_de_consulta",
+  "derivacion_llegada",
   "validacion_emocional",
   "cierre"
 ]);
