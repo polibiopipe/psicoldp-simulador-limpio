@@ -653,13 +653,6 @@ function isRepeatableFactResponse(responseType) {
   ].some((type) => responseType === type || responseType.startsWith(`fact:${type}`));
 }
 
-function makeVariation(text) {
-  if (!text) return "No sé bien cómo responder eso.";
-  if (/^no sé/i.test(text)) return text.replace(/^no sé/i, "Quizás no sé");
-  if (/^sí/i.test(text)) return text.replace(/^sí/i, "Sí, más o menos");
-  return `Lo diría de otra forma: ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
-}
-
 function normalizeForCompare(text) {
   return String(text)
     .toLowerCase()

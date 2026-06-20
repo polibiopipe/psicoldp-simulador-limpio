@@ -207,30 +207,6 @@ function isRepeatableResponseType(responseType = "") {
   ].some((type) => responseType === type || responseType.startsWith(`${type}:`) || responseType.includes(`case_profile:${type}`));
 }
 
-function avoidExactRepetition(response, lastPatientMessage, caseId) {
-  if (!lastPatientMessage || normalizeForCompare(response) !== normalizeForCompare(lastPatientMessage)) return response;
-
-  const alternatives = {
-    tomas: "Lo digo de otra forma: cuando me siento pasado a llevar, me cierro y me voy al computador.",
-    valentina: "Lo diría de otra forma: incluso cuando paro, mi cabeza sigue funcionando como si debiera estar haciendo algo.",
-    marcos: "Lo diría distinto: sigo cumpliendo, pero cada vez llego con menos energía.",
-    elena: "Quizás lo puedo decir de otra forma: me cuesta pedir compañía sin sentir que molesto.",
-    nicolas: "No sé, lo digo distinto: prefiero callarme porque siento que igual ya decidieron qué pasa.",
-    camila: "Lo diría de otra forma: me cuesta decir que no, aunque por dentro ya esté agotada.",
-    rodrigo: "Lo pongo distinto: intento seguir firme, pero la separación me mueve más de lo que muestro.",
-    fernanda: "Quizás lo puedo decir mejor: volver al trabajo me importa, pero me asusta sentirme observada.",
-    hector: "Lo diría así: dejé de trabajar, pero todavía no encuentro bien dónde poner mi energía.",
-    daniela: "Lo digo de otra forma: amo a mi hijo, pero estoy cansada y me cuesta admitirlo sin culpa.",
-    andres: "Lo diría distinto: entré a la universidad, pero todavía siento que estoy mirando desde afuera.",
-    patricia: "Quizás suena a control, pero detrás hay miedo de perder el vínculo con mi hija.",
-    miguel: "Lo diría mejor: estoy intentando avanzar acá, pero a veces extraño quién era antes de migrar.",
-    sofia: "Lo digo distinto: sé que las redes me hacen compararme, pero igual vuelvo a mirar.",
-    claudio: "Lo diría de otra forma: tengo estabilidad, pero siento que algo se quedó detenido."
-  };
-
-  return alternatives[caseId] || `Lo diría de otra forma: ${response.charAt(0).toLowerCase()}${response.slice(1)}`;
-}
-
 function ensurePunctuation(response) {
   if (!response) return "No sé bien cómo responder eso.";
   const clean = response.trim();

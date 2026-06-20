@@ -187,6 +187,7 @@ export function generateLocalPatientResponse({
     selectedResponse: selectedResponse.response,
     finalResponse: responseText,
     ambiguityDetected: intentResult.ambiguityDetected,
+    closureDetected: intentResult.intent === "cierre",
     explicitReferenceDetected: intentResult.explicitReferenceDetected,
     profileTopic: profileResponse?.profileTopic || null,
     profileResponseUsed: Boolean(profileResponse),
@@ -219,7 +220,8 @@ export function generateLocalPatientResponse({
       detectedIntent: intentResult.intent,
       caseId,
       selectedResponse: selectedResponse.response,
-      finalResponse: responseText,
+    finalResponse: responseText,
+    responseText,
       wasCompositeForced
     });
   }

@@ -63,6 +63,7 @@ export function selectCaseProfileResponse({
   const normalizedMessage = normalizeText(studentMessage);
   const explicitFollowUp = intentResult.intent === "seguimiento_emocional_contextual"
     || intentResult.intent === "seguimiento_contextual_explicito"
+    || intentResult.intent === "seguimiento_contextual_breve"
     || intentResult.intent === "seguimiento_contextual"
     || isExplicitFollowUp(normalizedMessage);
 
@@ -92,7 +93,7 @@ export function selectCaseProfileResponse({
     memory
   });
   const shouldResolveAsFollowUp = explicitFollowUp
-    && ["seguimiento_contextual", "seguimiento_no_es_tan_simple"].includes(detectedTopic);
+    && !["ambiguo_real", "cierre", "riesgo"].includes(detectedTopic);
 
   return {
     response: selected.text,
@@ -556,13 +557,6 @@ function isClosureMessage(text) {
 
 function isTrulyAmbiguous(text) {
   return /^(y|y eso|eso|como|por que|que cosa|explicate|no entiendo|como asi|mmm)$/.test(text);
-}
-
-function addNaturalVariation(text) {
-  if (!text) return "No estoy seguro de haber entendido bien.";
-  if (/^creo que/i.test(text)) return text.replace(/^creo que/i, "Quizás lo diría así: creo que");
-  if (/^no sé/i.test(text)) return text.replace(/^no sé/i, "No sé bien");
-  return `Lo diría de otra forma: ${lowerFirst(text)}`;
 }
 
 function combineNaturally(first, second) {

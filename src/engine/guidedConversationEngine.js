@@ -1084,8 +1084,8 @@ function makeGuidedResponseId(caseId, interventionType, stageName, text, index) 
 }
 
 function makeVariation(text) {
-  if (!text) return "Lo puedo decir de otra forma, pero necesito ir paso a paso.";
-  return `Lo diria de otra forma: ${lowerFirst(text)}`;
+  if (!text) return "Me cuesta agregar algo más por ahora.";
+  return "Creo que ya dije lo principal sobre eso. Me cuesta agregar algo más por ahora.";
 }
 
 function joinNatural(first, second) {
