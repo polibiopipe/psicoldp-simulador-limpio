@@ -25,8 +25,9 @@ export function CaseBrief({
 
         <div className="brief-content">
           <header className="section-header">
-            <span className="eyebrow">Preparación de entrevista</span>
+            <span className="eyebrow">VivoLab · Entrevista Inicial</span>
             <h1>{caseItem.name}</h1>
+            <span className="case-practice-label">Paciente ficticio para práctica formativa.</span>
             <p>{caseItem.motive}</p>
           </header>
 
@@ -68,7 +69,7 @@ export function CaseBrief({
           <section className="info-panel">
             <div className="panel-heading">
               <Target aria-hidden="true" />
-              <h2>Objetivos formativos de esta simulaciÃ³n</h2>
+              <h2>Objetivos formativos de esta simulación</h2>
             </div>
             <ul>
               {(caseItem.learningObjectives || caseItem.objectives || []).slice(0, 6).map((item) => (

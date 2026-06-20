@@ -5,11 +5,14 @@ export function EthicalNotice({ compact = false }) {
   return (
     <aside className={compact ? "ethical-notice compact" : "ethical-notice"}>
       {compact && (
-        <img
-          className="institutional-logo institutional-logo-small"
-          src="/nucleo-vivo-logo-horizontal.png"
-          alt="Núcleo Vivo"
-        />
+        <div className="compact-brand-lockup">
+          <img
+            className="platform-logo-small"
+            src="/vivolab-logo.png"
+            alt="VivoLab, simuladores formativos. Una iniciativa de Núcleo Vivo"
+          />
+          <span>Entrevista Inicial</span>
+        </div>
       )}
       <ShieldCheck aria-hidden="true" />
       <p>

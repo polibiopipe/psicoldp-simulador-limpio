@@ -105,10 +105,13 @@ export function SimulationChat({
       <section className="chat-panel">
         <header className="chat-header">
           <div>
-            <span className="eyebrow">
-              {sessionNumber === 1 ? "Primera entrevista simulada" : `Sesión ${sessionNumber} simulada`}
-            </span>
-            <h1>{caseItem.name}</h1>
+            <span className="eyebrow">VivoLab · Entrevista Inicial</span>
+            <div className="chat-title-line">
+              <h1>{caseItem.name}</h1>
+              <span className="session-context">
+                {sessionNumber === 1 ? "Entrevista inicial simulada" : `Sesión ${sessionNumber} simulada`}
+              </span>
+            </div>
           </div>
           <div className="chat-actions">
             <button className="secondary-action" type="button" onClick={onChangeCase}>

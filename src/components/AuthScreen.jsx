@@ -58,8 +58,8 @@ export function AuthScreen() {
   return (
     <section className="screen auth-screen">
       <div className="auth-card">
-        <span className="eyebrow">Acceso estudiantes</span>
-        <h1>Simulador Clinico Nucleo Vivo</h1>
+        <span className="eyebrow">Acceso a VivoLab</span>
+        <h1>VivoLab · Entrevista Inicial</h1>
         <p>
           Ingresa con tu correo y contrasena para guardar el historial de tus
           entrevistas simuladas.

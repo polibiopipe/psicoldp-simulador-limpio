@@ -20,11 +20,10 @@ export function CaseSelector({
   return (
     <section className="screen">
       <header className="section-header">
-        <span className="eyebrow">Elige una práctica</span>
-        <h1>Selector de casos ficticios</h1>
+        <span className="eyebrow">VivoLab · Entrevista Inicial</span>
+        <h1>Casos disponibles</h1>
         <p>
-          Cada escenario modifica el estilo de respuesta del paciente y los criterios
-          específicos de retroalimentación.
+          Selecciona un caso ficticio para practicar habilidades de entrevista inicial.
         </p>
       </header>
 

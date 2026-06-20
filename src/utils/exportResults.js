@@ -10,7 +10,7 @@ export function buildResultsText({ report, caseItem, history }) {
     .map((entry, index) => `${index + 1}. Estudiante: ${entry.question}\n   ${caseItem.name}: ${entry.answer}`)
     .join("\n");
 
-  return `Resultados simulación clínica Núcleo Vivo - ${caseItem.name}
+  return `VivoLab · Entrevista Inicial - ${caseItem.name}
 Fecha: ${date}
 Caso: ${caseItem.name} (${caseItem.age})
 Motivo ficticio: ${caseItem.motive}
@@ -47,7 +47,7 @@ Este material no reemplaza supervisión docente, atención psicológica real ni 
 }
 
 export function createMailto({ report, caseItem, history }) {
-  const subject = `Resultados simulación clínica Núcleo Vivo - ${caseItem.name}`;
+  const subject = `VivoLab · Entrevista Inicial - ${caseItem.name}`;
   const body = buildResultsText({ report, caseItem, history });
   return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
@@ -81,7 +81,7 @@ export function downloadResultsTxt(payload) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `resultados-simulador-nucleo-vivo-${payload.caseItem.id}.txt`;
+  link.download = `resultados-vivolab-entrevista-inicial-${payload.caseItem.id}.txt`;
   document.body.appendChild(link);
   link.click();
   link.remove();

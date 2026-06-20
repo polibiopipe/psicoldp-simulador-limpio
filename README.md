@@ -1,6 +1,6 @@
-# Simulador Clinico Nucleo Vivo
+# VivoLab · Entrevista Inicial
 
-Plataforma educativa para estudiantes de psicologia. Permite practicar entrevistas psicologicas iniciales con pacientes virtuales ficticios y recibir retroalimentacion formativa sobre el desempeno.
+VivoLab es una plataforma de simuladores formativos, iniciativa de Nucleo Vivo. Este modulo permite practicar entrevistas psicologicas iniciales con pacientes virtuales ficticios y recibir retroalimentacion formativa sobre el desempeno.
 
 Este simulador tiene fines exclusivamente educativos. No reemplaza atencion psicologica real, no realiza diagnosticos definitivos, no entrega tratamiento clinico y no debe usarse con datos reales de pacientes.
 

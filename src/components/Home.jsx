@@ -7,19 +7,27 @@ export function Home({ onStart, onViewHistory }) {
       <header className="landing-header">
         <img
           className="brand-logo"
-          src="/nucleo-vivo-logo-horizontal.png"
-          alt="Núcleo Vivo"
+          src="/vivolab-logo.png"
+          alt="VivoLab, simuladores formativos"
         />
-        <span className="ethical-banner">
-          <ShieldCheck aria-hidden="true" />
-          Simulación educativa con casos ficticios
-        </span>
+        <div className="parent-brand-lockup">
+          <span>Una iniciativa de</span>
+          <img src="/nucleo-vivo-logo-horizontal.png" alt="Núcleo Vivo" />
+        </div>
       </header>
 
       <div className="hero-section">
         <div className="hero-content">
-          <span className="eyebrow">Plataforma formativa</span>
-          <h1 className="hero-title">Simulador Clínico Núcleo Vivo</h1>
+          <span className="eyebrow">Plataforma de simuladores formativos</span>
+          <h1 className="hero-title">VivoLab</h1>
+          <p className="hero-tagline">
+            Simuladores formativos para entrenar habilidades psicológicas y humanas.
+          </p>
+          <div className="current-module">
+            <BookOpenCheck aria-hidden="true" />
+            <span>Módulo actual</span>
+            <strong>Entrevista Inicial</strong>
+          </div>
           <p className="hero-subtitle">
             Practica entrevistas psicológicas iniciales con pacientes virtuales ficticios,
             en un entorno seguro, ético y orientado al aprendizaje.
@@ -48,14 +56,14 @@ export function Home({ onStart, onViewHistory }) {
               <span />
               <span />
             </div>
-            <strong>Sesión simulada</strong>
+            <strong>VivoLab · Entrevista Inicial</strong>
           </div>
 
           <div className="preview-patient">
             <div className="preview-avatar" aria-hidden="true" />
             <div>
               <strong>Tomás</strong>
-              <span>Paciente ficticio · entrevista inicial</span>
+              <span>Paciente ficticio · sesión simulada</span>
             </div>
           </div>
 
