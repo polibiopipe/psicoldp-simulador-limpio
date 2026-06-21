@@ -186,6 +186,34 @@ Para habilitar una cuenta, abre `public.user_profiles` en Supabase Table Editor 
 cambia `approved` a `true`. `approved_at` se completa automaticamente. Los usuarios
 existentes quedan pendientes al ejecutar la migracion y deben aprobarse manualmente.
 
+### Aviso por correo de nuevas solicitudes
+
+El aviso se envia desde una Netlify Function; ninguna clave privada se expone en el
+navegador y la aprobacion sigue siendo manual desde Supabase.
+
+1. Ejecuta `supabase/access_request_notifications.sql` en Supabase SQL Editor.
+2. En Netlify configura estas variables de entorno solo para Functions:
+   - `ACCESS_REQUEST_WEBHOOK_SECRET`: secreto largo y aleatorio.
+   - `RESEND_API_KEY`: clave del proveedor de correo Resend.
+   - `ACCESS_REQUEST_FROM_EMAIL`: remitente de un dominio verificado en Resend.
+   - `ACCESS_REQUEST_TO_EMAIL`: `contacto@nucleovivo.net`.
+   - `SUPABASE_USER_PROFILES_URL`: enlace HTTPS al Table Editor de `user_profiles`.
+3. Despliega el sitio desde Git para publicar
+   `netlify/functions/new-access-request.mjs`.
+4. En **Supabase > Database > Webhooks**, crea un webhook para el evento `INSERT`
+   de `public.access_approval_notifications` con:
+   - URL: `https://TU-SITIO.netlify.app/.netlify/functions/new-access-request`.
+   - Header: `x-escucha-viva-webhook-secret` con el mismo secreto de Netlify.
+
+La cola se crea solamente cuando el correo pasa a confirmado. Su restriccion unica
+por `user_id` evita generar mas de una solicitud por cuenta. El correo incluye un
+enlace al Table Editor si `SUPABASE_USER_PROFILES_URL` esta configurado, pero no
+aprueba al usuario por si solo.
+
+Para avisar sobre usuarios confirmados antes de instalar esta migracion, configura
+primero el webhook y luego ejecuta una insercion manual en
+`public.access_approval_notifications` por cada cuenta pendiente que quieras notificar.
+
 ## Build de produccion
 
 ```bash
@@ -219,6 +247,9 @@ Opcion manual:
 
 1. Ejecuta `npm run build`.
 2. Sube la carpeta `dist/` a Netlify Drop.
+
+Nota: Netlify Drop publica solo el frontend. La notificacion por correo requiere un
+despliegue conectado a Git o mediante Netlify CLI para incluir la Function.
 
 ## Dependencias
 
