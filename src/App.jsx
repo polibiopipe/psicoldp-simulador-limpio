@@ -19,7 +19,9 @@ import { EthicalNotice } from "./components/EthicalNotice.jsx";
 import { SessionClosure } from "./components/SessionClosure.jsx";
 import { SavedSessions } from "./components/SavedSessions.jsx";
 import { AuthScreen } from "./components/AuthScreen.jsx";
+import { PendingApprovalScreen } from "./components/PendingApprovalScreen.jsx";
 import { isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
+import { getOrCreateUserApproval } from "./lib/userApproval.js";
 
 const screens = {
   home: "home",
@@ -40,6 +42,11 @@ export default function App() {
   const [sessionSummaries, setSessionSummaries] = useState(() => getSessionSummariesForCase(cases[0].id));
   const [authSession, setAuthSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
+  const [approvalState, setApprovalState] = useState({
+    status: isSupabaseConfigured ? "checking" : "approved",
+    profile: null,
+    error: null
+  });
   const [saveStatus, setSaveStatus] = useState(null);
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
@@ -53,21 +60,45 @@ export default function App() {
     }
 
     let isMounted = true;
-    supabase.auth.getSession().then(({ data }) => {
+    let approvalRequestId = 0;
+
+    async function applyAuthSession(nextSession) {
+      const requestId = ++approvalRequestId;
       if (!isMounted) return;
-      setAuthSession(data.session);
+
+      setAuthSession(nextSession);
+      if (!nextSession?.user) {
+        setApprovalState({ status: "signed_out", profile: null, error: null });
+        setAuthLoading(false);
+        return;
+      }
+
+      setAuthLoading(true);
+      setApprovalState({ status: "checking", profile: null, error: null });
+      const nextApprovalState = await getOrCreateUserApproval(nextSession.user);
+      if (!isMounted || requestId !== approvalRequestId) return;
+      setApprovalState(nextApprovalState);
       setAuthLoading(false);
+    }
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) console.error("AUTH_SESSION_ERROR", error);
+      void applyAuthSession(data?.session || null);
     });
 
+    let authChangeTimeoutId = null;
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setAuthSession(nextSession);
-      setAuthLoading(false);
+      if (authChangeTimeoutId) globalThis.clearTimeout(authChangeTimeoutId);
+      authChangeTimeoutId = globalThis.setTimeout(() => {
+        void applyAuthSession(nextSession);
+      }, 0);
     });
 
     return () => {
       isMounted = false;
+      if (authChangeTimeoutId) globalThis.clearTimeout(authChangeTimeoutId);
       subscription.unsubscribe();
     };
   }, []);
@@ -212,7 +243,19 @@ export default function App() {
     setHistory([]);
     setSessionNumber(1);
     setSessionSummary(null);
+    setAuthSession(null);
+    setApprovalState({ status: "signed_out", profile: null, error: null });
+    setAuthLoading(false);
     setScreen(screens.home);
+  }
+
+  async function refreshApproval() {
+    if (!authSession?.user) return;
+    setAuthLoading(true);
+    setApprovalState({ status: "checking", profile: null, error: null });
+    const nextApprovalState = await getOrCreateUserApproval(authSession.user);
+    setApprovalState(nextApprovalState);
+    setAuthLoading(false);
   }
 
   if (authLoading) {
@@ -235,6 +278,20 @@ export default function App() {
       <main className="app-shell">
         <EthicalNotice compact />
         <AuthScreen />
+      </main>
+    );
+  }
+
+  if (isSupabaseConfigured && authSession && approvalState.status !== "approved") {
+    return (
+      <main className="app-shell">
+        <EthicalNotice compact />
+        <PendingApprovalScreen
+          email={authSession.user.email}
+          error={approvalState.error}
+          onRetry={refreshApproval}
+          onSignOut={handleSignOut}
+        />
       </main>
     );
   }

@@ -34,7 +34,9 @@ export function AuthScreen() {
           }
         });
         if (signUpError) throw signUpError;
-        setMessage("Registro creado. Si Supabase solicita confirmacion, revisa tu correo antes de iniciar sesion.");
+        setMessage(
+          "Registro creado. Revisa tu correo para confirmarlo. Después, tu acceso quedará pendiente de aprobación por el equipo de Escucha Viva."
+        );
       } else if (mode === "reset") {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: globalThis.location?.origin

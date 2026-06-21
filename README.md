@@ -167,6 +167,25 @@ Abre la URL local que muestre Vite, normalmente:
 http://localhost:5173
 ```
 
+## Aprobacion manual de usuarios
+
+La aplicacion exige dos validaciones cuando Supabase esta configurado:
+
+1. Confirmacion del correo mediante Supabase Auth.
+2. Aprobacion manual del perfil en `public.user_profiles`.
+
+Antes de desplegar esta version, ejecuta el archivo
+`supabase/simulation_sessions.sql` completo en Supabase SQL Editor. El script:
+
+- crea perfiles pendientes automaticamente al registrar usuarios;
+- protege la lectura del perfil con RLS;
+- impide que un estudiante apruebe su propia cuenta;
+- restringe `simulation_sessions` a usuarios con `approved = true`.
+
+Para habilitar una cuenta, abre `public.user_profiles` en Supabase Table Editor y
+cambia `approved` a `true`. `approved_at` se completa automaticamente. Los usuarios
+existentes quedan pendientes al ejecutar la migracion y deben aprobarse manualmente.
+
 ## Build de produccion
 
 ```bash
