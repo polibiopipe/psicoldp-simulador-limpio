@@ -1,21 +1,21 @@
 import { patientFacts } from "./patientFacts.js";
 
 const caseImages = {
-  tomas: "/casos/tomas.png",
-  valentina: "/casos/valentina.png",
-  marcos: "/casos/marcos.png",
-  elena: "/casos/elena.png",
-  nicolas: "/casos/nicolas.png",
-  camila: "/casos/camila.png",
-  rodrigo: "/casos/rodrigo.png",
-  fernanda: "/casos/fernanda.png",
-  hector: "/casos/hector.png",
-  daniela: "/casos/daniela.png",
-  andres: "/casos/andres.png",
-  patricia: "/casos/patricia.png",
-  miguel: "/casos/miguel.png",
-  sofia: "/casos/sofia.png",
-  claudio: "/casos/claudio.png"
+  tomas: "/avatar/tomas.png",
+  valentina: "/avatar/valentina.png",
+  marcos: "/avatar/marcos.png",
+  elena: "/avatar/elena.png",
+  nicolas: "/avatar/nicolas.png",
+  camila: "/avatar/camila.png",
+  rodrigo: "/avatar/rodrigo.png",
+  fernanda: "/avatar/fernanda.png",
+  hector: "/avatar/hector.png",
+  daniela: "/avatar/daniela.png",
+  andres: "/avatar/andres.png",
+  patricia: "/avatar/patricia.png",
+  miguel: "/avatar/miguel.png",
+  sofia: "/avatar/sofia.png",
+  claudio: "/avatar/claudio.png"
 };
 
 const learningObjectivesByCase = {

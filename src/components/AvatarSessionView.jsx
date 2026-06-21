@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
   Clock3,
-  LampDesk,
-  Leaf,
   MicOff,
   MoreHorizontal,
   PhoneOff,
@@ -97,24 +95,14 @@ export function AvatarSessionView({
 }
 
 function AvatarRoomFrame({ caseItem }) {
-  const caseImage = caseItem.image || "/casos/placeholder.png";
-  const stageImage = getStageImage(caseImage);
+  const caseImage = caseItem.image || "/avatar/placeholder.png";
 
   return (
-    <div className="video-patient-stage avatar-room-frame">
-      <div className="avatar-room-background" aria-hidden="true">
-        <span className="room-window" />
-        <LampDesk className="room-lamp" />
-        <Leaf className="room-plant" />
-      </div>
+    <div className={`video-patient-stage patient-video-frame patient-video-${caseItem.id}`}>
       <img
         className="avatar-stage-portrait"
-        src={stageImage}
+        src={caseImage}
         alt={`Retrato ficticio de ${caseItem.name}`}
-        onError={(event) => {
-          event.currentTarget.onerror = null;
-          event.currentTarget.src = caseImage;
-        }}
       />
       <div className="video-patient-caption">
         <div>
@@ -125,13 +113,6 @@ function AvatarRoomFrame({ caseItem }) {
       </div>
     </div>
   );
-}
-
-function getStageImage(imagePath) {
-  if (!imagePath.startsWith("/casos/") || imagePath.includes("/stage/") || imagePath.includes("placeholder")) {
-    return imagePath;
-  }
-  return imagePath.replace("/casos/", "/casos/stage-cutout/");
 }
 
 function formatTimer(totalSeconds) {

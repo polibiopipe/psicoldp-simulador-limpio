@@ -2,7 +2,7 @@ import React from "react";
 import { Brain, MessageCircle, Signal } from "lucide-react";
 
 export function PatientCard({ caseItem, difficulty }) {
-  const caseImage = caseItem.image || "/casos/placeholder.png";
+  const caseImage = caseItem.image || "/avatar/placeholder.png";
 
   return (
     <aside className="patient-card" style={{ "--accent": caseItem.accent }}>

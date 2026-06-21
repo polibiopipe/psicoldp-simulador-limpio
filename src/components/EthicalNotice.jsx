@@ -6,11 +6,19 @@ export function EthicalNotice({ compact = false }) {
     <aside className={compact ? "ethical-notice compact" : "ethical-notice"}>
       {compact && (
         <div className="compact-brand-lockup">
-          <img
-            className="platform-logo-small"
-            src="/escucha-viva-logo.png"
-            alt="Escucha Viva, simuladores formativos. Una iniciativa de Núcleo Vivo"
-          />
+          <a
+            className="institutional-logo-link"
+            href="https://nucleovivo.net/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Visitar el sitio oficial de Núcleo Vivo"
+          >
+            <img
+              className="platform-logo-small"
+              src="/escucha-viva-logo.png"
+              alt="Escucha Viva, simuladores formativos. Una iniciativa de Núcleo Vivo"
+            />
+          </a>
           <span>Entrevista Psicológica Formativa</span>
         </div>
       )}

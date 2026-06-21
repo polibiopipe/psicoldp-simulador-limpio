@@ -220,7 +220,7 @@ export const caseProfiles = {
     difficulty: "intermedio",
     mainTheme: "Aislamiento y videojuegos",
     shortDescription: "Adolescente reservado, con tensión familiar por uso del computador y dificultad para relacionarse en persona.",
-    image: "/casos/tomas.png",
+    image: "/avatar/tomas.png",
     presentationStyle: "Adolescente reservado, responde breve al inicio y se incomoda si siente juicio.",
     communicationStyle: "Frases cortas, dudas y pausas. No usa lenguaje clínico. Evita explicar demasiado al comienzo.",
     reasonForConsultation: "Sus padres están preocupados porque pasa mucho tiempo jugando, sale poco y discuten frecuentemente por ese tema.",
@@ -351,7 +351,7 @@ export const caseProfiles = {
     difficulty: "intermedio",
     mainTheme: "Sobrecarga académica",
     shortDescription: "Universitaria autoexigente, cansada y con culpa al descansar.",
-    image: "/casos/valentina.png",
+    image: "/avatar/valentina.png",
     presentationStyle: "Universitaria amable y ordenada, intenta explicar bien lo que le pasa.",
     communicationStyle: "Habla más que Tomás, racionaliza y justifica su cansancio.",
     reasonForConsultation: "Se siente sobrepasada por la universidad, la autoexigencia y la culpa al descansar.",
@@ -436,7 +436,7 @@ export const caseProfiles = {
     difficulty: "intermedio",
     mainTheme: "Estrés laboral",
     shortDescription: "Adulto trabajador, cansado, irritable y con pérdida de sentido en el trabajo.",
-    image: "/casos/marcos.png",
+    image: "/avatar/marcos.png",
     presentationStyle: "Adulto práctico, contenido y algo escéptico al inicio.",
     communicationStyle: "Responde directo, minimiza vulnerabilidad y evita sonar quejoso.",
     reasonForConsultation: "Anda cansado, más irritable y con la sensación de que la pega le está quitando energía.",
@@ -509,7 +509,7 @@ export const caseProfiles = {
   }),
 
   elena: createProfileFromSeed("elena", {
-    name: "Elena", age: 52, difficulty: "avanzado", mainTheme: "Cambios vitales y soledad", image: "/casos/elena.png",
+    name: "Elena", age: 52, difficulty: "avanzado", mainTheme: "Cambios vitales y soledad", image: "/avatar/elena.png",
     shortDescription: "Mujer adulta, cordial y contenida, con soledad y dificultad para pedir ayuda.",
     presentationStyle: "Cordial, cuidadosa y acostumbrada a hablar primero de otros.",
     communicationStyle: "Habla con delicadeza, evita molestar y se abre lentamente.",
@@ -542,7 +542,7 @@ export const caseProfiles = {
   }),
 
   nicolas: createProfileFromSeed("nicolas", {
-    name: "Nicolás", age: 16, difficulty: "avanzado", mainTheme: "Derivación escolar", image: "/casos/nicolas.png",
+    name: "Nicolás", age: 16, difficulty: "avanzado", mainTheme: "Derivación escolar", image: "/avatar/nicolas.png",
     shortDescription: "Adolescente derivado desde el colegio, breve y desconfiado si se siente interrogado.",
     presentationStyle: "Breve, retraído y sensible a sentirse retado.",
     communicationStyle: "Responde corto. Se abre un poco si no lo presionan.",
@@ -581,7 +581,7 @@ export const caseProfiles = {
     difficulty: "intermedio",
     mainTheme: "Límites y sobrecarga relacional",
     shortDescription: "Mujer amable y complaciente, cansada de estar disponible para todos.",
-    image: "/casos/camila.png",
+    image: "/avatar/camila.png",
     presentationStyle: "Amable, cuidadosa y con tendencia a minimizar sus necesidades.",
     communicationStyle: "Habla con suavidad, justifica a otros y se culpa al poner límites.",
     reasonForConsultation: "Está cansada de estar siempre disponible para familia, trabajo y amistades.",
@@ -625,7 +625,7 @@ export const caseProfiles = {
     difficulty: "intermedio",
     mainTheme: "Maternidad, estudio y autocuidado",
     shortDescription: "Madre joven y estudiante, amorosa, cansada y con culpa al pensar en sí misma.",
-    image: "/casos/daniela.png",
+    image: "/avatar/daniela.png",
     presentationStyle: "Cálida, cansada y cuidadosa al hablar de su maternidad.",
     communicationStyle: "Habla desde el amor por su hijo, pero le cuesta reconocer agotamiento sin culpa.",
     reasonForConsultation: "Intenta compatibilizar maternidad, estudio y autocuidado; se siente cansada y culpable.",
@@ -662,7 +662,7 @@ export const caseProfiles = {
     }
   }),
 
-  rodrigo: createProfileFromSeed("rodrigo", seedAdvanced("Rodrigo", 45, "avanzado", "Separación y reorganización familiar", "/casos/rodrigo.png", {
+  rodrigo: createProfileFromSeed("rodrigo", seedAdvanced("Rodrigo", 45, "avanzado", "Separación y reorganización familiar", "/avatar/rodrigo.png", {
     desc: "Padre trabajador, práctico y contenido, afectado por una separación reciente.",
     reason: "Vino por cambios de ánimo asociados a una separación reciente y reorganización familiar.",
     core: "Trata de mostrarse fuerte, pero teme fallar como padre.",
@@ -678,7 +678,7 @@ export const caseProfiles = {
     follow: "Creo que me cuesta admitir cuánto me movió la separación.",
     phrases: ["Hay que seguir no más.", "No quiero que mis hijos me vean mal.", "Me cuesta hablar de tristeza directamente."]
   })),
-  fernanda: createProfileFromSeed("fernanda", seedAdvanced("Fernanda", 34, "avanzado", "Retorno laboral", "/casos/fernanda.png", {
+  fernanda: createProfileFromSeed("fernanda", seedAdvanced("Fernanda", 34, "avanzado", "Retorno laboral", "/avatar/fernanda.png", {
     desc: "Mujer cuidadosa e insegura, retomando el trabajo tras una licencia prolongada.",
     reason: "Está volviendo al trabajo después de una licencia y teme no rendir como antes.",
     core: "Teme sentirse observada y confirmar que ya no es la misma.",
@@ -694,7 +694,7 @@ export const caseProfiles = {
     follow: "Creo que lo difícil es volver sintiendo que todos podrían estar evaluándome.",
     phrases: ["Siento que todos van a estar mirando.", "No quiero parecer incapaz.", "Me cuesta confiar en que puedo retomar de a poco."]
   })),
-  hector: createProfileFromSeed("hector", seedAdvanced("Héctor", 61, "avanzado", "Jubilación y sentido", "/casos/hector.png", {
+  hector: createProfileFromSeed("hector", seedAdvanced("Héctor", 61, "avanzado", "Jubilación y sentido", "/avatar/hector.png", {
     desc: "Adulto mayor reservado y orgulloso, en búsqueda de rutina tras jubilar.",
     reason: "Jubiló hace poco y siente vacío, pérdida de rutina y menor sentido de utilidad.",
     core: "Le cuesta aceptar que ya no lo necesitan de la misma forma.",
@@ -710,7 +710,7 @@ export const caseProfiles = {
     follow: "Creo que lo que se me movió fue sentirme útil.",
     phrases: ["Uno se acostumbra a ser útil.", "Me levanto temprano igual, pero no sé para qué.", "No quiero que estén pendientes de mí."]
   })),
-  andres: createProfileFromSeed("andres", seedAdvanced("Andrés", 19, "intermedio", "Pertenencia universitaria", "/casos/andres.png", {
+  andres: createProfileFromSeed("andres", seedAdvanced("Andrés", 19, "intermedio", "Pertenencia universitaria", "/avatar/andres.png", {
     desc: "Estudiante universitario nuevo, inseguro y comparativo.",
     reason: "Entró hace poco a la universidad y siente que no pertenece.",
     core: "Teme decepcionar a su familia y no estar a la altura.",
@@ -726,7 +726,7 @@ export const caseProfiles = {
     follow: "Creo que lo que me cuesta es sentir que pertenezco ahí.",
     phrases: ["Siento que todos saben moverse menos yo.", "Mi familia está orgullosa y eso pesa.", "No quiero que se note que estoy perdido."]
   })),
-  patricia: createProfileFromSeed("patricia", seedAdvanced("Patricia", 48, "avanzado", "Conflicto con hija adolescente", "/casos/patricia.png", {
+  patricia: createProfileFromSeed("patricia", seedAdvanced("Patricia", 48, "avanzado", "Conflicto con hija adolescente", "/avatar/patricia.png", {
     desc: "Madre preocupada, intensa y protectora, en conflicto con su hija adolescente.",
     reason: "Vino por conflictos con su hija adolescente y sensación de pérdida de autoridad.",
     core: "No quiere controlar, pero teme perder el vínculo y que a su hija le pase algo.",
@@ -742,7 +742,7 @@ export const caseProfiles = {
     follow: "Creo que detrás de mi enojo hay mucho miedo.",
     phrases: ["Yo solo quiero cuidarla.", "Siento que ya no me escucha.", "A veces salgo controladora cuando estoy asustada."]
   })),
-  miguel: createProfileFromSeed("miguel", seedAdvanced("Miguel", 32, "intermedio", "Migración y adaptación", "/casos/miguel.png", {
+  miguel: createProfileFromSeed("miguel", seedAdvanced("Miguel", 32, "intermedio", "Migración y adaptación", "/avatar/miguel.png", {
     desc: "Hombre migrante, respetuoso y contenido, mezclando esperanza con cansancio.",
     reason: "Le ha costado adaptarse después de migrar y siente que empezó de cero.",
     core: "Teme perder partes de quien era antes y quedarse solo.",
@@ -758,7 +758,7 @@ export const caseProfiles = {
     follow: "Creo que lo difícil es armar vida acá sin perder lo que dejé atrás.",
     phrases: ["Estoy empezando de cero.", "No quiero sonar ingrato.", "Extraño quién era antes."]
   })),
-  sofia: createProfileFromSeed("sofia", seedAdvanced("Sofía", 24, "intermedio", "Redes sociales y comparación", "/casos/sofia.png", {
+  sofia: createProfileFromSeed("sofia", seedAdvanced("Sofía", 24, "intermedio", "Redes sociales y comparación", "/avatar/sofia.png", {
     desc: "Joven lúcida e irónica, ambivalente frente a redes y comparación.",
     reason: "Usa intensamente redes sociales, se compara y le cuesta desconectarse.",
     core: "Le da vergüenza admitir cuánto le afecta la validación externa.",
@@ -774,7 +774,7 @@ export const caseProfiles = {
     follow: "Creo que lo que me cuesta decir es que las redes me importan más de lo que aparento.",
     phrases: ["Sé que suena superficial.", "Me comparo más de lo que digo.", "Quedo pendiente de si reaccionan."]
   })),
-  claudio: createProfileFromSeed("claudio", seedAdvanced("Claudio", 40, "avanzado", "Estancamiento vital", "/casos/claudio.png", {
+  claudio: createProfileFromSeed("claudio", seedAdvanced("Claudio", 40, "avanzado", "Estancamiento vital", "/avatar/claudio.png", {
     desc: "Adulto racional y contenido, con rutina estable pero sensación de estancamiento.",
     reason: "Siente estancamiento vital, rutina rígida y dificultad para tomar decisiones.",
     core: "Teme mirar atrás y sentir que no cambió nada por miedo.",

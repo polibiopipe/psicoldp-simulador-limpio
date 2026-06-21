@@ -2879,21 +2879,122 @@ textarea:hover {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--nv-radius-sm);
-  background: #eadfd1;
+  background: #e8dccd;
 }
 
-.video-patient-stage img {
+.video-patient-stage .avatar-stage-portrait {
+  position: absolute;
+  z-index: 2;
+  top: -8%;
+  left: 50%;
   display: block;
-  width: 100%;
-  height: 100%;
+  width: auto;
+  max-width: none;
+  height: 165%;
   object-fit: contain;
   object-position: center;
   transform-origin: center 58%;
+  transform: translateX(-50%);
+  -webkit-mask-image: radial-gradient(ellipse 72% 94% at 50% 45%, #000 56%, rgba(0, 0, 0, 0.94) 68%, rgba(0, 0, 0, 0.48) 84%, transparent 100%);
+  mask-image: radial-gradient(ellipse 72% 94% at 50% 45%, #000 56%, rgba(0, 0, 0, 0.94) 68%, rgba(0, 0, 0, 0.48) 84%, transparent 100%);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  filter: sepia(0.05) saturate(0.94) contrast(0.98);
   transition: filter 260ms ease, opacity 260ms ease, transform 260ms ease;
+}
+
+.avatar-room-frame {
+  isolation: isolate;
+  box-shadow: inset 0 0 46px rgba(75, 50, 30, 0.12);
+}
+
+.avatar-room-frame::after {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(231, 187, 132, 0.055);
+  content: "";
+}
+
+.avatar-room-background {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, #efe4d7 0 72%, #cdb294 72% 100%);
+}
+
+.avatar-room-background::after {
+  position: absolute;
+  right: 0;
+  bottom: 27%;
+  left: 0;
+  height: 1px;
+  background: rgba(118, 85, 55, 0.18);
+  box-shadow: 0 12px 26px rgba(90, 60, 35, 0.08);
+  content: "";
+}
+
+.room-window {
+  position: absolute;
+  top: 12%;
+  left: 7%;
+  width: 26%;
+  height: 42%;
+  border: 5px solid rgba(255, 250, 240, 0.72);
+  border-radius: 5px;
+  background: #dce9e4;
+  box-shadow: inset 0 0 0 1px rgba(48, 92, 87, 0.09), 0 8px 24px rgba(71, 53, 35, 0.07);
+}
+
+.room-window::before,
+.room-window::after {
+  position: absolute;
+  background: rgba(255, 250, 240, 0.78);
+  content: "";
+}
+
+.room-window::before {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+}
+
+.room-window::after {
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 3px;
+}
+
+.room-lamp,
+.room-plant {
+  position: absolute;
+  color: rgba(87, 101, 74, 0.42);
+  filter: drop-shadow(0 7px 10px rgba(77, 55, 35, 0.08));
+}
+
+.room-lamp {
+  right: 9%;
+  bottom: 19%;
+  width: 44px;
+  height: 44px;
+  color: rgba(183, 127, 52, 0.46);
+}
+
+.room-plant {
+  bottom: 10%;
+  left: 12%;
+  width: 50px;
+  height: 50px;
+  transform: rotate(-9deg);
 }
 
 .video-patient-caption {
   position: absolute;
+  z-index: 4;
   right: 8px;
   bottom: 8px;
   left: 8px;
@@ -3035,7 +3136,7 @@ textarea:hover {
   box-shadow: inset 0 0 34px rgba(16, 42, 67, 0.08);
 }
 
-.avatar-session-view.state-idle .video-patient-stage img {
+.avatar-session-view.state-idle .avatar-stage-portrait {
   animation: avatar-breathe 5.6s ease-in-out infinite;
 }
 
@@ -3044,16 +3145,24 @@ textarea:hover {
   box-shadow: 0 14px 34px rgba(0, 124, 122, 0.2);
 }
 
-.avatar-session-view.state-listening .video-patient-stage img {
+.avatar-session-view.state-listening .avatar-stage-portrait {
   animation: avatar-listening 4.2s ease-in-out infinite;
+}
+
+.avatar-session-view.state-listening .avatar-room-frame {
+  box-shadow: inset 0 0 48px rgba(0, 124, 122, 0.12);
 }
 
 .avatar-session-view.state-thinking {
   border-color: rgba(199, 154, 59, 0.58);
 }
 
-.avatar-session-view.state-thinking .video-patient-stage img {
+.avatar-session-view.state-thinking .avatar-stage-portrait {
   animation: avatar-thinking 2.4s ease-in-out infinite;
+}
+
+.avatar-session-view.state-thinking .avatar-room-frame {
+  box-shadow: inset 0 0 52px rgba(199, 154, 59, 0.17);
 }
 
 .avatar-session-view.state-speaking {
@@ -3061,8 +3170,12 @@ textarea:hover {
   box-shadow: 0 16px 38px rgba(217, 133, 91, 0.18);
 }
 
-.avatar-session-view.state-speaking .video-patient-stage img {
+.avatar-session-view.state-speaking .avatar-stage-portrait {
   animation: avatar-speaking 1.8s ease-in-out infinite;
+}
+
+.avatar-session-view.state-speaking .avatar-room-frame {
+  box-shadow: inset 0 0 52px rgba(217, 133, 91, 0.16);
 }
 
 .avatar-session-view.state-closed {
@@ -3070,7 +3183,7 @@ textarea:hover {
   background: #314d50;
 }
 
-.avatar-session-view.state-closed .video-patient-stage img {
+.avatar-session-view.state-closed .avatar-stage-portrait {
   opacity: 0.82;
   filter: saturate(0.58);
 }
@@ -3101,27 +3214,27 @@ textarea:hover {
 }
 
 @keyframes avatar-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.012) translateY(-1px); }
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.012) translateY(-1px); }
 }
 
 @keyframes avatar-listening {
-  0%, 100% { transform: scale(1.006) translateX(0); }
-  50% { transform: scale(1.018) translateX(1px); }
+  0%, 100% { transform: translateX(-50%) scale(1.006); }
+  50% { transform: translateX(calc(-50% + 1px)) scale(1.018); }
 }
 
 @keyframes avatar-thinking {
-  0%, 100% { transform: scale(1.006) translateX(0); }
-  50% { transform: scale(1.014) translateX(-2px); }
+  0%, 100% { transform: translateX(-50%) scale(1.006); }
+  50% { transform: translateX(calc(-50% - 2px)) scale(1.014); }
 }
 
 @keyframes avatar-speaking {
-  0%, 100% { transform: scale(1.008) translateY(0); }
-  50% { transform: scale(1.02) translateY(-1px); }
+  0%, 100% { transform: translateX(-50%) scale(1.008) translateY(0); }
+  50% { transform: translateX(-50%) scale(1.02) translateY(-1px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .avatar-session-view .video-patient-stage img {
+  .avatar-session-view .avatar-stage-portrait {
     animation: none !important;
     transition: none;
   }
@@ -3148,7 +3261,7 @@ textarea:hover {
   }
 
   .simulated-video-session {
-    height: 260px;
+    height: 290px;
   }
 
   .interview-experience.with-video > .conversation {
@@ -3157,5 +3270,384 @@ textarea:hover {
 
   .interview-experience.chat-only > .conversation {
     height: clamp(280px, 42vh, 380px);
+  }
+}
+
+/* Immersive avatar room, guided by the supplied reference */
+.avatar-session-view {
+  position: relative;
+  display: block;
+  padding: 0;
+  background: #2d241d;
+}
+
+.avatar-session-view .avatar-room-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: #8a6a4e;
+  box-shadow: inset 0 0 70px rgba(37, 24, 15, 0.18);
+}
+
+.avatar-session-view .avatar-room-background {
+  background-image:
+    linear-gradient(rgba(57, 38, 25, 0.04), rgba(40, 28, 21, 0.14)),
+    url("/avatar-room-background.png");
+  background-position: center;
+  background-size: cover;
+}
+
+.avatar-session-view .avatar-room-background::after,
+.avatar-session-view .room-window,
+.avatar-session-view .room-lamp,
+.avatar-session-view .room-plant {
+  display: none;
+}
+
+.avatar-session-view .avatar-stage-portrait {
+  top: -6%;
+  height: 150%;
+  -webkit-mask-image: none;
+  mask-image: none;
+  filter: sepia(0.035) saturate(0.98) contrast(1.01) drop-shadow(0 14px 18px rgba(44, 27, 17, 0.22));
+}
+
+.avatar-session-view .video-session-status {
+  position: absolute;
+  z-index: 7;
+  top: 14px;
+  left: 14px;
+  display: grid;
+  gap: 5px;
+  min-width: 150px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--nv-radius);
+  padding: 9px 11px;
+  color: #ffffff;
+  background: rgba(27, 31, 30, 0.74);
+  box-shadow: 0 8px 20px rgba(26, 18, 13, 0.13);
+  backdrop-filter: blur(5px);
+}
+
+.avatar-session-view .video-session-status > div {
+  justify-content: space-between;
+}
+
+.avatar-session-view .video-turn-count {
+  color: #ffffff;
+}
+
+.avatar-session-view .video-student-tile {
+  z-index: 7;
+  top: 14px;
+  right: 14px;
+  border-color: rgba(255, 255, 255, 0.13);
+  color: #ffffff;
+  background: rgba(27, 31, 30, 0.76);
+  backdrop-filter: blur(5px);
+}
+
+.avatar-session-view .video-student-tile > svg {
+  color: #ffffff;
+  background: rgba(24, 166, 161, 0.78);
+}
+
+.avatar-session-view .video-student-tile span {
+  color: #dce8e5;
+}
+
+.avatar-session-view .video-patient-caption {
+  right: auto;
+  bottom: 88px;
+  left: 14px;
+  width: min(54%, 210px);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  padding: 9px 11px;
+  background: rgba(20, 29, 30, 0.78);
+  box-shadow: 0 8px 20px rgba(26, 18, 13, 0.12);
+  backdrop-filter: blur(5px);
+}
+
+.avatar-session-view .video-patient-caption small {
+  color: #67d3c9;
+}
+
+.avatar-session-view .video-session-controls {
+  position: absolute;
+  z-index: 7;
+  right: 0;
+  bottom: 40px;
+  left: 0;
+}
+
+.avatar-session-view .video-session-controls button {
+  width: 42px;
+  height: 42px;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(20, 29, 30, 0.76);
+  backdrop-filter: blur(5px);
+}
+
+.avatar-session-view .video-session-controls .video-finish-control {
+  background: #e56e55;
+}
+
+.avatar-session-view .video-session-disclaimer {
+  position: absolute;
+  z-index: 7;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  min-height: 30px;
+  padding: 8px 10px;
+  color: #eef5f3;
+  background: rgba(22, 25, 24, 0.82);
+  backdrop-filter: blur(5px);
+}
+
+.avatar-session-view::after {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 46px rgba(32, 21, 14, 0.14);
+  content: "";
+}
+
+@media (max-width: 760px) {
+  .avatar-session-view .avatar-stage-portrait {
+    top: -3%;
+    height: 150%;
+  }
+
+  .avatar-session-view .video-session-status {
+    top: 9px;
+    left: 9px;
+    min-width: 130px;
+    padding: 7px 9px;
+  }
+
+  .avatar-session-view .video-student-tile {
+    top: 9px;
+    right: 9px;
+  }
+
+  .avatar-session-view .video-patient-caption {
+    bottom: 58px;
+    left: 9px;
+    width: auto;
+    max-width: 120px;
+    padding: 6px 8px;
+  }
+
+  .avatar-session-view .video-patient-caption span,
+  .avatar-session-view .video-patient-caption small {
+    display: none;
+  }
+
+  .avatar-session-view .video-session-controls {
+    bottom: 37px;
+  }
+}
+
+/* Official patient photography and institutional content */
+.institutional-logo-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border-radius: var(--nv-radius-sm);
+}
+
+.institutional-logo-link:focus-visible,
+.parent-brand-lockup:focus-visible {
+  outline: 3px solid rgba(24, 166, 161, 0.3);
+  outline-offset: 4px;
+}
+
+.parent-brand-lockup {
+  color: inherit;
+  text-decoration: none;
+}
+
+.case-card-image img,
+.patient-portrait img,
+.preview-avatar img,
+.hero-patient-stack img {
+  object-position: center 18%;
+}
+
+.avatar-session-view .patient-video-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: inherit;
+  background: #3c342c;
+  box-shadow: none;
+  isolation: isolate;
+}
+
+.avatar-session-view .patient-video-frame::before {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(10, 23, 25, 0.1) 0%, transparent 26%),
+    linear-gradient(0deg, rgba(18, 20, 18, 0.38) 0%, transparent 38%);
+  content: "";
+}
+
+.avatar-session-view .avatar-stage-portrait {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 18%;
+  transform: scale(1.01);
+  transform-origin: center;
+  -webkit-mask-image: none;
+  mask-image: none;
+  filter: saturate(0.96) contrast(1.015) brightness(0.97);
+  transition: filter 260ms ease, opacity 260ms ease, transform 260ms ease;
+}
+
+.avatar-session-view.state-idle .avatar-stage-portrait {
+  animation: patient-camera-idle 6.5s ease-in-out infinite;
+}
+
+.avatar-session-view.state-listening .avatar-stage-portrait {
+  animation: patient-camera-listening 4.5s ease-in-out infinite;
+}
+
+.avatar-session-view.state-thinking .avatar-stage-portrait {
+  animation: patient-camera-thinking 2.8s ease-in-out infinite;
+}
+
+.avatar-session-view.state-speaking .avatar-stage-portrait {
+  animation: patient-camera-speaking 2s ease-in-out infinite;
+}
+
+.avatar-session-view.state-closed .avatar-stage-portrait {
+  transform: scale(1.01);
+}
+
+@keyframes patient-camera-idle {
+  0%, 100% { transform: scale(1.01); }
+  50% { transform: scale(1.018); }
+}
+
+@keyframes patient-camera-listening {
+  0%, 100% { transform: scale(1.012); }
+  50% { transform: scale(1.021) translateY(-1px); }
+}
+
+@keyframes patient-camera-thinking {
+  0%, 100% { transform: scale(1.014); }
+  50% { transform: scale(1.021) translateX(-1px); }
+}
+
+@keyframes patient-camera-speaking {
+  0%, 100% { transform: scale(1.012); }
+  50% { transform: scale(1.022) translateY(-1px); }
+}
+
+.podcast-section {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.72fr) minmax(420px, 1.28fr);
+  gap: clamp(24px, 4vw, 58px);
+  align-items: center;
+  width: min(1280px, calc(100% - 48px));
+  margin: 30px auto 54px;
+  border: 1px solid rgba(199, 154, 59, 0.28);
+  border-radius: var(--nv-radius);
+  padding: clamp(24px, 4vw, 48px);
+  background:
+    linear-gradient(135deg, rgba(255, 249, 240, 0.98), rgba(239, 247, 243, 0.94));
+  box-shadow: 0 20px 48px rgba(63, 49, 35, 0.1);
+}
+
+.podcast-copy {
+  min-width: 0;
+}
+
+.podcast-eyebrow {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--nv-primary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.podcast-eyebrow svg {
+  width: 18px;
+  height: 18px;
+  color: var(--nv-gold);
+}
+
+.podcast-copy h2 {
+  margin: 12px 0 10px;
+  color: var(--nv-heading);
+  font-size: clamp(1.5rem, 2.5vw, 2.25rem);
+}
+
+.podcast-copy p {
+  max-width: 40ch;
+  margin: 0 0 20px;
+  color: var(--nv-muted);
+  line-height: 1.65;
+}
+
+.podcast-action {
+  display: inline-flex;
+  width: fit-content;
+  color: var(--nv-primary);
+  text-decoration: none;
+}
+
+.podcast-action svg {
+  width: 17px;
+  height: 17px;
+}
+
+.spotify-embed {
+  display: block;
+  min-width: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(16, 42, 67, 0.12);
+}
+
+@media (max-width: 900px) {
+  .podcast-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .avatar-session-view .avatar-stage-portrait {
+    object-position: center 12%;
+  }
+
+  .podcast-section {
+    width: calc(100% - 28px);
+    margin: 22px auto 36px;
+    border-radius: var(--nv-radius);
+    padding: 20px;
+  }
+
+  .spotify-embed {
+    height: 300px;
   }
 }

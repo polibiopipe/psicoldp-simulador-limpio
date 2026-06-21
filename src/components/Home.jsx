@@ -3,7 +3,9 @@ import {
   ArrowRight,
   BookOpenCheck,
   Compass,
+  ExternalLink,
   FolderClock,
+  Headphones,
   HeartHandshake,
   MessageSquareText,
   Play,
@@ -16,15 +18,29 @@ export function Home({ onStart, onViewHistory }) {
   return (
     <section className="landing-page">
       <header className="landing-header">
-        <img
-          className="brand-logo"
-          src="/escucha-viva-logo.png"
-          alt="Escucha Viva, simuladores formativos"
-        />
-        <div className="parent-brand-lockup">
+        <a
+          className="institutional-logo-link"
+          href="https://nucleovivo.net/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Visitar el sitio oficial de Núcleo Vivo"
+        >
+          <img
+            className="brand-logo"
+            src="/escucha-viva-logo.png"
+            alt="Escucha Viva, simuladores formativos"
+          />
+        </a>
+        <a
+          className="parent-brand-lockup"
+          href="https://nucleovivo.net/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Visitar el sitio oficial de Núcleo Vivo"
+        >
           <span>Una iniciativa de</span>
           <img src="/nucleo-vivo-logo-horizontal.png" alt="Núcleo Vivo" />
-        </div>
+        </a>
       </header>
 
       <div className="hero-section">
@@ -82,7 +98,7 @@ export function Home({ onStart, onViewHistory }) {
 
             <div className="preview-patient">
               <div className="preview-avatar">
-                <img src="/casos/tomas.png" alt="Retrato ficticio de Tomás" />
+                <img src="/avatar/tomas.png" alt="Retrato ficticio de Tomás" />
               </div>
               <div>
                 <strong>Tomás</strong>
@@ -122,15 +138,15 @@ export function Home({ onStart, onViewHistory }) {
 
           <div className="hero-patient-stack" aria-label="Ejemplos de pacientes ficticios">
             <article>
-              <img src="/casos/camila.png" alt="Retrato ficticio de Camila" />
+              <img src="/avatar/camila.png" alt="Retrato ficticio de Camila" />
               <div><strong>Camila, 29</strong><span>Límites y sobrecarga</span></div>
             </article>
             <article>
-              <img src="/casos/marcos.png" alt="Retrato ficticio de Marcos" />
+              <img src="/avatar/marcos.png" alt="Retrato ficticio de Marcos" />
               <div><strong>Marcos, 38</strong><span>Estrés laboral</span></div>
             </article>
             <article>
-              <img src="/casos/elena.png" alt="Retrato ficticio de Elena" />
+              <img src="/avatar/elena.png" alt="Retrato ficticio de Elena" />
               <div><strong>Elena, 52</strong><span>Cambios vitales</span></div>
             </article>
           </div>
@@ -175,6 +191,34 @@ export function Home({ onStart, onViewHistory }) {
           </span>
         </div>
       </article>
+
+      <section className="podcast-section" aria-labelledby="podcast-title">
+        <div className="podcast-copy">
+          <span className="podcast-eyebrow"><Headphones aria-hidden="true" /> Contenido Núcleo Vivo</span>
+          <h2 id="podcast-title">Podcast Núcleo Vivo</h2>
+          <p>Conversaciones sobre bienestar, cultura, vínculos y desarrollo humano.</p>
+          <a
+            className="secondary-action podcast-action"
+            href="https://open.spotify.com/show/033sQIGbzXamAjYqMuTAyU"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Abrir en Spotify
+            <ExternalLink aria-hidden="true" />
+          </a>
+        </div>
+        <iframe
+          className="spotify-embed"
+          src="https://open.spotify.com/embed/show/033sQIGbzXamAjYqMuTAyU?utm_source=generator"
+          width="100%"
+          height="352"
+          frameBorder="0"
+          allowFullScreen
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy"
+          title="Podcast Núcleo Vivo en Spotify"
+        />
+      </section>
     </section>
   );
 }
