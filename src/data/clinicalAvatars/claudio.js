@@ -62,12 +62,162 @@ export const claudioClinicalAvatar = defineClinicalAvatar({
     ],
     hermanos: [response("fact-siblings", "Tengo hermanos, pero no suelo hablar con ellos de estas dudas.", { topic: "familia" })],
     estudios_trabajo: [
-      response("fact-work-1", "Trabajo y tengo una situación laboral estable. Cumplo bien, aunque hace tiempo siento que funciono por inercia.", { topic: "trabajo" }),
+      response("fact-work-1", "Trabajo y tengo estabilidad laboral. Cumplo, aunque últimamente funciono por inercia.", { topic: "trabajo" }),
       response("fact-work-2", "Mi trabajo está ordenado y no tengo un problema grave ahí. Lo difícil es que ya no sé cuánto de mi rutina elegí y cuánto simplemente mantuve.", { topic: "trabajo", minSession: 2, minOpenness: "medium" })
     ],
     amistades: [response("fact-friends", "Tengo algunos amigos. Nos vemos, pero suelo hablar de cosas prácticas y no tanto de lo que me pasa.", { topic: "vinculos" })],
     derivacion: [response("fact-referral", "Vine por decisión propia. Llevaba tiempo pensando que quizás necesitaba ordenar esto con alguien.", { topic: "llegada" })],
     riesgo: [response("fact-risk", "No he pensado en hacerme daño ni siento que esté en una crisis. Es más bien un desgaste que se ha ido quedando conmigo.", { topic: "riesgo" })]
+  },
+
+  intentResponses: {
+    temporal: [
+      response("time-1", "Diría que empezó a sentirse más claro hace unos meses, pero mirando hacia atrás venía acumulándose desde antes.", { topic: "temporal" }),
+      response("time-2", "No fue de un día para otro. Después de mi separación seguí funcionando, pero con el tiempo noté que algo había quedado más apagado.", { topic: "temporal", minOpenness: "medium" }),
+      response("time-3", "Tal vez hace un año lo habría descrito solo como cansancio. Ahora veo que es algo más persistente.", { topic: "temporal" }),
+      response("time-4", "Me cuesta poner una fecha exacta. Sí recuerdo que antes tenía más sensación de movimiento y que últimamente todo se volvió demasiado repetido.", { topic: "temporal", minOpenness: "medium" })
+    ],
+    miedo_especifico: [
+      response("fear-1", "Me da miedo equivocarme. Hacer un cambio y después sentir que arruiné algo que, al menos desde afuera, funcionaba.", { topic: "miedo_especifico" }),
+      response("fear-2", "Creo que temo tomar una decisión que no pueda deshacer. Esa idea me hace revisar tanto las opciones que termino sin elegir ninguna.", { topic: "miedo_especifico" }),
+      response("fear-3", "Me preocupa descubrir que quería otra vida y haber esperado demasiado. Es una idea incómoda, así que muchas veces vuelvo a la rutina.", { topic: "miedo_especifico", minSession: 2, minOpenness: "medium" })
+    ],
+    foco_sesion: [
+      response("focus-1", "Me gustaría entender por qué me cuesta tanto decidir, incluso cuando sé que algo de mi vida no me está haciendo bien.", { topic: "foco_sesion" }),
+      response("focus-2", "Creo que podríamos enfocarnos en distinguir si lo que me frena es miedo, costumbre o cansancio. Ahora se me mezcla todo.", { topic: "foco_sesion" }),
+      response("focus-3", "Quisiera mirar esta sensación de estar detenido sin partir de la idea de que tengo que cambiarlo todo de inmediato.", { topic: "foco_sesion" })
+    ],
+    confidencialidad: [
+      response("confidentiality-1", "Sí, estoy de acuerdo. Me tranquiliza saberlo, porque no estoy acostumbrado a hablar mucho de estas cosas.", { topic: "encuadre" }),
+      response("confidentiality-2", "Está bien. Saber que este es un espacio cuidado me permite hablar con un poco menos de cautela.", { topic: "encuadre" })
+    ],
+    certeza_control: [
+      response("certainty-1", "Sí, puede ser. Me cuesta actuar si no tengo cierta seguridad. Y como casi nunca estoy completamente seguro, termino postergando.", { topic: "certeza_control" }),
+      response("certainty-2", "Suelo revisar mucho si una decisión es razonable antes de hacerla. El problema es que esa revisión no termina de darme la certeza que busco.", { topic: "certeza_control" })
+    ]
+  },
+
+  contextualFallbacks: {
+    cierre: [
+      response("fallback-close-1", "Está bien. Prefiero dejarlo aquí y seguir ordenándolo con calma, sin forzar una conclusión hoy.", { topic: "cierre" }),
+      response("fallback-close-2", "Gracias por el espacio. Me voy con algunas ideas más claras y otras que todavía necesito pensar.", { topic: "cierre" }),
+      response("fallback-close-3", "Podemos cerrar. No siento que esté resuelto, pero sí que ahora puedo mirar el problema con algo más de perspectiva.", { topic: "cierre", minSession: 3 })
+    ],
+    temporal: [
+      response("fallback-time-1", "La primera señal fue que empecé a sentir todos los días demasiado parecidos. Eso se hizo difícil de ignorar durante el último año.", { topic: "temporal" }),
+      response("fallback-time-2", "Viene de antes, pero en los últimos meses dejó de ser una incomodidad ocasional y pasó a acompañarme casi todos los días.", { topic: "temporal" }),
+      response("fallback-time-3", "No tengo una fecha precisa. Lo ubico después de varios cambios personales que resolví en lo práctico, pero no terminé de procesar.", { topic: "temporal", minSession: 2 })
+    ],
+    miedo_especifico: [
+      response("fallback-fear-1", "El miedo concreto es tomar una mala decisión y perder una estabilidad que me ha costado construir.", { topic: "miedo_especifico" }),
+      response("fallback-fear-2", "También temo actuar por cansancio y descubrir después que confundí una etapa difícil con la necesidad de cambiarlo todo.", { topic: "miedo_especifico", minOpenness: "medium" })
+    ],
+    foco_sesion: [
+      response("fallback-focus-1", "El foco podría ser entender qué necesito yo, antes de convertir esto en una lista de decisiones que debería tomar.", { topic: "foco_sesion" }),
+      response("fallback-focus-2", "Me serviría ordenar la diferencia entre cuidar lo que tengo y quedarme quieto solo por temor a equivocarme.", { topic: "foco_sesion" })
+    ],
+    confidencialidad: [
+      response("fallback-confidentiality", "Sí, me parece bien ese acuerdo. Tener claro el límite de este espacio hace más fácil que pueda hablar con honestidad.", { topic: "encuadre" })
+    ],
+    certeza_control: [
+      response("fallback-certainty-1", "Busco una confirmación de que la decisión será correcta. Como esa garantía no existe, sigo revisando lo mismo sin avanzar.", { topic: "certeza_control" }),
+      response("fallback-certainty-2", "Necesito sentir que consideré todas las variables. A veces eso parece prudencia, pero otras veces es una forma de no exponerme al error.", { topic: "certeza_control", minOpenness: "medium" })
+    ],
+    motivo: [
+      response("fallback-motive-1", "Lo central es esta sensación de seguir cumpliendo sin sentir que realmente avanzo hacia algo elegido por mí.", { topic: "motivo" }),
+      response("fallback-motive-2", "No hay un hecho único que explique que viniera. Fue notar que el desgaste seguía ahí aunque todo lo práctico estuviera en orden.", { topic: "motivo" })
+    ],
+    rutina: [
+      response("fallback-routine-1", "La rutina me sostiene, pero también reduce casi todos mis días a cumplir y repetir. Hay poco espacio para preguntarme qué quiero.", { topic: "rutina" }),
+      response("fallback-routine-2", "No diría que mis días son malos. Son predecibles, y justamente esa falta de movimiento empezó a pesarme.", { topic: "rutina" })
+    ],
+    decisiones: [
+      response("fallback-decision-1", "Cuando tengo que elegir, intento anticipar todas las consecuencias. Esa búsqueda de una opción segura suele dejarme inmóvil.", { topic: "decisiones" }),
+      response("fallback-decision-2", "Postergar me alivia por un momento porque no arriesgo nada, pero después vuelve la frustración de seguir en el mismo lugar.", { topic: "decisiones" })
+    ],
+    emociones: [
+      response("fallback-emotion-1", "Hay cansancio, pero también frustración. Me cuesta admitirla porque desde afuera pareciera que no tengo razones para sentirme así.", { topic: "emociones" }),
+      response("fallback-emotion-2", "Lo que más noto es una mezcla de inquietud y desconexión. Sigo haciendo las cosas, pero con poca sensación de estar presente.", { topic: "emociones" })
+    ],
+    estudios_trabajo: [
+      response("fallback-work-1", "En el trabajo respondo bien y nadie diría que hay un problema. Lo que noto es que cumplo sin mucho interés y después llego a repetir la misma rutina.", { topic: "trabajo" }),
+      response("fallback-work-2", "La estabilidad laboral me importa. Al mismo tiempo, a veces la uso como argumento para no revisar otras partes de mi vida.", { topic: "trabajo", minSession: 2 })
+    ],
+    follow_up: [
+      response("fallback-follow-1", "Lo que intento explicar es que no estoy completamente mal, pero hace tiempo vivo con poca sensación de elección.", { topic: "motivo" }),
+      response("fallback-follow-2", "Hay una parte práctica que funciona y otra, más personal, que siento bastante detenida. Esa contradicción es la que me cuesta ordenar.", { topic: "motivo" }),
+      response("fallback-follow-3", "No tengo una respuesta cerrada. Lo que sí noto es que pienso mucho para evitar equivocarme y termino manteniendo lo mismo.", { topic: "decisiones" })
+    ],
+    default: [
+      response("fallback-default-1", "Podría pensarlo desde lo que veníamos hablando: por fuera mantengo todo en orden, pero internamente me cuesta saber qué quiero mover.", { topic: "motivo" }),
+      response("fallback-default-2", "No lo tengo completamente claro todavía. Puedo decir que la duda aparece sobre todo cuando una decisión podría cambiar mi rutina.", { topic: "decisiones" }),
+      response("fallback-default-3", "Quizás necesito separar dos cosas: el cansancio de sostener lo mismo y el miedo que aparece cuando imagino cambiarlo.", { topic: "emociones" })
+    ]
+  },
+
+  fallbackSynthesis: {
+    temporal: {
+      openings: [
+        "No puedo ubicarlo en un día específico.",
+        "Si intento ordenarlo en el tiempo, diría que fue apareciendo de forma gradual.",
+        "La sensación no empezó de golpe."
+      ],
+      details: [
+        "Durante los últimos meses se volvió más constante y difícil de ignorar.",
+        "Primero parecía cansancio; después noté que seguía presente incluso cuando descansaba.",
+        "La asocio a un período en que mantuve la rutina, pero dejé de sentir que avanzaba."
+      ]
+    },
+    miedo_especifico: {
+      openings: [
+        "Lo que más temo es tomar una decisión difícil de revertir.",
+        "El miedo aparece cuando imagino que un cambio puede salir mal."
+      ],
+      details: [
+        "Entonces vuelvo a revisar todas las opciones y termino postergando.",
+        "Prefiero conservar lo conocido, aunque una parte de mí ya no esté conforme."
+      ]
+    },
+    foco_sesion: {
+      openings: [
+        "Me serviría seguir mirando cómo tomo decisiones.",
+        "Quisiera ordenar qué parte de esto es cansancio y cuál es temor al cambio."
+      ],
+      details: [
+        "No busco resolverlo de inmediato, sino entender por qué vuelvo a quedarme quieto.",
+        "Creo que ese foco podría ayudarme a distinguir prudencia de paralización."
+      ]
+    },
+    confidencialidad: {
+      openings: [
+        "Estoy de acuerdo con ese encuadre.",
+        "Me parece bien que quede claro cómo se cuidará lo que conversemos."
+      ],
+      details: [
+        "Tener ese límite definido hace que pueda hablar con menos reserva.",
+        "No suelo contar estas cosas, así que saberlo me da algo de tranquilidad."
+      ]
+    },
+    certeza_control: {
+      openings: [
+        "Sí, suelo buscar una seguridad que ninguna decisión puede ofrecer del todo.",
+        "Reviso mucho antes de actuar porque quiero reducir al mínimo la posibilidad de error."
+      ],
+      details: [
+        "Esa búsqueda parece responsable, pero muchas veces termina inmovilizándome.",
+        "Cuando la confirmación no llega, postergo y mantengo la rutina."
+      ]
+    },
+    default: {
+      openings: [
+        "Hay otro matiz que puedo agregar.",
+        "Pensándolo un poco más, noto una contradicción."
+      ],
+      details: [
+        "Valoro la estabilidad, pero también me pesa sentir que ya no elijo demasiado.",
+        "Intento proteger lo que funciona y al mismo tiempo sigo postergando lo que necesito revisar."
+      ]
+    }
   },
 
   sessionProgression: {
@@ -79,7 +229,7 @@ export const claudioClinicalAvatar = defineClinicalAvatar({
       defaultStage: "initial_exploration",
       responses: {
         saludo: [
-          response("s1-greeting-1", "Hola. Está bien, podemos conversar.", { topic: "apertura", maxSession: 1 }),
+          response("s1-greeting-1", "Hola. Bien, dentro de lo que cabe. Me costó un poco decidir venir, pero estoy aquí.", { topic: "apertura", maxSession: 1 }),
           response("s1-greeting-2", "Hola. No sé muy bien por dónde partir, pero puedo intentarlo.", { topic: "apertura", maxSession: 1 })
         ],
         encuadre: [
@@ -318,6 +468,10 @@ export const claudioClinicalAvatar = defineClinicalAvatar({
   },
 
   followUpResponses: {
+    encuadre: [
+      response("follow-framing-1", "A que no suelo hablar de lo que me pasa. Como por fuera mi vida está ordenada, generalmente sigo funcionando sin explicar demasiado cómo me siento. Incluso con personas cercanas tiendo a hablar de lo práctico y dejar esto para después.", { topic: "encuadre" }),
+      response("follow-framing-2", "Me refiero a que estoy acostumbrado a resolver las cosas por mi cuenta. Poner en palabras esta sensación me resulta menos natural de lo que pensaba.", { topic: "encuadre" })
+    ],
     rutina: [
       response("follow-routine-1", "La rutina me evita muchas decisiones pequeñas. Eso es cómodo, pero también hace que los días se vuelvan intercambiables.", { topic: "rutina" }),
       response("follow-routine-2", "Me ordena y me permite cumplir. El costo es que casi nunca me pregunto si quiero hacer algo distinto.", { topic: "rutina", minOpenness: "medium" })

@@ -21,7 +21,7 @@ export function generateLocalPatientResponse({
   previousSessionSummary = null,
   memory
 }) {
-  const workingMemory = buildPatientMemory({ caseId, history, difficulty, memory });
+  const workingMemory = buildPatientMemory({ caseId, history, difficulty, sessionNumber, memory });
   const intentResult = detectIntent(studentMessage, history);
   const textDetectedIntent = intentResult.intent;
   const compositeMessageDetected = isCompositeOpenQuestionMessage(studentMessage);
@@ -119,6 +119,8 @@ export function generateLocalPatientResponse({
     intentResult.intent = clinicalResponse.resolvedIntent || intentResult.intent;
     intentResult.profileTopic = clinicalResponse.profileTopic;
     intentResult.contextualTopic = clinicalResponse.profileTopic || intentResult.contextualTopic;
+    intentResult.revealedTopics = clinicalResponse.clinical?.reveals || [];
+    intentResult.clinicalTaskKind = clinicalResponse.clinical?.taskKind || null;
     intentResult.matches = {
       ...intentResult.matches,
       [intentResult.intent]: true
@@ -170,7 +172,7 @@ export function generateLocalPatientResponse({
     : selectResponse({ caseId, intentResult, memory: workingMemory });
 
   let responseText = composeFinalResponse({ selectedResponse, memory: workingMemory });
-  if (intentResult.intent === "validacion_emocional") {
+  if (intentResult.intent === "validacion_emocional" && !clinicalResponse) {
     responseText = ensureValidationAcknowledgement(responseText, caseId);
   }
   let wasCompositeForced = false;

@@ -7,7 +7,7 @@ const difficultyShift = {
   avanzado: -10
 };
 
-export function buildPatientMemory({ caseId, history = [], difficulty = "intermedio", memory }) {
+export function buildPatientMemory({ caseId, history = [], difficulty = "intermedio", sessionNumber = 1, memory }) {
   const voice = patientVoices[caseId] || patientVoices.tomas;
   const trustLevel = history.at(-1)?.patientState?.trustLevel
     ?? memory?.trustLevel
@@ -40,10 +40,22 @@ export function buildPatientMemory({ caseId, history = [], difficulty = "interme
     || null;
   const lastSubstantiveTopic = findLastSubstantiveTopic(recentTurns) || memory?.lastSubstantiveTopic || lastTopic;
   const recentValidationCount = recentTurns.filter((turn) => turn.validation).length;
+  const revealedTopics = Array.from(new Set([
+    ...(memory?.revealedTopics || []),
+    ...history.flatMap((turn) => turn.analysis?.clinicalAvatar?.reveals || [])
+  ]));
+  const latestTaskTurn = [...history]
+    .reverse()
+    .find((turn) => turn.analysis?.clinicalAvatar?.taskKind);
+  const taskKind = latestTaskTurn?.analysis?.clinicalAvatar?.taskKind || memory?.taskStatus || null;
+  const taskAssigned = latestTaskTurn?.analysis?.clinicalAvatar?.taskKind === "concrete"
+    ? latestTaskTurn.question
+    : memory?.taskAssigned || null;
 
   return {
     ...(memory || {}),
     caseId,
+    sessionNumber,
     turnCount: history.length || memory?.turnCount || 0,
     trustLevel,
     opennessLevel: getOpennessLevel(trustLevel),
@@ -59,9 +71,15 @@ export function buildPatientMemory({ caseId, history = [], difficulty = "interme
     lastPatientMessage,
     lastStudentMessage,
     lastIntent,
+    lastStudentIntent: lastIntent,
     lastTopic,
+    currentTopic: lastTopic,
     lastSubstantiveTopic,
     exploredTopics: Array.from(exploredTopics),
+    revealedTopics,
+    emotionalOpenness: getOpennessLevel(trustLevel),
+    taskAssigned,
+    taskStatus: taskKind,
     hadValidation: Boolean(memory?.hadValidation || history.some((turn) => turn.analysis?.categories?.validation)),
     hadJudgment: Boolean(memory?.hadJudgment || history.some((turn) => turn.analysis?.categories?.judgment)),
     hadRushedAdvice: Boolean(memory?.hadRushedAdvice || history.some((turn) => turn.analysis?.categories?.rushedAdvice)),
@@ -99,6 +117,10 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
   const nextTrust = clamp(trustLevel);
   const lastTopic = intentResult?.contextualTopic || topicFromIntent(intent) || memory.lastTopic;
   const exploredTopics = Array.from(new Set([...(memory.exploredTopics || []), intent, lastTopic].filter(Boolean)));
+  const revealedTopics = Array.from(new Set([
+    ...(memory.revealedTopics || []),
+    ...(intentResult?.revealedTopics || [])
+  ]));
   const evasiveCount = isEvasivePatientResponse(responseText) ? (memory.evasiveCount || 0) + 1 : 0;
   const recentTurns = [
     ...(memory.recentTurns || []),
@@ -130,9 +152,15 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
     lastPatientMessage: responseText,
     lastStudentMessage: studentMessage,
     lastIntent: intent,
+    lastStudentIntent: intent,
     lastTopic,
+    currentTopic: lastTopic,
     lastSubstantiveTopic: isSubstantiveTopic(lastTopic) ? lastTopic : memory.lastSubstantiveTopic,
     exploredTopics,
+    revealedTopics,
+    emotionalOpenness: getOpennessLevel(nextTrust),
+    taskAssigned: intent === "tarea_concreta" ? studentMessage : memory.taskAssigned,
+    taskStatus: intentResult?.clinicalTaskKind || memory.taskStatus || null,
     hadValidation: memory.hadValidation || intent === "validacion_emocional",
     hadJudgment: memory.hadJudgment || intent === "juicio_o_critica",
     hadRushedAdvice: memory.hadRushedAdvice || intent === "consejo_apresurado",

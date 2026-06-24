@@ -55,6 +55,11 @@ export function detectClinicalTopic({ text, intent, selectedInterventionType = "
   if (/\b(que edad|cuantos anos|edad tienes)\b/.test(text)) return "edad";
   if (/\b(con quien vives|donde vives|vives solo|vives con)\b/.test(text)) return "convivencia";
   if (/\b(tienes hermanos|hermanos|hijo unico)\b/.test(text)) return "hermanos";
+  if (/\b(desde cuando|hace cuanto|cuando empezo|cuando comenz[oó]|en que momento empezo|en que momento comenzo|cuando te empezaste|cuanto tiempo llevas)\b/.test(text)) return "temporal";
+  if (/\b(confidencial|confidencialidad|quedara entre nosotros|queda entre nosotros|entre tu y yo|privado|estas de acuerdo con este encuadre)\b/.test(text)) return "confidencialidad";
+  if (/\b(en que quieres que nos enfoquemos|en que te gustaria enfocarte|que te gustaria conversar|que quisieras conversar|que te gustaria trabajar|por donde te gustaria empezar)\b/.test(text)) return "foco_sesion";
+  if (/\b(que te da miedo|cual es tu miedo|a que le tienes miedo|que es lo que temes|que te preocupa de (?:cambiar|decidir|equivocarte))\b/.test(text)) return "miedo_especifico";
+  if (/\b(necesitas validar|validar todo|tener todo validado|estar completamente seguro|necesitas certeza|buscar certeza|tener garantias)\b/.test(text)) return "certeza_control";
   if (/\b(a que te refieres|que quieres decir|cuentame mas|explicame|eso que dijiste|mencionaste que|dijiste que)\b/.test(text)) {
     if (/\b(corresponde|deber|responsable|responsabilidad)\b/.test(text)) return "deber";
     if (/\b(separacion|ex pareja|expareja)\b/.test(text)) return "separacion";
@@ -66,7 +71,7 @@ export function detectClinicalTopic({ text, intent, selectedInterventionType = "
   if (/\b(hacerte dano|hacerte algo|suicid|morir|no querer vivir|poner tu vida en peligro)\b/.test(text)) return "riesgo";
   if (/\b(separacion|separaste|ex pareja|expareja|relacion anterior)\b/.test(text)) return "separacion";
   if (/\b(cambio pequeno|paso pequeno|accion pequena|posible sostener|podrias sostener|empezar a mover)\b/.test(text)) return "recursos";
-  if (/\b(rutina|dia a dia|todos los dias|piloto automatico|automatico)\b/.test(text)) return "rutina";
+  if (/\b(rutina|dia a dia|todos los dias|dia habitual|un dia habitual|como es un dia|como son tus dias|piloto automatico|automatico)\b/.test(text)) return "rutina";
   if (/\b(decidir|decision|decisiones|posterg|equivocar|error|paraliz)\b/.test(text)) return "decisiones";
   if (/\b(valor|valores|que valoras|que valor te|importante para ti|vida que quieres|que quieres)\b/.test(text)) return "valores";
   if (/\b(recurso|recursos|que te ayuda|que te ha servido|apoyo|fortalezas|te sostiene)\b/.test(text)) return "recursos";
@@ -188,8 +193,11 @@ function detectGoodIntervention({ text, intent }) {
 }
 
 function isExplicitFollowUp(text, intent, topic) {
-  const explicitReference = /\b(a que te refieres|que quieres decir|cuentame mas|explicame|por que|eso que dijiste|mencionaste que|dijiste que)\b/.test(text);
+  const explicitReference = /\b(a que te refieres|que quieres decir|cuentame mas|explicame|eso que dijiste|mencionaste que|dijiste que)\b/.test(text);
   if (explicitReference) return true;
+
+  const briefWhy = /^(por que|porque|pq|xq)(\s+eso)?$/.test(text);
+  if (briefWhy) return true;
 
   return topic === "follow_up" && [
     "seguimiento_contextual",

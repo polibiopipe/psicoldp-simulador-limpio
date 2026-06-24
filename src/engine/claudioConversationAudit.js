@@ -16,6 +16,7 @@ export function runClaudioConversationAudit({ log = true } = {}) {
   const results = [];
 
   results.push(auditSessionOne(log));
+  results.push(auditLongSessionOne(log));
   results.push(auditSessionTwo(log));
   results.push(auditSessionThree(log));
   results.push(auditSessionFour(log));
@@ -64,6 +65,51 @@ function auditSessionOne(log) {
   assert.match(earlySeparation.text, /no sé si quiero entrar|preferiría partir/i);
 
   return section("session_1", 7);
+}
+
+function auditLongSessionOne(log) {
+  const conversation = runConversation({
+    sessionNumber: 1,
+    prompts: [
+      "Hola, ¿cómo estás?",
+      "Quiero escucharte y saber por qué estás aquí.",
+      "¿Qué te gustaría conversar?",
+      "Todo lo que se converse aquí quedará entre nosotros. ¿Estás de acuerdo?",
+      "¿A qué te refieres?",
+      "¿Necesitas validar todo lo que haces?",
+      "¿En qué quieres que nos enfoquemos?",
+      "¿Qué te da miedo?",
+      "¿Desde cuándo te sientes así?",
+      "¿Cómo es un día habitual para ti?",
+      "¿Qué pasa en tu trabajo?",
+      "Entiendo que no quieras resolverlo todo ahora.",
+      "¿Qué ocurre cuando tienes que decidir?",
+      "¿Qué cambió después de tu separación?",
+      "Gracias por compartirlo. Dejemos la sesión hasta aquí."
+    ],
+    log
+  });
+
+  assert.equal(conversation.length, 15);
+  assertUniqueResponses(conversation);
+  assert.equal(conversation[1].clinical.source, "session_motivo");
+  assert.equal(conversation[2].clinical.source, "intent_foco_sesion");
+  assert.equal(conversation[3].clinical.source, "intent_confidencialidad");
+  assert.equal(conversation[4].clinical.source, "follow_up_encuadre");
+  assert.equal(conversation[6].clinical.source, "intent_foco_sesion");
+  assert.equal(conversation[7].clinical.source, "intent_miedo_especifico");
+  assert.match(conversation[7].text, /miedo|temo|equivoc|arruin/i);
+  assert.equal(conversation[8].clinical.source, "intent_temporal");
+  assert.match(conversation[8].text, /meses|año|tiempo|desde|antes|empez/i);
+  assert.equal(conversation[13].clinical.source, "session_boundary");
+  assert.equal(conversation[14].clinical.source, "closure");
+
+  const validationLeads = conversation.filter(({ text }) => /^me ayuda\b/i.test(text)).length;
+  assert.ok(validationLeads <= 2);
+  assert.ok(conversation.slice(0, 9).every(({ text }) => !/separaci[oó]n/i.test(text)));
+  assert.equal(new Set(conversation.map(({ text }) => responseLength(text))).size, 3);
+
+  return section("session_1_long_context", 15);
 }
 
 function auditSessionTwo(log) {
@@ -135,14 +181,15 @@ function auditSessionFour(log) {
     log
   });
 
-  assert.match(conversation[0].text, /entiendo|clar|quiet|decisi|certeza/i);
+  assert.match(conversation[0].text, /entiendo|clar|quiet|decisi|certeza|representa|estabilidad/i);
   assert.match(conversation[1].text, /pequeñ|sostener|semana|paso/i);
   assert.equal(conversation[2].clinical.source, "closure");
-  assert.equal(conversation[3].clinical.source, "closure");
+  assert.ok(["closure", "contextual_fallback", "contextual_fallback_relaxed"].includes(conversation[3].clinical.source));
+  assert.equal(conversation[3].clinical.detectedTopic, "cierre");
   assert.ok(conversation.slice(2).every(({ text }) => !/ya est[aá] resuelto|todo cambi[oó]|problema resuelto/i.test(text)));
   assertUniqueResponses(conversation);
 
-  return section("session_4", 6);
+  return section("session_4", 7);
 }
 
 function auditApproaches(log) {
@@ -193,6 +240,20 @@ function auditTasksAndInterventionQuality(log) {
   assert.equal(advice.clinical.poorIntervention, "pressure");
   assert.match(advice.text, /cerrarme|decidir rápido|resuelto/i);
 
+  const validationConversation = runConversation({
+    sessionNumber: 2,
+    history: [sessionPrelude(2, 58, "La vez pasada hablamos de cuánto me cuesta decidir.")],
+    prompts: [
+      "Entiendo que no quieras apurar una solución.",
+      "¿Cómo se nota eso en tu rutina?",
+      "¿Qué ocurre cuando tienes que elegir?",
+      "Gracias por contarlo; tiene sentido que necesites tiempo."
+    ],
+    log: false
+  });
+  assert.equal(validationConversation[3].clinical.validationCooldownActive, true);
+  assert.ok(!/^me ayuda\b/i.test(validationConversation[3].text));
+
   if (log) {
     logTurn(3, "Tarea concreta", concrete);
     logTurn(3, "Tarea amplia", broad);
@@ -200,7 +261,7 @@ function auditTasksAndInterventionQuality(log) {
     logTurn(2, "Presión", advice);
   }
 
-  return section("tasks_and_quality", 8);
+  return section("tasks_and_quality", 10);
 }
 
 function runConversation({ sessionNumber, prompts, history = [], previousSessionSummary = null, log }) {
@@ -286,6 +347,13 @@ function sessionPrelude(sessionNumber, trustLevel, answer) {
 function assertUniqueResponses(conversation) {
   assert.equal(new Set(conversation.map(({ responseId }) => responseId)).size, conversation.length);
   assert.equal(new Set(conversation.map(({ text }) => text)).size, conversation.length);
+}
+
+function responseLength(text) {
+  const words = String(text).trim().split(/\s+/).length;
+  if (words <= 12) return "brief";
+  if (words <= 28) return "medium";
+  return "deep";
 }
 
 function logTurn(sessionNumber, studentMessage, result) {

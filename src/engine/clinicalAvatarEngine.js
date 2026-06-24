@@ -1,4 +1,4 @@
-import { isSemanticallyRepeated, selectLeastSimilarCandidate } from "./conversationQuality.js";
+import { normalizeComparableText, responseSimilarity } from "./conversationQuality.js";
 import { analyzeClinicalIntervention } from "./clinicalInterventionAnalysis.js";
 
 const OPENNESS_RANK = {
@@ -38,6 +38,8 @@ export function generateClinicalAvatarResponse({
     session
   });
   const effectiveOpenness = resolveAvatarOpenness(avatarProfile, memory);
+  const validationCooldownActive = analysis.goodType === "validation"
+    && hasRecentValidationLead(memory, 5);
   const selection = buildCandidateSelection({
     avatarProfile,
     session,
@@ -52,28 +54,38 @@ export function generateClinicalAvatarResponse({
   const candidates = filterAllowedCandidates(
     selection.candidates,
     sessionNumber,
-    effectiveOpenness
+    effectiveOpenness,
+    { avoidValidationLead: validationCooldownActive }
   );
+  const contextualFallbacks = buildContextualFallbackCandidates({
+    avatarProfile,
+    session,
+    topic: analysis.topic
+  });
   const selected = selectClinicalCandidate({
     candidates,
     memory,
     avatarId: avatarProfile.identity.id,
+    avatarProfile,
+    topic: analysis.topic,
+    sessionNumber,
     fallbackCandidates: filterAllowedCandidates(
-      session.responses.follow_up
-        || session.responses.motivo
-        || avatarProfile.ambiguityResponses,
+      contextualFallbacks,
       sessionNumber,
-      effectiveOpenness
+      effectiveOpenness,
+      { avoidValidationLead: validationCooldownActive }
     )
   });
 
   if (!selected) return null;
 
+  const responseSource = selected.selectionSource || selection.source;
+
   return {
     response: selected.text,
     responseId: `clinical:${avatarProfile.identity.id}:${selected.id}`,
-    responseType: `clinical_avatar:${selection.source}:${selected.topic || analysis.topic}`,
-    fallbackUsed: selection.source === "fallback",
+    responseType: `clinical_avatar:${responseSource}:${selected.topic || analysis.topic}`,
+    fallbackUsed: responseSource.startsWith("contextual_fallback") || selection.source === "fallback",
     profileTopic: selected.topic || analysis.topic,
     resolvedIntent: selection.resolvedIntent || intentResult.intent,
     clinical: {
@@ -81,12 +93,13 @@ export function generateClinicalAvatarResponse({
       sessionNumber,
       sessionTitle: session.title,
       stage,
-      source: selection.source,
+      source: responseSource,
       detectedTopic: analysis.topic,
       approach: analysis.approach,
       taskKind: analysis.taskKind,
       goodIntervention: analysis.goodType,
       poorIntervention: analysis.poorType,
+      validationCooldownActive,
       opennessLevel: effectiveOpenness,
       previousTask: previousSessionSummary?.tareaAcordada || null,
       selectedResponseId: selected.id,
@@ -160,6 +173,15 @@ function buildCandidateSelection({
     );
   }
 
+  const directIntentCandidates = avatarProfile.intentResponses?.[analysis.topic] || [];
+  if (directIntentCandidates.length) {
+    return selection(
+      directIntentCandidates,
+      `intent_${analysis.topic}`,
+      intentForClinicalTopic(analysis.topic, intentResult.intent)
+    );
+  }
+
   if (analysis.goodType) {
     const approachCandidates = analysis.approach
       ? avatarProfile.approachResponses[analysis.approach] || []
@@ -220,11 +242,25 @@ function shouldPrioritizeSessionTopic(topic, approach) {
   return ["saludo", "encuadre", "encuadre_mas_pregunta", "motivo", "separacion", "ayuda"].includes(topic);
 }
 
+function intentForClinicalTopic(topic, fallbackIntent) {
+  const map = {
+    temporal: "pregunta_temporal",
+    miedo_especifico: "exploracion_miedo",
+    foco_sesion: "preferencias_valoracion",
+    confidencialidad: "encuadre_o_consentimiento",
+    certeza_control: "exploracion_decisiones"
+  };
+  return map[topic] || fallbackIntent;
+}
+
 function prioritizeCandidatesByTopic(candidates = [], topic) {
   if (!topic || topic === "follow_up") return candidates;
   const matching = candidates.filter((candidate) => candidate.topic === topic);
   if (!matching.length) return candidates;
-  return [...matching, ...candidates.filter((candidate) => candidate.topic !== topic)];
+  return [
+    ...matching.map((candidate) => ({ ...candidate, selectionPriority: -0.35 })),
+    ...candidates.filter((candidate) => candidate.topic !== topic)
+  ];
 }
 
 function factualCandidates(profile, topic) {
@@ -262,7 +298,8 @@ function sessionCandidatesForTopic(session, topic) {
   if (direct.length) return direct;
   if (topic === "motivo" && session.responses.sintesis) return session.responses.sintesis;
   if (topic === "recursos" && session.responses.accion) return session.responses.accion;
-  return session.responses.follow_up || [];
+  if (topic === "follow_up") return session.responses.follow_up || [];
+  return [];
 }
 
 function taskResponseCandidates({ avatarProfile, taskKind, previousSessionSummary, memory }) {
@@ -300,10 +337,11 @@ function isProtectedEarlyTopic(session, topic) {
   return session.protectedThemes?.includes(protectedTopicMap[topic]);
 }
 
-function filterAllowedCandidates(candidates = [], sessionNumber, opennessLevel) {
+function filterAllowedCandidates(candidates = [], sessionNumber, opennessLevel, options = {}) {
   const currentOpenness = OPENNESS_RANK[opennessLevel] ?? 0;
   return candidates.filter((candidate) => {
     if (!candidate?.text) return false;
+    if (options.avoidValidationLead && startsWithValidationLead(candidate.text)) return false;
     const minimum = OPENNESS_RANK[candidate.minOpenness] ?? 0;
     return (
       sessionNumber >= (candidate.minSession || 1)
@@ -313,20 +351,170 @@ function filterAllowedCandidates(candidates = [], sessionNumber, opennessLevel) 
   });
 }
 
-function selectClinicalCandidate({ candidates, memory, avatarId, fallbackCandidates }) {
-  const pool = candidates.length ? candidates : fallbackCandidates;
-  if (!pool?.length) return null;
-
+function selectClinicalCandidate({ candidates, memory, avatarId, avatarProfile, topic, sessionNumber, fallbackCandidates }) {
   const previousResponses = memory?.usedResponseTexts || memory?.recentPatientMessages || [];
+  const recentResponses = memory?.recentPatientMessages || previousResponses.slice(-5);
   const usedIds = new Set(memory?.usedResponseIds || []);
-  const unused = pool.find((candidate) => {
-    const responseId = `clinical:${avatarId}:${candidate.id}`;
-    return !usedIds.has(responseId)
-      && !isSemanticallyRepeated(candidate.text, previousResponses, 0.64);
+  const primary = selectFreshCandidate(candidates, {
+    avatarId,
+    usedIds,
+    previousResponses,
+    recentResponses,
+    maximumSimilarity: 0.66
   });
-  if (unused) return unused;
+  if (primary) return primary;
 
-  return selectLeastSimilarCandidate(pool, previousResponses) || pool[0];
+  const contextual = selectFreshCandidate(fallbackCandidates, {
+    avatarId,
+    usedIds,
+    previousResponses,
+    recentResponses,
+    maximumSimilarity: 0.72
+  });
+  if (contextual) {
+    return { ...contextual, selectionSource: "contextual_fallback" };
+  }
+
+  const unused = rankCandidates(
+    dedupeCandidates([...(candidates || []), ...(fallbackCandidates || [])]),
+    { avatarId, usedIds, previousResponses, recentResponses }
+  ).find((entry) => !entry.used && !entry.exactRepeat)?.candidate;
+
+  if (unused) return { ...unused, selectionSource: "contextual_fallback_relaxed" };
+
+  return synthesizeContextualFallback({
+    avatarProfile,
+    topic,
+    sessionNumber,
+    memory,
+    previousResponses,
+    recentResponses
+  });
+}
+
+function selectFreshCandidate(candidates, context) {
+  return rankCandidates(dedupeCandidates(candidates), context)
+    .find((entry) => !entry.used && !entry.exactRepeat && entry.similarity < context.maximumSimilarity)
+    ?.candidate || null;
+}
+
+function rankCandidates(candidates, { avatarId, usedIds, previousResponses, recentResponses }) {
+  return candidates
+    .map((candidate) => {
+      const responseId = `clinical:${avatarId}:${candidate.id}`;
+      const normalized = normalizeComparableText(candidate.text);
+      const similarities = previousResponses.map((previous) => responseSimilarity(candidate.text, previous));
+      const similarity = similarities.length ? Math.max(...similarities) : 0;
+      const exactRepeat = previousResponses.some(
+        (previous) => normalizeComparableText(previous) === normalized
+      );
+      const openingPenalty = hasRepeatedOpening(candidate.text, recentResponses) ? 0.32 : 0;
+      return {
+        candidate,
+        used: usedIds.has(responseId),
+        exactRepeat,
+        similarity,
+        score: similarity + openingPenalty + (candidate.selectionPriority || 0)
+      };
+    })
+    .sort((first, second) => first.score - second.score);
+}
+
+function buildContextualFallbackCandidates({ avatarProfile, session, topic }) {
+  const contextual = avatarProfile.contextualFallbacks || {};
+  const directIntentCandidates = avatarProfile.intentResponses?.[topic] || [];
+  if (directIntentCandidates.length) {
+    return dedupeCandidates([
+      ...(contextual[topic] || []),
+      ...directIntentCandidates,
+      ...sessionCandidatesForTopic(session, topic)
+    ]);
+  }
+
+  return dedupeCandidates([
+    ...(contextual[topic] || []),
+    ...sessionCandidatesForTopic(session, topic),
+    ...(avatarProfile.followUpResponses?.[topic] || []),
+    ...(contextual.follow_up || []),
+    ...(session.responses.follow_up || []),
+    ...(contextual.default || [])
+  ]);
+}
+
+function dedupeCandidates(candidates = []) {
+  const seen = new Set();
+  return candidates.filter((candidate) => {
+    if (!candidate?.id || seen.has(candidate.id)) return false;
+    seen.add(candidate.id);
+    return true;
+  });
+}
+
+function hasRecentValidationLead(memory, cooldownTurns) {
+  return (memory?.recentPatientMessages || [])
+    .slice(-cooldownTurns)
+    .some(startsWithValidationLead);
+}
+
+function startsWithValidationLead(text = "") {
+  return /^(me ayuda|gracias|eso me ayuda|agradezco|si,? eso ayuda)/.test(normalizeComparableText(text));
+}
+
+function hasRepeatedOpening(candidateText, recentResponses) {
+  const candidateOpening = openingFamily(candidateText);
+  if (!candidateOpening) return false;
+  return recentResponses.some((response) => openingFamily(response) === candidateOpening);
+}
+
+function openingFamily(text = "") {
+  const normalized = normalizeComparableText(text);
+  const patterned = [
+    ["me_ayuda", /^(me ayuda|eso me ayuda)/],
+    ["creo_relacion", /^creo que (se relaciona|tiene que ver)/],
+    ["no_se_si", /^no se si/],
+    ["puede_ser", /^puede ser/],
+    ["gracias", /^gracias/]
+  ].find(([, pattern]) => pattern.test(normalized));
+  if (patterned) return patterned[0];
+  return normalized.split(" ").slice(0, 3).join(" ");
+}
+
+function synthesizeContextualFallback({
+  avatarProfile,
+  topic,
+  sessionNumber,
+  memory,
+  previousResponses,
+  recentResponses
+}) {
+  const synthesis = avatarProfile.fallbackSynthesis?.[topic]
+    || avatarProfile.fallbackSynthesis?.default;
+  if (!synthesis?.openings?.length || !synthesis?.details?.length) return null;
+
+  const combinations = synthesis.openings.flatMap((opening, openingIndex) =>
+    synthesis.details.map((detail, detailIndex) => ({
+      id: `synthesis-${topic}-${sessionNumber}-${openingIndex}-${detailIndex}-${memory?.turnCount || 0}`,
+      text: `${opening} ${detail}`,
+      topic,
+      openingIndex,
+      detailIndex
+    }))
+  );
+  const ranked = combinations
+    .map((candidate) => {
+      const similarities = previousResponses.map((previous) => responseSimilarity(candidate.text, previous));
+      const similarity = similarities.length ? Math.max(...similarities) : 0;
+      const openingPenalty = hasRepeatedOpening(candidate.text, recentResponses) ? 0.32 : 0;
+      return { candidate, score: similarity + openingPenalty, similarity };
+    })
+    .sort((first, second) => first.score - second.score);
+  const selected = ranked.find(({ candidate }) =>
+    !previousResponses.some(
+      (previous) => normalizeComparableText(previous) === normalizeComparableText(candidate.text)
+    )
+  )?.candidate;
+
+  return selected ? { ...selected, selectionSource: "contextual_synthesis" } : null;
 }
 
 function inferLastClinicalTopic(memory, conversationHistory) {
@@ -336,6 +524,7 @@ function inferLastClinicalTopic(memory, conversationHistory) {
   const lastMessage = String(memory?.lastPatientMessage || conversationHistory.at(-1)?.answer || "").toLowerCase();
   const combined = `${lastResponseId} ${lastMessage}`;
   const topics = [
+    ["encuadre", /acostumbr|hablar de lo que|espacio cuidado|confidencial/],
     ["separacion", /separaci|expareja/],
     ["rutina", /routine|rutina|automatico|automático/],
     ["decisiones", /decision|decidir|posterg|equivoc/],
