@@ -173,7 +173,8 @@ export default function App() {
       question,
       history,
       sessionNumber,
-      selectedInterventionType
+      selectedInterventionType,
+      previousSessionSummary: sessionSummary
     });
 
     setHistory((current) => [

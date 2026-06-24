@@ -73,7 +73,7 @@ export const sessionTwoOpenings = {
   patricia: "La vez pasada hablamos de mi hija y de cómo terminamos peleando. Me quedé pensando en que detrás de mi enojo hay miedo.",
   miguel: "La vez pasada hablamos de migrar y de empezar de cero. Me quedé pensando en lo mucho que extraño algunas partes de mi vida anterior.",
   sofia: "La vez pasada hablamos de las redes y de cómo me comparo. Me dio vergüenza, pero también me hizo sentido.",
-  claudio: "La vez pasada hablamos de la rutina y de sentirme estancado. Me quedé pensando en eso de estar en piloto automático."
+  claudio: "La vez pasada hablamos de la rutina y de sentirme estancado. Me quedé pensando en cuánto de mi vida he organizado desde lo que corresponde."
 };
 
 export const sessionThreeOpenings = {
@@ -91,7 +91,7 @@ export const sessionThreeOpenings = {
   patricia: "Me quedé pensando en la relación con mi hija. Creo que a veces parto desde el miedo y termino controlando más.",
   miguel: "Me quedé pensando en lo de empezar de cero. Creo que mi contexto acá y lo que dejé allá se mezclan más de lo que digo.",
   sofia: "Me quedé pensando en lo de las redes. Creo que no es solo mirar el celular, es cómo quedo después.",
-  claudio: "Me quedé pensando en mi rutina. Creo que hay patrones que me ordenan, pero también me dejan quieto."
+  claudio: "Me quedé pensando en mi rutina. Creo que hay patrones que me ordenan, pero también me dejan quieto. Quisiera pensar en algo pequeño que sí pueda mover."
 };
 
 export const sessionFourOpenings = {
@@ -109,7 +109,7 @@ export const sessionFourOpenings = {
   patricia: "Creo que estas conversaciones me han servido para mirar el miedo que aparece detrás de las peleas con mi hija.",
   miguel: "Creo que estas conversaciones me han servido para poner en palabras lo de migrar y empezar de nuevo.",
   sofia: "Creo que estas conversaciones me han servido para mirar las redes sin hacer como que no me importan.",
-  claudio: "Creo que estas conversaciones me han servido para ordenar esta sensación de estar detenido, aunque por fuera todo funcione."
+  claudio: "Creo que estas conversaciones me han servido para ordenar esta sensación de estar detenido. No lo tengo resuelto, pero entiendo mejor por qué me he quedado tan quieto."
 };
 
 export function getNextSessionAgreement(caseId) {

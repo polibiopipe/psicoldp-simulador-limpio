@@ -7,6 +7,8 @@ import { selectCaseProfileResponse } from "./caseProfileResponse.js";
 import { selectResponse } from "./responseSelector.js";
 import { composeFinalResponse } from "./responseComposer.js";
 import { applyActivePatientInteraction } from "./activePatientInteraction.js";
+import { getClinicalAvatar } from "../data/clinicalAvatars/index.js";
+import { generateClinicalAvatarResponse } from "./clinicalAvatarEngine.js";
 
 export function generateLocalPatientResponse({
   caseId,
@@ -16,6 +18,7 @@ export function generateLocalPatientResponse({
   sessionNumber = 1,
   selectedInterventionType = "",
   conversationStage,
+  previousSessionSummary = null,
   memory
 }) {
   const workingMemory = buildPatientMemory({ caseId, history, difficulty, memory });
@@ -97,7 +100,36 @@ export function generateLocalPatientResponse({
     };
   }
 
-  const profileResponse = selectCaseProfileResponse({
+  const clinicalAvatar = getClinicalAvatar(caseId);
+  const clinicalResponse = clinicalAvatar
+    ? generateClinicalAvatarResponse({
+        avatarProfile: clinicalAvatar,
+        studentMessage,
+        intentResult,
+        selectedInterventionType,
+        sessionNumber,
+        conversationHistory: history,
+        memory: workingMemory,
+        conversationStage: guidedResult?.stage || conversationStage,
+        previousSessionSummary
+      })
+    : null;
+
+  if (clinicalResponse) {
+    intentResult.intent = clinicalResponse.resolvedIntent || intentResult.intent;
+    intentResult.profileTopic = clinicalResponse.profileTopic;
+    intentResult.contextualTopic = clinicalResponse.profileTopic || intentResult.contextualTopic;
+    intentResult.matches = {
+      ...intentResult.matches,
+      [intentResult.intent]: true
+    };
+    intentResult.categories = {
+      ...intentResult.categories,
+      ...categoriesForClinicalResponse(intentResult.intent)
+    };
+  }
+
+  const profileResponse = clinicalResponse ? null : selectCaseProfileResponse({
     caseId,
     studentMessage,
     intentResult,
@@ -114,7 +146,14 @@ export function generateLocalPatientResponse({
     };
   }
 
-  const selectedResponse = profileResponse
+  const selectedResponse = clinicalResponse
+    ? {
+        response: clinicalResponse.response,
+        responseId: clinicalResponse.responseId,
+        responseType: clinicalResponse.responseType,
+        fallbackUsed: clinicalResponse.fallbackUsed
+      }
+    : profileResponse
     ? {
         response: profileResponse.response,
         responseId: profileResponse.responseId,
@@ -145,14 +184,16 @@ export function generateLocalPatientResponse({
     wasCompositeForced = true;
   }
 
-  const activeInteractionResult = applyActivePatientInteraction({
-    caseId,
-    responseText,
-    studentMessage,
-    intentResult,
-    memory: workingMemory,
-    selectedResponse
-  });
+  const activeInteractionResult = clinicalResponse
+    ? { responseText, activeInteraction: null }
+    : applyActivePatientInteraction({
+        caseId,
+        responseText,
+        studentMessage,
+        intentResult,
+        memory: workingMemory,
+        selectedResponse
+      });
   responseText = activeInteractionResult.responseText;
 
   const memoryUpdate = updatePatientMemory({
@@ -170,8 +211,11 @@ export function generateLocalPatientResponse({
     selectedCaseId: caseId,
     detectedIntent: intentResult.intent,
     detectedQuestionType: intentResult.profileTopic || intentResult.contextualTopic || intentResult.intent,
-    resolvedIntent: debugResolvedIntent(intentResult.intent, profileResponse?.profileTopic),
-    detectedTopic: profileResponse?.profileTopic || intentResult.contextualTopic || null,
+    resolvedIntent: debugResolvedIntent(
+      intentResult.intent,
+      clinicalResponse?.profileTopic || profileResponse?.profileTopic
+    ),
+    detectedTopic: clinicalResponse?.profileTopic || profileResponse?.profileTopic || intentResult.contextualTopic || null,
     caseId,
     responseType: selectedResponse.responseType,
     selectedResponseType: selectedResponse.responseType,
@@ -189,7 +233,9 @@ export function generateLocalPatientResponse({
     ambiguityDetected: intentResult.ambiguityDetected,
     closureDetected: intentResult.intent === "cierre",
     explicitReferenceDetected: intentResult.explicitReferenceDetected,
-    profileTopic: profileResponse?.profileTopic || null,
+    profileTopic: clinicalResponse?.profileTopic || profileResponse?.profileTopic || null,
+    clinicalAvatarUsed: Boolean(clinicalResponse),
+    clinicalAvatar: clinicalResponse?.clinical || null,
     profileResponseUsed: Boolean(profileResponse),
     usedCaseFacts: Boolean(profileResponse),
     usedResponseIds: workingMemory.usedResponseIds,
@@ -272,7 +318,8 @@ function ensureValidationAcknowledgement(responseText, caseId) {
     valentina: "Gracias. Me ayuda que lo digas así.",
     marcos: "Sí, tiene sentido que lo plantees así.",
     camila: "Gracias. Me ayuda que lo mires así.",
-    daniela: "Gracias. Me alivia poder decirlo así."
+    daniela: "Gracias. Me alivia poder decirlo así.",
+    claudio: "Gracias. Me ayuda que lo plantees así."
   };
   return `${acknowledgements[caseId] || "Gracias. Me ayuda que lo digas así."} ${responseText}`;
 }
@@ -328,5 +375,23 @@ function categoriesForGuidedIntent(intent) {
     preferencesExploration: intent === "preferencias_valoracion",
     concernExploration: intent === "preocupacion_principal" || intent === "motivo_de_consulta" || intent === "derivacion_llegada" || intent === "derivacion_llegada_consulta",
     supportExploration: intent === "amistades_red_social"
+  };
+}
+
+function categoriesForClinicalResponse(intent) {
+  const base = categoriesForGuidedIntent(intent);
+  const taskIntent = ["tarea_concreta", "tarea_amplia", "tarea_prematura", "seguimiento_tarea"].includes(intent);
+
+  return {
+    ...base,
+    validation: intent === "validacion_emocional" || base.validation,
+    judgment: intent === "juicio_o_critica",
+    rushedAdvice: ["consejo_apresurado", "presion_directiva"].includes(intent),
+    emotionalExploration: ["exploracion_emocional", "seguimiento_emocional_contextual"].includes(intent) || base.emotionalExploration,
+    closure: intent === "cierre" || base.closure,
+    goodClosure: intent === "cierre" || base.goodClosure,
+    continuityAgreement: intent === "cierre" || base.continuityAgreement,
+    followUp: ["seguimiento_contextual", "seguimiento_contextual_explicito", "seguimiento_tarea"].includes(intent) || base.followUp,
+    taskProposal: taskIntent
   };
 }

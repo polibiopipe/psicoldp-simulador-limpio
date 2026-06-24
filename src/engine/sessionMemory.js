@@ -20,6 +20,7 @@ export function buildSessionSummary({ caseItem, history, report, sessionNumber =
     fortalezasEstudiante: report.strengths.slice(0, 4),
     aspectosPorMejorar: report.improvements.slice(0, 4),
     resumenConversacion: summarizeConversation(meaningfulHistory, caseItem.name),
+    tareaAcordada: deriveAssignedTask(meaningfulHistory),
     acuerdoContinuidad: agreement,
     ethicalNotice:
       "Registro ficticio y educativo. No corresponde a atención psicológica real, tratamiento ni diagnóstico."
@@ -199,4 +200,13 @@ function summarizeConversation(history, patientName) {
   const first = history[0];
   const last = history.at(-1);
   return `Se realizaron ${history.length} intervención(es). La entrevista comenzó con “${first.question}” y cerró con “${last.question}”. ${patientName} respondió con una apertura final registrada como ${last.patientState?.opennessLevel || "no observada"}.`;
+}
+
+function deriveAssignedTask(history) {
+  const taskCue = /\b(tarea|te propongo|podr[ií]as (?:intentar|anotar|registrar)|anota|registra|para la pr[oó]xima|esta semana|te parece si)\b/i;
+  const taskEntry = [...history]
+    .reverse()
+    .find((entry) => taskCue.test(String(entry.question || "")));
+
+  return taskEntry?.question?.trim() || "";
 }

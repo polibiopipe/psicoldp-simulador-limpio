@@ -774,7 +774,7 @@ export const caseProfiles = {
     follow: "Creo que lo que me cuesta decir es que las redes me importan más de lo que aparento.",
     phrases: ["Sé que suena superficial.", "Me comparo más de lo que digo.", "Quedo pendiente de si reaccionan."]
   })),
-  claudio: createProfileFromSeed("claudio", seedAdvanced("Claudio", 40, "avanzado", "Estancamiento vital", "/avatar/claudio.png", {
+  claudio: createProfileFromSeed("claudio", seedAdvanced("Claudio", 40, "intermedio", "Estancamiento vital", "/avatar/claudio.png", {
     desc: "Adulto racional y contenido, con rutina estable pero sensación de estancamiento.",
     reason: "Siente estancamiento vital, rutina rígida y dificultad para tomar decisiones.",
     core: "Teme mirar atrás y sentir que no cambió nada por miedo.",

@@ -91,6 +91,9 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
   if (intent === "exploracion_emocional" || intent === "exploracion_contextual" || intent === "contexto_familiar_social") trustLevel += 5;
   if (intent === "juicio_o_critica") trustLevel -= 16;
   if (intent === "consejo_apresurado") trustLevel -= 10;
+  if (intent === "tarea_concreta" || intent === "seguimiento_tarea") trustLevel += 3;
+  if (intent === "tarea_amplia") trustLevel -= 3;
+  if (intent === "tarea_prematura") trustLevel -= 5;
   if (intent === "cierre") trustLevel += 2;
 
   const nextTrust = clamp(trustLevel);
@@ -262,6 +265,8 @@ function topicFromIntent(intent) {
   if (intent === "seguimiento_contextual_breve") return "seguimiento";
   if (intent === "seguimiento_emocional_contextual") return "seguimiento_emocional";
   if (intent === "validacion_emocional") return "validacion";
+  if (intent === "tarea_concreta" || intent === "tarea_amplia" || intent === "tarea_prematura") return "tarea";
+  if (intent === "seguimiento_tarea") return "seguimiento_tarea";
   if (intent === "contexto_familiar_social") return "contexto";
   if (intent === "cierre") return "cierre";
   if (intent === "exploracion_emocional") return "emocion";

@@ -6,7 +6,8 @@ export function createPatientResponse({
   question,
   history,
   sessionNumber = 1,
-  selectedInterventionType = ""
+  selectedInterventionType = "",
+  previousSessionSummary = null
 }) {
   const result = generateLocalPatientResponse({
     caseId: caseItem.id,
@@ -14,7 +15,8 @@ export function createPatientResponse({
     history,
     difficulty,
     sessionNumber,
-    selectedInterventionType
+    selectedInterventionType,
+    previousSessionSummary
   });
 
   return {
@@ -34,7 +36,8 @@ export function createPatientResponse({
       categoryList: Object.entries(result.intentResult.categories)
         .filter(([, value]) => value)
         .map(([key]) => key),
-      guidedIntervention: result.debug.guided
+      guidedIntervention: result.debug.guided,
+      clinicalAvatar: result.debug.clinicalAvatar
     },
     patientState: {
       trustLevel: result.memoryUpdate.trustLevel,
@@ -43,6 +46,7 @@ export function createPatientResponse({
       repeatedQuestion: false
     },
     responseCategory: result.intent,
-    guidedIntervention: result.debug.guided
+    guidedIntervention: result.debug.guided,
+    clinicalAvatar: result.debug.clinicalAvatar
   };
 }
