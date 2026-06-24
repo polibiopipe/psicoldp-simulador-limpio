@@ -186,10 +186,12 @@ Para habilitar una cuenta, abre `public.user_profiles` en Supabase Table Editor 
 cambia `approved` a `true`. `approved_at` se completa automaticamente. Los usuarios
 existentes quedan pendientes al ejecutar la migracion y deben aprobarse manualmente.
 
-### Aviso por correo de nuevas solicitudes
+### Aprobacion segura desde el correo
 
-El aviso se envia desde una Netlify Function; ninguna clave privada se expone en el
-navegador y la aprobacion sigue siendo manual desde Supabase.
+La solicitud se envia desde una Netlify Function y contiene un enlace de aprobacion
+de un solo uso. El token plano existe solamente en memoria durante el envio; Supabase
+guarda su hash SHA-256. La `service_role` se usa exclusivamente en las Functions y
+nunca se expone al navegador ni al frontend de Vite.
 
 1. Ejecuta `supabase/access_request_notifications.sql` en Supabase SQL Editor.
 2. En Netlify configura estas variables de entorno solo para Functions:
@@ -197,18 +199,29 @@ navegador y la aprobacion sigue siendo manual desde Supabase.
    - `RESEND_API_KEY`: clave del proveedor de correo Resend.
    - `ACCESS_REQUEST_FROM_EMAIL`: remitente de un dominio verificado en Resend.
    - `ACCESS_REQUEST_TO_EMAIL`: `contacto@nucleovivo.net`.
-   - `SUPABASE_USER_PROFILES_URL`: enlace HTTPS al Table Editor de `user_profiles`.
+   - `SUPABASE_URL`: URL del proyecto Supabase.
+   - `SUPABASE_SERVICE_ROLE_KEY`: clave secreta disponible solo para Functions.
 3. Despliega el sitio desde Git para publicar
-   `netlify/functions/new-access-request.mjs`.
+   `netlify/functions/new-access-request.mjs` y
+   `netlify/functions/approve-access.mjs`.
 4. En **Supabase > Database > Webhooks**, crea un webhook para el evento `INSERT`
    de `public.access_approval_notifications` con:
    - URL: `https://TU-SITIO.netlify.app/.netlify/functions/new-access-request`.
    - Header: `x-escucha-viva-webhook-secret` con el mismo secreto de Netlify.
 
 La cola se crea solamente cuando el correo pasa a confirmado. Su restriccion unica
-por `user_id` evita generar mas de una solicitud por cuenta. El correo incluye un
-enlace al Table Editor si `SUPABASE_USER_PROFILES_URL` esta configurado, pero no
-aprueba al usuario por si solo.
+por `user_id` evita generar mas de una solicitud por cuenta. El correo incluye el
+boton **Aprobar acceso**, que abre una pagina de confirmacion responsive. El enlace
+expira en 7 dias y solo puede utilizarse una vez.
+
+Al confirmar, la funcion SQL `approve_access_with_token_hash` actualiza en una sola
+transaccion `public.user_profiles` y `public.access_approval_notifications`. Un token
+vencido, reutilizado o invalido no modifica la cuenta. La aprobacion manual desde el
+Table Editor sigue disponible como respaldo.
+
+Importante: `SUPABASE_SERVICE_ROLE_KEY` debe configurarse en Netlify como variable
+secreta. No debe agregarse a `.env`, no debe usar el prefijo `VITE_` y nunca debe
+subirse a GitHub.
 
 Para avisar sobre usuarios confirmados antes de instalar esta migracion, configura
 primero el webhook y luego ejecuta una insercion manual en
