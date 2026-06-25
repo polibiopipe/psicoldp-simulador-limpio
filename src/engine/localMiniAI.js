@@ -121,6 +121,8 @@ export function generateLocalPatientResponse({
     intentResult.contextualTopic = clinicalResponse.profileTopic || intentResult.contextualTopic;
     intentResult.revealedTopics = clinicalResponse.clinical?.reveals || [];
     intentResult.clinicalTaskKind = clinicalResponse.clinical?.taskKind || null;
+    intentResult.clinicalTaskDetails = clinicalResponse.clinical?.taskDetails || null;
+    intentResult.practicalAct = clinicalResponse.clinical?.practicalAct || null;
     intentResult.matches = {
       ...intentResult.matches,
       [intentResult.intent]: true

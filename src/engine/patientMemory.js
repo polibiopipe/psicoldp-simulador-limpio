@@ -46,11 +46,15 @@ export function buildPatientMemory({ caseId, history = [], difficulty = "interme
   ]));
   const latestTaskTurn = [...history]
     .reverse()
-    .find((turn) => turn.analysis?.clinicalAvatar?.taskKind);
-  const taskKind = latestTaskTurn?.analysis?.clinicalAvatar?.taskKind || memory?.taskStatus || null;
-  const taskAssigned = latestTaskTurn?.analysis?.clinicalAvatar?.taskKind === "concrete"
-    ? latestTaskTurn.question
-    : memory?.taskAssigned || null;
+    .find((turn) =>
+      turn.analysis?.clinicalAvatar?.taskKind
+      || turn.analysis?.clinicalAvatar?.practicalAct === "task_confirmation"
+    );
+  const latestTask = latestTaskTurn?.analysis?.clinicalAvatar || null;
+  const taskKind = latestTask?.taskKind || memory?.taskStatus || null;
+  const taskDetails = latestTask?.taskDetails || null;
+  const acceptedTask = latestTask?.taskKind === "concrete"
+    || latestTask?.practicalAct === "task_confirmation";
 
   return {
     ...(memory || {}),
@@ -78,8 +82,12 @@ export function buildPatientMemory({ caseId, history = [], difficulty = "interme
     exploredTopics: Array.from(exploredTopics),
     revealedTopics,
     emotionalOpenness: getOpennessLevel(trustLevel),
-    taskAssigned,
-    taskStatus: taskKind,
+    taskAssigned: acceptedTask ? true : Boolean(memory?.taskAssigned),
+    taskType: taskDetails?.type || memory?.taskType || null,
+    taskDescription: taskDetails?.description || memory?.taskDescription || null,
+    taskProposedText: taskDetails?.proposedText || memory?.taskProposedText || null,
+    taskAccepted: acceptedTask ? true : Boolean(memory?.taskAccepted),
+    taskStatus: acceptedTask ? "accepted" : taskKind,
     hadValidation: Boolean(memory?.hadValidation || history.some((turn) => turn.analysis?.categories?.validation)),
     hadJudgment: Boolean(memory?.hadJudgment || history.some((turn) => turn.analysis?.categories?.judgment)),
     hadRushedAdvice: Boolean(memory?.hadRushedAdvice || history.some((turn) => turn.analysis?.categories?.rushedAdvice)),
@@ -121,6 +129,8 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
     ...(memory.revealedTopics || []),
     ...(intentResult?.revealedTopics || [])
   ]));
+  const taskDetails = intentResult?.clinicalTaskDetails || null;
+  const taskWasAccepted = intent === "tarea_concreta" || intent === "confirmacion_tarea";
   const evasiveCount = isEvasivePatientResponse(responseText) ? (memory.evasiveCount || 0) + 1 : 0;
   const recentTurns = [
     ...(memory.recentTurns || []),
@@ -159,8 +169,13 @@ export function updatePatientMemory({ memory, intent, intentResult, responseId, 
     exploredTopics,
     revealedTopics,
     emotionalOpenness: getOpennessLevel(nextTrust),
-    taskAssigned: intent === "tarea_concreta" ? studentMessage : memory.taskAssigned,
-    taskStatus: intentResult?.clinicalTaskKind || memory.taskStatus || null,
+    taskAssigned: taskWasAccepted ? true : Boolean(memory.taskAssigned),
+    taskType: taskDetails?.type || memory.taskType || null,
+    taskDescription: taskDetails?.description || memory.taskDescription || null,
+    taskProposedText: taskDetails?.proposedText || memory.taskProposedText || null,
+    taskAccepted: taskWasAccepted ? true : Boolean(memory.taskAccepted),
+    taskStatus: taskWasAccepted ? "accepted" : intentResult?.clinicalTaskKind || memory.taskStatus || null,
+    nextSessionAgreement: intent === "agenda_continuidad" ? studentMessage : memory.nextSessionAgreement || null,
     hadValidation: memory.hadValidation || intent === "validacion_emocional",
     hadJudgment: memory.hadJudgment || intent === "juicio_o_critica",
     hadRushedAdvice: memory.hadRushedAdvice || intent === "consejo_apresurado",

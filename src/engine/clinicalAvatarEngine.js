@@ -30,7 +30,8 @@ export function generateClinicalAvatarResponse({
     intentResult,
     selectedInterventionType,
     sessionNumber,
-    previousSessionSummary
+    previousSessionSummary,
+    memory
   });
   const stage = resolveClinicalStage({
     analysis,
@@ -97,6 +98,8 @@ export function generateClinicalAvatarResponse({
       detectedTopic: analysis.topic,
       approach: analysis.approach,
       taskKind: analysis.taskKind,
+      practicalAct: analysis.practicalAct,
+      taskDetails: analysis.taskDetails,
       goodIntervention: analysis.goodType,
       poorIntervention: analysis.poorType,
       validationCooldownActive,
@@ -248,7 +251,11 @@ function intentForClinicalTopic(topic, fallbackIntent) {
     miedo_especifico: "exploracion_miedo",
     foco_sesion: "preferencias_valoracion",
     confidencialidad: "encuadre_o_consentimiento",
-    certeza_control: "exploracion_decisiones"
+    certeza_control: "exploracion_decisiones",
+    confirmacion_tarea: "confirmacion_tarea",
+    agenda_continuidad: "agenda_continuidad",
+    causal_gatillante: "exploracion_causal",
+    dificultad_profundizar: "exploracion_emocional"
   };
   return map[topic] || fallbackIntent;
 }
@@ -303,18 +310,22 @@ function sessionCandidatesForTopic(session, topic) {
 }
 
 function taskResponseCandidates({ avatarProfile, taskKind, previousSessionSummary, memory }) {
+  const specialized = avatarProfile.taskResponses.byType?.[previousSessionSummary?.taskType] || null;
+  if (taskKind === "helpful") {
+    return specialized?.helpful || avatarProfile.taskResponses.helpful || [];
+  }
   if (taskKind !== "followUp") return avatarProfile.taskResponses[taskKind] || [];
   if (!previousSessionSummary?.tareaAcordada) return avatarProfile.taskResponses.noPreviousTask || [];
 
   const priorTaskResponses = memory?.usedResponseIds || [];
-  const partialWasUsed = priorTaskResponses.some((id) => id.includes("task-partial"));
-  if (partialWasUsed) return avatarProfile.taskResponses.helpful || [];
+  const partialWasUsed = priorTaskResponses.some((id) => id.includes("partial"));
+  if (partialWasUsed) return specialized?.helpful || avatarProfile.taskResponses.helpful || [];
 
   const taskText = String(previousSessionSummary.tareaAcordada).toLowerCase();
   const wasBroad = /cambiar toda|renuncia|decide|resuelve|todos los dias/.test(taskText);
   return wasBroad
-    ? avatarProfile.taskResponses.notDone || []
-    : avatarProfile.taskResponses.partial || [];
+    ? specialized?.notDone || avatarProfile.taskResponses.notDone || []
+    : specialized?.partial || avatarProfile.taskResponses.partial || [];
 }
 
 function taskIntent(taskKind) {

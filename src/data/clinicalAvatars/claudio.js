@@ -94,6 +94,30 @@ export const claudioClinicalAvatar = defineClinicalAvatar({
     certeza_control: [
       response("certainty-1", "Sí, puede ser. Me cuesta actuar si no tengo cierta seguridad. Y como casi nunca estoy completamente seguro, termino postergando.", { topic: "certeza_control" }),
       response("certainty-2", "Suelo revisar mucho si una decisión es razonable antes de hacerla. El problema es que esa revisión no termina de darme la certeza que busco.", { topic: "certeza_control" })
+    ],
+    confirmacion_tarea: [
+      response("task-confirm-1", "Sí, me parece bien. Lo puedo intentar de una manera sencilla.", { topic: "confirmacion_tarea" }),
+      response("task-confirm-2", "Sí, estoy de acuerdo. Creo que puede servirme para ordenar lo que me pasa.", { topic: "confirmacion_tarea" }),
+      response("task-confirm-3", "Me parece razonable. Me acomoda que no sea algo demasiado grande.", { topic: "confirmacion_tarea" }),
+      response("task-confirm-4", "Sí, aunque probablemente me cueste ser constante. Pero puedo intentarlo.", { topic: "confirmacion_tarea" })
+    ],
+    agenda_continuidad: [
+      response("schedule-1", "Sí, me parece bien. Puedo venir ese día a las 17 horas.", { topic: "agenda_continuidad" }),
+      response("schedule-2", "Sí, esa hora me acomoda.", { topic: "agenda_continuidad" }),
+      response("schedule-3", "Podría ser. Me hace sentido continuar, porque siento que recién estoy empezando a ordenar esto.", { topic: "agenda_continuidad" }),
+      response("schedule-4", "Sí, creo que sería bueno seguir conversándolo. Puedo organizarme para venir.", { topic: "agenda_continuidad" })
+    ],
+    causal_gatillante: [
+      response("cause-1", "No hubo una sola situación. Creo que fue más bien una acumulación; empecé a notar que todos mis días se parecían demasiado.", { topic: "causal_gatillante" }),
+      response("cause-2", "Creo que se hizo más evidente después de mi separación. Seguí funcionando, pero algo quedó más apagado.", { topic: "causal_gatillante", minOpenness: "medium" }),
+      response("cause-3", "Me di cuenta cuando empecé a postergar decisiones pequeñas, incluso cosas que antes resolvía con más facilidad.", { topic: "causal_gatillante" }),
+      response("cause-4", "Decidí venir porque la sensación dejó de ser solo cansancio. Empecé a notar que estaba perdiendo interés en cosas que antes me daban cierta dirección.", { topic: "causal_gatillante", minOpenness: "medium" })
+    ],
+    dificultad_profundizar: [
+      response("depth-1", "Vergüenza quizás no, pero sí me cuesta. No estoy acostumbrado a hablar de mí de esta manera.", { topic: "dificultad_profundizar" }),
+      response("depth-2", "Me cuesta porque no tengo una explicación clara. Cuando no puedo explicarlo bien, tiendo a callarme.", { topic: "dificultad_profundizar" }),
+      response("depth-3", "Puede ser que haya algo de pudor. Me incomoda sentir que debería estar bien y no lo estoy del todo.", { topic: "dificultad_profundizar", minOpenness: "medium" }),
+      response("depth-4", "No sé si es falta de atrevimiento. Creo que necesito ordenar lo que siento antes de decirlo.", { topic: "dificultad_profundizar" })
     ]
   },
 
@@ -402,8 +426,10 @@ export const claudioClinicalAvatar = defineClinicalAvatar({
 
   taskResponses: {
     concrete: [
-      response("task-concrete-1", "Sí, eso me parece posible. Me acomoda que sea algo específico. Podría anotarlo al final del día.", { topic: "tarea", minSession: 2 }),
-      response("task-concrete-2", "Si queda acotado a observar una situación concreta, creo que podría intentarlo sin convertirlo en otro proyecto.", { topic: "tarea", minSession: 2 })
+      response("task-concrete-1", "Sí, eso me parece posible. Me acomoda que sea algo específico. Podría anotarlo al final del día.", { topic: "tarea" }),
+      response("task-concrete-2", "Si queda acotado a observar una situación concreta, creo que podría intentarlo sin convertirlo en otro proyecto.", { topic: "tarea" }),
+      response("task-concrete-3", "Puedo intentarlo. Quizás no me resulte todos los días, pero sí podría partir con algo breve.", { topic: "tarea" }),
+      response("task-concrete-4", "Me cuesta escribir sobre lo que siento, pero si lo dejo simple creo que puedo hacerlo. Preferiría anotar dos o tres ideas por día.", { topic: "tarea" })
     ],
     tooBroad: [
       response("task-broad-1", "Eso me suena un poco grande. Justamente cuando lo pienso así, me paralizo.", { topic: "tarea" }),
@@ -425,7 +451,22 @@ export const claudioClinicalAvatar = defineClinicalAvatar({
       response("task-helpful-1", "Me ayudó a notar que la sensación de bloqueo aparece más cuando tengo que decidir algo que podría cambiar mi rutina.", { topic: "aprendizaje_tarea", minSession: 2 }),
       response("task-helpful-2", "Sirvió para ver que la duda no aparece igual en todo. Se vuelve más fuerte cuando siento que la decisión puede ser definitiva.", { topic: "aprendizaje_tarea", minSession: 2 })
     ],
-    noPreviousTask: [response("task-none", "No recuerdo que hubiéramos dejado una tarea concreta. Sí me quedé pensando en lo que conversamos.", { topic: "seguimiento_tarea", minSession: 2 })]
+    noPreviousTask: [response("task-none", "No recuerdo que hubiéramos dejado una tarea concreta. Sí me quedé pensando en lo que conversamos.", { topic: "seguimiento_tarea", minSession: 2 })],
+    byType: {
+      registro_diario_situaciones_emociones: {
+        partial: [
+          response("task-daily-partial-1", "La hice dos días. No fui constante, pero me sirvió notar que el malestar aparece más en la noche.", { topic: "seguimiento_tarea", minSession: 2 }),
+          response("task-daily-partial-2", "La empecé, pero después la dejé. Me di cuenta de que me cuesta detenerme a mirar lo que siento.", { topic: "seguimiento_tarea", minSession: 2 })
+        ],
+        notDone: [
+          response("task-daily-not-done", "No alcancé a hacer el registro. Lo fui postergando cada noche, y creo que eso también muestra lo fácil que vuelvo al automático.", { topic: "seguimiento_tarea", minSession: 2 })
+        ],
+        helpful: [
+          response("task-daily-helpful-1", "Sí, anoté algunas cosas. Me llamó la atención que no siempre eran hechos grandes; a veces era la repetición de lo mismo.", { topic: "aprendizaje_tarea", minSession: 2 }),
+          response("task-daily-helpful-2", "Me ayudó a notar que el desgaste aumenta al final del día, cuando ya cumplí con todo y aparece la sensación de no haber elegido nada.", { topic: "aprendizaje_tarea", minSession: 2 })
+        ]
+      }
+    }
   },
 
   goodInterventions: {

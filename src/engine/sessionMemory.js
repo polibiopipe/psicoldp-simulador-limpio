@@ -6,6 +6,7 @@ export function buildSessionSummary({ caseItem, history, report, sessionNumber =
   const facts = patientFacts[caseItem.id] || {};
   const meaningfulHistory = history.filter((entry) => !entry.isSessionPrelude);
   const lastState = meaningfulHistory.at(-1)?.patientState;
+  const taskState = deriveTaskState(meaningfulHistory);
 
   return {
     id: `${caseItem.id}-s${sessionNumber}-${Date.now()}`,
@@ -20,7 +21,10 @@ export function buildSessionSummary({ caseItem, history, report, sessionNumber =
     fortalezasEstudiante: report.strengths.slice(0, 4),
     aspectosPorMejorar: report.improvements.slice(0, 4),
     resumenConversacion: summarizeConversation(meaningfulHistory, caseItem.name),
-    tareaAcordada: deriveAssignedTask(meaningfulHistory),
+    tareaAcordada: taskState.description || deriveAssignedTask(meaningfulHistory),
+    taskType: taskState.type,
+    taskDescription: taskState.description,
+    taskAccepted: taskState.accepted,
     acuerdoContinuidad: agreement,
     ethicalNotice:
       "Registro ficticio y educativo. No corresponde a atención psicológica real, tratamiento ni diagnóstico."
@@ -209,4 +213,20 @@ function deriveAssignedTask(history) {
     .find((entry) => taskCue.test(String(entry.question || "")));
 
   return taskEntry?.question?.trim() || "";
+}
+
+function deriveTaskState(history) {
+  const taskEntry = [...history]
+    .reverse()
+    .find((entry) => entry.analysis?.clinicalAvatar?.taskDetails);
+  const clinical = taskEntry?.analysis?.clinicalAvatar;
+  if (!clinical?.taskDetails) {
+    return { type: null, description: "", accepted: false };
+  }
+
+  return {
+    type: clinical.taskDetails.type || null,
+    description: clinical.taskDetails.description || taskEntry.question || "",
+    accepted: clinical.taskKind === "concrete" || clinical.practicalAct === "task_confirmation"
+  };
 }

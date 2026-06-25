@@ -18,18 +18,24 @@ export function analyzeClinicalIntervention({
   intentResult,
   selectedInterventionType = "",
   sessionNumber = 1,
-  previousSessionSummary = null
+  previousSessionSummary = null,
+  memory = null
 }) {
   const text = normalizeText(studentMessage);
-  const topic = detectClinicalTopic({
+  const practicalAct = detectPracticalAct({
     text,
-    intent: intentResult?.intent,
-    selectedInterventionType
+    memory
   });
+  const topic = practicalAct?.topic || detectClinicalTopic({
+      text,
+      intent: intentResult?.intent,
+      selectedInterventionType
+    });
   const taskKind = detectTaskKind({
     text,
     sessionNumber,
-    hasPreviousTask: Boolean(previousSessionSummary?.tareaAcordada)
+    hasPreviousTask: Boolean(previousSessionSummary?.tareaAcordada || memory?.taskAssigned),
+    practicalAct
   });
   const poorType = detectPoorIntervention(text, studentMessage);
   const goodType = detectGoodIntervention({ text, intent: intentResult?.intent });
@@ -42,7 +48,17 @@ export function analyzeClinicalIntervention({
     poorType,
     goodType,
     approach,
-    isClosure: intentResult?.intent === "cierre" || topic === "cierre",
+    practicalAct: practicalAct?.type || null,
+    taskDetails: practicalAct?.type === "task_proposal"
+      ? describeTask(text, studentMessage)
+      : memory?.taskDescription
+        ? {
+            type: memory.taskType,
+            description: memory.taskDescription,
+            proposedText: memory.taskProposedText || null
+          }
+        : null,
+    isClosure: !practicalAct && (intentResult?.intent === "cierre" || topic === "cierre"),
     isExplicitFollowUp: isExplicitFollowUp(text, intentResult?.intent, topic),
     isAmbiguous: intentResult?.intent === "desconocida" || intentResult?.intent === "ambiguo_real",
     questionCount: countQuestions(studentMessage)
@@ -60,6 +76,8 @@ export function detectClinicalTopic({ text, intent, selectedInterventionType = "
   if (/\b(en que quieres que nos enfoquemos|en que te gustaria enfocarte|que te gustaria conversar|que quisieras conversar|que te gustaria trabajar|por donde te gustaria empezar)\b/.test(text)) return "foco_sesion";
   if (/\b(que te da miedo|cual es tu miedo|a que le tienes miedo|que es lo que temes|que te preocupa de (?:cambiar|decidir|equivocarte))\b/.test(text)) return "miedo_especifico";
   if (/\b(necesitas validar|validar todo|tener todo validado|estar completamente seguro|necesitas certeza|buscar certeza|tener garantias)\b/.test(text)) return "certeza_control";
+  if (/\b(que situacion gatillo|que gatillo|de donde nace|que lo provoco|que crees que lo provoco|que desencadeno|que hizo que empezara|por que decidiste venir|que te llevo a consultar)\b/.test(text)) return "causal_gatillante";
+  if (/\b(te da verguenza|verguenza|por que no te atreves|no te atreves|quieres decir algo|pudor|te cuesta profundizar|te cuesta hablar mas)\b/.test(text)) return "dificultad_profundizar";
   if (/\b(a que te refieres|que quieres decir|cuentame mas|explicame|eso que dijiste|mencionaste que|dijiste que)\b/.test(text)) {
     if (/\b(corresponde|deber|responsable|responsabilidad)\b/.test(text)) return "deber";
     if (/\b(separacion|ex pareja|expareja)\b/.test(text)) return "separacion";
@@ -147,7 +165,7 @@ function detectClinicalApproach(studentMessage) {
   return APPROACH_ALIASES[primaryId] || null;
 }
 
-function detectTaskKind({ text, sessionNumber, hasPreviousTask }) {
+function detectTaskKind({ text, sessionNumber, hasPreviousTask, practicalAct }) {
   const followUp = /\b(como te fue|hiciste la tarea|pudiste hacer|pudiste intentar|alcanzaste a|que notaste|te sirvio|revisaste el registro|hiciste el registro|anotaste)\b/.test(text);
   if (followUp) {
     if (!hasPreviousTask && sessionNumber > 1) return "noPreviousTask";
@@ -155,8 +173,7 @@ function detectTaskKind({ text, sessionNumber, hasPreviousTask }) {
     return "followUp";
   }
 
-  const taskCue = /\b(como tarea|te propongo|podrias intentar|podrias anotar|podrias registrar|anota|registra|para la proxima|esta semana|intenta hacer|te parece si)\b/.test(text);
-  if (!taskCue) return null;
+  if (practicalAct?.type !== "task_proposal") return null;
 
   const emotionallyPremature = sessionNumber <= 2 && /\b(habla con tu ex|enfrenta a|dile todo|cuentale todo|escribele una carta|escribas una carta|le escribas|revive|confronta)\b/.test(text);
   if (emotionallyPremature) return "emotionallyPremature";
@@ -165,6 +182,47 @@ function detectTaskKind({ text, sessionNumber, hasPreviousTask }) {
   if (tooBroad) return "tooBroad";
 
   return "concrete";
+}
+
+function detectPracticalAct({ text, memory }) {
+  const agendaCue = /\b(agendar|agendamos|coordinamos (?:la )?proxima sesion|puedes venir|podrias venir|te parece si vienes|vienes en|te espero|nos vemos el|nos vemos en|a las \d{1,2}|\d+\s*(?:dias|semanas) mas)\b/.test(text);
+  if (agendaCue) return { type: "schedule", topic: "agenda_continuidad" };
+
+  const taskContext = Boolean(
+    memory?.taskAssigned
+    || memory?.recentTurns?.some((turn) => /\b(tarea|anotar|registrar|escribir al final|te propongo)\b/.test(normalizeText(turn.studentMessage)))
+  );
+  const explicitTaskConfirmation = /\b(te parece bien lo que te propuse|estas de acuerdo con (?:esa|la) tarea|aceptas (?:esa|la) tarea|podrias hacer (?:esa|la) tarea|lo podrias hacer|puedes intentar lo que te propuse)\b/.test(text);
+  const contextualTaskConfirmation = taskContext
+    && /^(te parece|te parece bien|estas de acuerdo|lo podrias hacer|podrias hacerlo|puedes hacerlo)\??$/.test(text);
+  if (explicitTaskConfirmation || contextualTaskConfirmation) {
+    return { type: "task_confirmation", topic: "confirmacion_tarea" };
+  }
+
+  const taskCue = /\b(como tarea|te propongo|durante la semana|para la proxima)\b/.test(text)
+    || /\b(podrias|te parece si|intenta|puedes)\b.{0,100}\b(anotar|anotas|escribir|escribes|registrar|registras|observar|observas|llevar un registro)\b/.test(text)
+    || /\b(al finalizar (?:tu )?dia|al final del dia)\b.{0,100}\b(escribir|anotar|registrar|relatar)\b/.test(text);
+  if (taskCue) return { type: "task_proposal", topic: "propuesta_tarea" };
+
+  return null;
+}
+
+function describeTask(text, originalMessage) {
+  const dailyEmotionalLog = /\b(escribir|escribes|escribas|anotar|anotas|anotes|registrar|registras|registres|relatar|relatas|relates)\b/.test(text)
+    && /\b(dia|situacion|paso|ocurrio|afecto|emocion|positivo|negativo)\b/.test(text);
+  if (dailyEmotionalLog) {
+    return {
+      type: "registro_diario_situaciones_emociones",
+      description: "Escribir al final del día qué ocurrió y qué le afectó positiva o negativamente.",
+      proposedText: originalMessage
+    };
+  }
+
+  return {
+    type: "tarea_concreta_personalizada",
+    description: originalMessage.trim(),
+    proposedText: originalMessage
+  };
 }
 
 function detectPoorIntervention(text, originalMessage) {

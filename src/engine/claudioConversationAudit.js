@@ -17,6 +17,7 @@ export function runClaudioConversationAudit({ log = true } = {}) {
 
   results.push(auditSessionOne(log));
   results.push(auditLongSessionOne(log));
+  results.push(auditPracticalActs(log));
   results.push(auditSessionTwo(log));
   results.push(auditSessionThree(log));
   results.push(auditSessionFour(log));
@@ -110,6 +111,65 @@ function auditLongSessionOne(log) {
   assert.equal(new Set(conversation.map(({ text }) => responseLength(text))).size, 3);
 
   return section("session_1_long_context", 15);
+}
+
+function auditPracticalActs(log) {
+  const practicalConversation = runConversation({
+    sessionNumber: 1,
+    prompts: [
+      "Nos queda poco tiempo, te parece si al finalizar tu día escribes qué pasó durante el día y relatas lo que más te afectó, positiva o negativamente?",
+      "¿Te parece bien lo que te propuse?",
+      "¿Te parece si vienes en 4 días más a las 17 hrs?"
+    ],
+    log
+  });
+
+  assert.equal(practicalConversation[0].intent, "tarea_concreta");
+  assert.equal(practicalConversation[0].clinical.source, "task_concrete");
+  assert.match(practicalConversation[0].text, /sí|puedo|intentarlo|posible/i);
+  assert.equal(practicalConversation[0].memoryUpdate.taskAssigned, true);
+  assert.equal(practicalConversation[0].memoryUpdate.taskAccepted, true);
+  assert.equal(practicalConversation[0].memoryUpdate.taskType, "registro_diario_situaciones_emociones");
+  assert.match(practicalConversation[0].memoryUpdate.taskDescription, /final del día|afectó positiva o negativamente/i);
+
+  assert.equal(practicalConversation[1].intent, "confirmacion_tarea");
+  assert.equal(practicalConversation[1].clinical.source, "intent_confirmacion_tarea");
+  assert.match(practicalConversation[1].text, /sí|de acuerdo|me parece|puedo intentarlo/i);
+
+  assert.equal(practicalConversation[2].intent, "agenda_continuidad");
+  assert.equal(practicalConversation[2].clinical.source, "intent_agenda_continuidad");
+  assert.match(practicalConversation[2].text, /venir|hora|acomoda|continuar|organizarme/i);
+  assertUniqueResponses(practicalConversation);
+
+  const causal = ask({
+    sessionNumber: 1,
+    studentMessage: "¿Qué situación gatilló ese sentir?"
+  });
+  assert.equal(causal.clinical.source, "intent_causal_gatillante");
+  assert.match(causal.text, /situación|acumulación|días|decisiones|cansancio/i);
+
+  const depth = ask({
+    sessionNumber: 1,
+    studentMessage: "¿Te da vergüenza profundizar?"
+  });
+  assert.equal(depth.clinical.source, "intent_dificultad_profundizar");
+  assert.match(depth.text, /vergüenza|cuesta|pudor|hablar/i);
+
+  const previousSessionSummary = {
+    tareaAcordada: "Escribir al final del día qué ocurrió y qué le afectó positiva o negativamente.",
+    taskType: "registro_diario_situaciones_emociones",
+    taskDescription: "Escribir al final del día qué ocurrió y qué le afectó positiva o negativamente.",
+    taskAccepted: true
+  };
+  const taskFollowUp = ask({
+    sessionNumber: 2,
+    previousSessionSummary,
+    studentMessage: "¿Cómo te fue con la tarea?"
+  });
+  assert.equal(taskFollowUp.clinical.source, "task_followUp");
+  assert.match(taskFollowUp.text, /dos días|empecé|registro|constante|noche/i);
+
+  return section("practical_acts", 19);
 }
 
 function auditSessionTwo(log) {
