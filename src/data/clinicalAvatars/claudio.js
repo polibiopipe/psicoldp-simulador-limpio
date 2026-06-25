@@ -104,8 +104,8 @@ export const claudioClinicalAvatar = defineClinicalAvatar({
     agenda_continuidad: [
       response("schedule-1", "Sí, me parece bien. Puedo venir ese día a las 17 horas.", { topic: "agenda_continuidad" }),
       response("schedule-2", "Sí, esa hora me acomoda.", { topic: "agenda_continuidad" }),
-      response("schedule-3", "Podría ser. Me hace sentido continuar, porque siento que recién estoy empezando a ordenar esto.", { topic: "agenda_continuidad" }),
-      response("schedule-4", "Sí, creo que sería bueno seguir conversándolo. Puedo organizarme para venir.", { topic: "agenda_continuidad" })
+      response("schedule-3", "Podría ser. Me hace sentido continuar; puedo acomodarme para venir ese día a esa hora.", { topic: "agenda_continuidad" }),
+      response("schedule-4", "Sí, creo que sería bueno seguir conversándolo. Puedo organizarme para venir ese día.", { topic: "agenda_continuidad" })
     ],
     causal_gatillante: [
       response("cause-1", "No hubo una sola situación. Creo que fue más bien una acumulación; empecé a notar que todos mis días se parecían demasiado.", { topic: "causal_gatillante" }),

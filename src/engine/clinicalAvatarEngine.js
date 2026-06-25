@@ -433,6 +433,13 @@ function rankCandidates(candidates, { avatarId, usedIds, previousResponses, rece
 
 function buildContextualFallbackCandidates({ avatarProfile, session, topic }) {
   const contextual = avatarProfile.contextualFallbacks || {};
+  if (topic === "cierre") {
+    return dedupeCandidates([
+      ...(contextual.cierre || []),
+      ...sessionCandidatesForTopic(session, topic)
+    ]);
+  }
+
   const directIntentCandidates = avatarProfile.intentResponses?.[topic] || [];
   if (directIntentCandidates.length) {
     return dedupeCandidates([
