@@ -9,6 +9,7 @@ import { composeFinalResponse } from "./responseComposer.js";
 import { applyActivePatientInteraction } from "./activePatientInteraction.js";
 import { getClinicalAvatar } from "../data/clinicalAvatars/index.js";
 import { generateClinicalAvatarResponse } from "./clinicalAvatarEngine.js";
+import { CLINICAL_ENGINE_CASE_IDS, generateClinicalSimulationResponse } from "./clinicalSimulationEngine.js";
 
 export function generateLocalPatientResponse({
   caseId,
@@ -22,6 +23,25 @@ export function generateLocalPatientResponse({
   memory
 }) {
   const workingMemory = buildPatientMemory({ caseId, history, difficulty, sessionNumber, memory });
+  const clinicalSimulationResult = CLINICAL_ENGINE_CASE_IDS.includes(caseId)
+    ? generateClinicalSimulationResponse({
+        caseId,
+        studentMessage,
+        history,
+        sessionNumber,
+        memory: workingMemory
+      })
+    : null;
+
+  if (clinicalSimulationResult) {
+    return buildClinicalSimulationLocalResult({
+      caseId,
+      studentMessage,
+      result: clinicalSimulationResult,
+      workingMemory
+    });
+  }
+
   const intentResult = detectIntent(studentMessage, history);
   const textDetectedIntent = intentResult.intent;
   const compositeMessageDetected = isCompositeOpenQuestionMessage(studentMessage);
@@ -307,6 +327,121 @@ export function generateLocalPatientResponse({
   };
 }
 
+function buildClinicalSimulationLocalResult({ caseId, studentMessage, result, workingMemory }) {
+  const categories = categoriesForClinicalSimulation(result.detectedAct, result.clinicalTopic);
+  const intentResult = {
+    intent: result.detectedAct,
+    confidence: result.confidence || 0.95,
+    normalizedText: result.normalizedMessage,
+    contextualTopic: result.clinicalTopic,
+    profileTopic: result.clinicalTopic,
+    explicitReferenceDetected: result.detectedAct === "experiencia_vivida",
+    ambiguityDetected: result.detectedAct === "pregunta_confusa",
+    detectedEmotionInLastPatientMessage: null,
+    reformulationDetected: false,
+    supportiveStatementDetected: result.detectedAct === "intervencion_empatica",
+    hardConcreteIntent: result.detectedAct,
+    matches: {
+      [result.detectedAct]: true,
+      [result.clinicalTopic]: true
+    },
+    categories,
+    revealedTopics: result.memoryPatch.revealedTopics || [],
+    clinicalTaskKind: result.memoryPatch.taskAccepted ? "concrete" : null,
+    clinicalTaskDetails: result.memoryPatch.taskDetails || result.taskDetails || null,
+    practicalAct: result.detectedAct === "confirmar_tarea"
+      ? "task_confirmation"
+      : result.detectedAct === "tarea_terapeutica"
+      ? "task_proposal"
+      : null
+  };
+  const memoryUpdate = {
+    ...workingMemory,
+    ...result.memoryPatch,
+    opennessLevel: clinicalOpennessLocal(result.memoryPatch.trustLevel),
+    emotionalOpenness: clinicalOpennessLocal(result.memoryPatch.trustLevel)
+  };
+  const clinicalAvatarCompatibility = {
+    avatarId: caseId,
+    engine: "ClinicalSimulationEngine",
+    source: "clinical-simulation-engine",
+    detectedAct: result.detectedAct,
+    resolvedIntent: result.detectedAct,
+    profileTopic: result.clinicalTopic,
+    detectedTopic: result.clinicalTopic,
+    emotionalState: result.emotionalState,
+    disclosureLevel: result.disclosureLevel,
+    selectedResponseId: result.selectedResponseId,
+    responseId: result.responseId,
+    responseType: "clinical_simulation",
+    taskKind: result.memoryPatch.taskAccepted ? "concrete" : null,
+    practicalAct: intentResult.practicalAct,
+    taskDetails: result.memoryPatch.taskDetails || result.taskDetails || null,
+    reveals: result.memoryPatch.revealedTopics || [],
+    feedbackSignals: result.feedbackSignals
+  };
+  const debug = {
+    studentMessage,
+    normalizedMessage: result.normalizedMessage,
+    selectedCaseId: caseId,
+    detectedIntent: result.detectedAct,
+    detectedQuestionType: result.clinicalTopic,
+    resolvedIntent: result.detectedAct,
+    detectedTopic: result.clinicalTopic,
+    caseId,
+    responseType: "clinical_simulation",
+    selectedResponseType: "clinical_simulation",
+    opennessLevel: memoryUpdate.opennessLevel,
+    evasiveCount: workingMemory.evasiveCount || 0,
+    lastPatientMessage: workingMemory.lastPatientMessage,
+    recentTurns: workingMemory.recentTurns,
+    lastSubstantiveTopic: result.memoryPatch.currentTopic || workingMemory.lastSubstantiveTopic,
+    reformulationDetected: false,
+    detectedEmotionInLastPatientMessage: null,
+    lastTopic: result.clinicalTopic,
+    selectedResponseId: result.responseId,
+    selectedResponse: result.responseText,
+    finalResponse: result.responseText,
+    ambiguityDetected: result.detectedAct === "pregunta_confusa",
+    closureDetected: result.detectedAct === "cierre",
+    explicitReferenceDetected: result.detectedAct === "experiencia_vivida",
+    profileTopic: result.clinicalTopic,
+    clinicalAvatarUsed: true,
+    clinicalAvatar: clinicalAvatarCompatibility,
+    clinicalSimulation: {
+      ...result,
+      stateAfter: result.memoryPatch
+    },
+    profileResponseUsed: false,
+    usedCaseFacts: true,
+    usedResponseIds: memoryUpdate.usedResponseIds,
+    usedIdeaSignatures: memoryUpdate.usedIdeaSignatures || workingMemory.usedIdeaSignatures,
+    memory: memoryUpdate,
+    fallbackUsed: false,
+    wasCompositeForced: false,
+    activeInteraction: null,
+    guided: null
+  };
+
+  if (isDevRuntime()) {
+    console.log("[ClinicalSimulationEngine]", debug);
+  }
+
+  return {
+    responseText: result.responseText,
+    intent: result.detectedAct,
+    caseId,
+    confidence: result.confidence || 0.95,
+    memoryUpdate,
+    debug,
+    responseId: result.responseId,
+    fallbackUsed: false,
+    intentResult,
+    trustStage: getTrustStage(memoryUpdate.trustLevel),
+    guidedResult: null
+  };
+}
+
 function debugResolvedIntent(intent, profileTopic) {
   if (intent === "motivo_de_consulta" || profileTopic === "motivo_consulta") return "motivo_consulta";
   return intent;
@@ -398,4 +533,38 @@ function categoriesForClinicalResponse(intent) {
     followUp: ["seguimiento_contextual", "seguimiento_contextual_explicito", "seguimiento_tarea"].includes(intent) || base.followUp,
     taskProposal: taskIntent
   };
+}
+
+function categoriesForClinicalSimulation(detectedAct, clinicalTopic) {
+  const closure = detectedAct === "cierre";
+  const taskProposal = detectedAct === "tarea_terapeutica" || detectedAct === "confirmar_tarea";
+  const emotionalExploration = detectedAct === "emocion" || ["emocion", "miedo", "verguenza"].includes(clinicalTopic);
+
+  return {
+    framing: detectedAct === "saludo",
+    openQuestion: ["motivo_consulta", "emocion", "experiencia_vivida", "rutina", "apoyo_redes"].includes(detectedAct),
+    closedQuestion: ["identidad_nombre", "datos_basicos", "convivencia_familia", "agenda_proxima_sesion"].includes(detectedAct),
+    validation: detectedAct === "intervencion_empatica",
+    judgment: detectedAct === "intervencion_confrontativa",
+    rushedAdvice: detectedAct === "intervencion_confrontativa",
+    emotionalExploration,
+    familyExploration: detectedAct === "convivencia_familia" || clinicalTopic === "familia",
+    contextExploration: ["convivencia_familia", "rutina", "apoyo_redes"].includes(detectedAct),
+    closure,
+    goodClosure: closure,
+    continuityAgreement: detectedAct === "agenda_proxima_sesion" || closure,
+    paceRespect: detectedAct === "intervencion_empatica" || detectedAct === "saludo",
+    empathicSummary: detectedAct === "intervencion_empatica" || detectedAct === "experiencia_vivida",
+    followUp: detectedAct === "experiencia_vivida" || detectedAct === "seguimiento_tarea",
+    preferencesExploration: clinicalTopic === "experiencia_vivida",
+    concernExploration: detectedAct === "motivo_consulta",
+    supportExploration: detectedAct === "apoyo_redes",
+    taskProposal
+  };
+}
+
+function clinicalOpennessLocal(trustLevel = 0) {
+  if (trustLevel <= 35) return "apertura_baja";
+  if (trustLevel <= 70) return "apertura_media";
+  return "apertura_alta";
 }

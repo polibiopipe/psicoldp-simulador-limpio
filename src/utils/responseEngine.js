@@ -37,16 +37,19 @@ export function createPatientResponse({
         .filter(([, value]) => value)
         .map(([key]) => key),
       guidedIntervention: result.debug.guided,
-      clinicalAvatar: result.debug.clinicalAvatar
+      clinicalAvatar: result.debug.clinicalAvatar,
+      clinicalSimulation: result.debug.clinicalSimulation
     },
     patientState: {
       trustLevel: result.memoryUpdate.trustLevel,
       trustStage: result.trustStage,
       opennessLevel: result.memoryUpdate.opennessLevel,
+      clinicalEmotionalState: result.memoryUpdate.emotionalState || null,
       repeatedQuestion: false
     },
     responseCategory: result.intent,
     guidedIntervention: result.debug.guided,
-    clinicalAvatar: result.debug.clinicalAvatar
+    clinicalAvatar: result.debug.clinicalAvatar,
+    clinicalSimulation: result.debug.clinicalSimulation
   };
 }
