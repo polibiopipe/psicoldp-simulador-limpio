@@ -84,7 +84,7 @@ export const claudioClinicalSimulationProfile = {
 
   responses: {
     saludo: [
-      response("greeting-1", "Hola. Bien, dentro de lo que cabe. Me costo un poco decidir venir, pero estoy aqui.", { topic: "saludo" }),
+      response("greeting-1", "Hola... si, gracias. Me cuesta un poco partir, pero estoy aqui.", { topic: "saludo" }),
       response("greeting-2", "Hola. No se muy bien por donde partir, pero puedo intentarlo.", { topic: "saludo" })
     ],
     identidad_nombre: [
@@ -110,7 +110,7 @@ export const claudioClinicalSimulationProfile = {
       response("motive-repeat", "Lo central sigue siendo esa sensacion de estar detenido, aunque por fuera mi vida se vea bastante ordenada.", { topic: "motivo", minDisclosure: "medium" })
     ],
     emocion: [
-      response("emotion-1", "Me cuesta ponerle un nombre. Diria que hay cansancio y una incomodidad que no se va del todo.", { topic: "emocion", reveals: ["malestar"] }),
+      response("emotion-1", "Cansado, creo. No un cansancio fisico solamente, sino una sensacion de estar repitiendo los dias sin avanzar mucho.", { topic: "emocion", reveals: ["malestar"] }),
       response("emotion-2", "Siento desgaste. No es tristeza intensa, pero si una especie de apagamiento.", { topic: "emocion", reveals: ["malestar"] }),
       response("emotion-medium", "Creo que debajo del cansancio hay miedo a mover algo y equivocarme. Me cuesta admitirlo porque sigo funcionando.", { topic: "emocion", minDisclosure: "medium", reveals: ["miedo_a_equivocarse"] })
     ],

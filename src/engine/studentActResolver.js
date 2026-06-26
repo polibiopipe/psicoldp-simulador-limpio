@@ -7,7 +7,7 @@ const ACT_PATTERNS = [
     reason: "saludo",
     test: (text, words) =>
       /^(hola|buenas|buenos dias|buenas tardes|buenas noches)(\s|$)/.test(text)
-      && words.length <= 8
+      || /\b(soy estudiante de psicologia|gracias por estar aqui|gracias por venir|partir presentandome)\b/.test(text)
   },
   {
     act: "identidad_nombre",
@@ -31,25 +31,25 @@ const ACT_PATTERNS = [
     act: "motivo_consulta",
     confidence: 0.97,
     reason: "motivo_consulta",
-    test: (text) => /\b(por que estas aqui|que te trae|que te trajo|motivo|consulta|por que viniste|que haces aqui|por que decidiste venir|que te llevo a consultar|por que llegaste|por que consultaste)\b/.test(text)
+    test: (text) => /\b(por que estas aqui|que te trae|que te trajo|que te hizo venir|que te pasa|motivo|consulta|por que viniste|que haces aqui|por que decidiste venir|que te llevo a consultar|por que llegaste|por que consultaste|venir a esta conversacion|trae a esta conversacion|que hizo que vinieras|que hizo que consultaras)\b/.test(text)
   },
   {
     act: "emocion",
     confidence: 0.93,
     reason: "emocion_malestar",
-    test: (text) => /\b(que sientes|como te sientes|miedo|te da miedo|te preocupa|preocupacion|verguenza|triste|cansancio|cansado|desgaste|malestar|emocion|angustia|incomodidad)\b/.test(text)
+    test: (text) => /\b(que sientes|que has sentido|has sentido|como te sientes|como te has sentido|como estas|como has estado|como lo has vivido|como lo viviste|como te afecta|que emociones|emociones aparecen|miedo|te da miedo|te preocupa|preocupacion|verguenza|triste|cansancio|cansado|desgaste|malestar|emocion|emociones|angustia|incomodidad)\b/.test(text)
   },
   {
     act: "experiencia_vivida",
     confidence: 0.91,
     reason: "seguimiento_experiencia",
-    test: (text) => /\b(a que te refieres|que quieres decir|cuentame mas|explicame|explica|desde cuando|hace cuanto|cuando empezo|que paso|como lo vives|que significa|que hay detras|profundizar|de donde nace|que lo gatillo|que lo provoco|separacion|separaste|ex pareja|historia familiar|familia de origen|infancia)\b/.test(text)
+    test: (text) => /\b(a que te refieres|que quieres decir|cuentame mas|explicame|explica|explicar|un poco mas|desde cuando|hace cuanto|cuando empezo|que paso|como lo vives|que significa|que hay detras|profundizar|de donde nace|que lo gatillo|que lo provoco|que hizo que|que hizo que esto|que lo hizo mas evidente|que volvio esto mas evidente|que lo volvio mas evidente|separacion|separaste|ex pareja|historia familiar|familia de origen|infancia)\b/.test(text)
   },
   {
     act: "rutina",
     confidence: 0.92,
     reason: "rutina",
-    test: (text) => /\b(rutina|dia a dia|dia habitual|como son tus dias|que haces durante el dia|piloto automatico|automatico|cotidiano|cotidianidad)\b/.test(text)
+    test: (text) => /\b(rutina|dia a dia|dia habitual|dia normal|dia comun|dia tipico|como es un dia|como es un dia normal|como es un dia para ti|como son tus dias|que haces durante el dia|piloto automatico|funcionando en automatico|automatico|cotidiano|cotidianidad)\b/.test(text)
   },
   {
     act: "apoyo_redes",
@@ -105,6 +105,10 @@ export function resolveStudentAct({ studentMessage = "", memory = {} } = {}) {
     return buildResult("agenda_proxima_sesion", normalizedMessage, 0.97, ["agenda_continuidad"], null);
   }
 
+  if (/\b(funcionando en automatico|piloto automatico|automatico)\b/.test(normalizedMessage)) {
+    return buildResult("rutina", normalizedMessage, 0.95, ["rutina_automatico"], null);
+  }
+
   if (hasTaskContext && /\b(tarea|registro|lo hiciste|la hiciste|pudiste hacerlo|como te fue|que observaste|que notaste|anotaste)\b/.test(normalizedMessage)) {
     return buildResult("seguimiento_tarea", normalizedMessage, 0.95, ["seguimiento_tarea"], memory.taskDetails || null);
   }
@@ -142,7 +146,7 @@ function detectTaskDetails(normalizedMessage, originalMessage) {
 }
 
 function isAgendaMessage(normalizedMessage) {
-  return /\b(agendar|agendamos|proxima sesion|puedes venir|podrias venir|te parece si vienes|vienes en|te espero|nos vemos el|nos vemos en|a las \d{1,2}|hrs|hora|lunes|martes|miercoles|jueves|viernes|sabado|domingo|\d+\s*(dias|semanas) mas)\b/.test(normalizedMessage);
+  return /\b(agendar|agendamos|proxima sesion|proxima semana|puedes venir|podrias venir|te parece si vienes|vienes en|te espero|nos vemos|nos vemos el|nos vemos en|revisar como te fue|a las \d{1,2}|hrs|hora|lunes|martes|miercoles|jueves|viernes|sabado|domingo|\d+\s*(dias|semanas) mas)\b/.test(normalizedMessage);
 }
 
 function buildResult(detectedAct, normalizedMessage, confidence, reasons, taskDetails) {
