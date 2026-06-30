@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "audit:claudio": "node src/engine/claudioConversationAudit.js",
-    "audit:clinical-claudio": "node src/engine/clinicalSimulationEngine.claudioAudit.js"
+    "audit:clinical-claudio": "node src/engine/clinicalSimulationEngine.claudioAudit.js",
+    "audit:clinical-all": "node src/engine/clinicalSimulationEngine.allAudit.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",
