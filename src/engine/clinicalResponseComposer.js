@@ -1,4 +1,5 @@
 import { responseSimilarity } from "./conversationQuality.js";
+import { MARCOS_BASIC_ACTS, composeMarcosBasicResponse } from "./marcosBasicHandlers.js";
 
 const DISCLOSURE_ORDER = {
   low: 0,
@@ -9,16 +10,20 @@ const DISCLOSURE_ORDER = {
 const BASIC_ACTS = new Set([
   "saludo",
   "identidad_nombre",
+  "encuadre_confidencialidad",
   "edad",
   "vivienda",
   "ocupacion_estudios",
+  "motivo_consulta",
   "datos_basicos",
   "convivencia_familia",
   "familia_composicion",
   "estado_civil_pareja",
   "red_apoyo",
+  "sintomas_malestar",
   "riesgo_autolesion",
   "consumo_sustancias",
+  "rutina",
   "agenda_proxima_sesion",
   "cierre",
   "cierre_sesion"
@@ -32,7 +37,26 @@ export function composePatientResponse({
   disclosureLevel,
   studentMessage = ""
 }) {
-  const responseKey = resolveResponseKey({ detectedAct, clinicalTopic, state });
+  let responseKey = resolveResponseKey({ detectedAct, clinicalTopic, state });
+  if (responseKey === "pregunta_confusa" && BASIC_ACTS.has(detectedAct)) {
+    responseKey = clinicalTopic || detectedAct;
+  }
+
+  const marcosBasicResponse = profile.id === "marcos" && MARCOS_BASIC_ACTS.has(detectedAct)
+    ? composeMarcosBasicResponse({ detectedAct, clinicalTopic })
+    : null;
+
+  if (marcosBasicResponse) {
+    return {
+      responseText: cleanPatientVoice(marcosBasicResponse.responseText),
+      responseId: marcosBasicResponse.responseId,
+      responseHandler: marcosBasicResponse.responseHandler,
+      patientDataUsed: marcosBasicResponse.patientDataUsed,
+      selectedResponse: marcosBasicResponse.selectedResponse,
+      feedbackSignals: buildFeedbackSignals({ detectedAct, clinicalTopic, responseKey, state })
+    };
+  }
+
   let responses = profile.responses[responseKey] || [];
   if (!responses.length && detectedAct !== "pregunta_confusa") {
     responses = profile.responses.no_definido || [];
@@ -60,9 +84,46 @@ export function composePatientResponse({
   return {
     responseText: cleanPatientVoice(responseText),
     responseId: candidate.id,
+    responseHandler: responseKey,
+    patientDataUsed: buildPatientDataUsed({ profile, responseKey, clinicalTopic }),
     selectedResponse: candidate,
     feedbackSignals: buildFeedbackSignals({ detectedAct, clinicalTopic, responseKey, state })
   };
+}
+
+function buildPatientDataUsed({ profile, responseKey, clinicalTopic }) {
+  const identity = profile?.patientRecord?.identity || {};
+  const family = profile?.patientRecord?.family || {};
+  const consultation = profile?.patientRecord?.consultation || {};
+  const emotionalState = profile?.patientRecord?.emotionalState || {};
+
+  if (responseKey === "vivienda") {
+    return {
+      city: identity.city,
+      commune: identity.commune,
+      livesWith: identity.livesWith,
+      housingType: identity.housingType,
+      residenceExperience: identity.residenceExperience
+    };
+  }
+  if (responseKey === "familia_composicion" || clinicalTopic === "hijos") {
+    return {
+      familyComposition: family.composition,
+      children: family.children
+    };
+  }
+  if (responseKey === "motivo_consulta") {
+    return {
+      consultationReason: consultation.whyNow || consultation.manifestMotive
+    };
+  }
+  if (responseKey === "sintomas_malestar") {
+    return {
+      emotionalState: emotionalState.currentlyFeels
+    };
+  }
+
+  return { responseKey, clinicalTopic };
 }
 
 function resolveResponseKey({ detectedAct, clinicalTopic, state }) {
@@ -82,6 +143,7 @@ function resolveResponseKey({ detectedAct, clinicalTopic, state }) {
   if (detectedAct === "vivienda") return "vivienda";
   if (detectedAct === "ocupacion_estudios") return "ocupacion_estudios";
   if (detectedAct === "datos_basicos") return clinicalTopic === "trabajo" ? "trabajo" : "edad";
+  if (detectedAct === "familia_composicion" && clinicalTopic === "hijos") return "hijos";
   if (detectedAct === "familia_composicion") return "familia_composicion";
   if (detectedAct === "estado_civil_pareja") return "estado_civil_pareja";
   if (detectedAct === "red_apoyo") return "red_apoyo";

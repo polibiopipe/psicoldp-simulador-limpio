@@ -4,6 +4,11 @@ import { generateLocalPatientResponse } from "./localMiniAI.js";
 
 const BASIC_TESTS = [
   {
+    label: "identidad nombre",
+    message: "Como te llamas?",
+    expectedAct: "identidad_nombre"
+  },
+  {
     label: "encuadre confidencialidad",
     message: "Antes de comenzar, quiero explicarte que esta conversacion sera confidencial, salvo que estes en riesgo.",
     expectedAct: "encuadre_confidencialidad"
@@ -14,7 +19,13 @@ const BASIC_TESTS = [
     expectedAct: "edad"
   },
   {
-    label: "vivienda",
+    label: "vivienda residencia",
+    message: "Donde vives?",
+    expectedAct: "vivienda",
+    mustIncludeAny: ["santiago"]
+  },
+  {
+    label: "vivienda convivencia",
     message: "Con quien vives?",
     expectedAct: "vivienda"
   },
@@ -24,19 +35,34 @@ const BASIC_TESTS = [
     expectedAct: "familia_composicion"
   },
   {
+    label: "hijos",
+    message: "Tienes hijos?",
+    expectedAct: "familia_composicion"
+  },
+  {
     label: "estado civil pareja",
     message: "Tienes pareja?",
     expectedAct: "estado_civil_pareja"
   },
   {
     label: "ocupacion estudios",
-    message: "A que te dedicas?",
+    message: "En que trabajas o estudias?",
     expectedAct: "ocupacion_estudios"
   },
   {
     label: "motivo consulta",
     message: "Que te trae por aca?",
     expectedAct: "motivo_consulta"
+  },
+  {
+    label: "temporalidad",
+    message: "Desde cuando te pasa?",
+    expectedAct: "experiencia_vivida"
+  },
+  {
+    label: "estado emocional",
+    message: "Como te has sentido?",
+    expectedAct: "sintomas_malestar"
   },
   {
     label: "red apoyo",
@@ -114,6 +140,9 @@ for (const caseId of clinicalEngineCaseIds) {
     }
     if (fellBackToConfusion) {
       caseFailures.push(`${test.label}: cayo en fallback de confusion.`);
+    }
+    if (test.mustIncludeAny?.length && !test.mustIncludeAny.some((term) => normalizedResponse.includes(normalizeText(term)))) {
+      caseFailures.push(`${test.label}: respuesta no incluyo datos esperados (${test.mustIncludeAny.join(" / ")}).`);
     }
   }
 

@@ -1,5 +1,6 @@
 import { caseProfiles } from "../caseProfiles.js";
 import { patientFacts } from "../patientFacts.js";
+import { marcosBasicProfile } from "./marcosBasicProfile.js";
 
 const UNKNOWN = "No esta definido en el expediente inicial.";
 
@@ -99,7 +100,7 @@ const priorityPatientRecords = {
       unknownAnswer: "No se bien. No es algo que tenga tan claro todavia."
     },
     emotionalState: {
-      currentlyFeels: "incmodo, observado y pasado a llevar",
+      currentlyFeels: "incomodo, observado y pasado a llevar",
       worries: "que todos crean que el problema es solo el computador",
       fears: "quedar raro o decir algo mal en persona",
       shame: "le da verguenza reconocer que le cuesta relacionarse",
@@ -650,11 +651,15 @@ const baselineIdentityOverrides = {
   marcos: {
     gender: "masculino",
     city: "Santiago",
+    commune: "Nunoa",
     education: "educacion superior o tecnica completa",
-    occupation: "trabajador",
-    civilStatus: "Si, tengo pareja.",
-    livesWith: "Vivo con mi pareja.",
-    supportNetwork: "Mi pareja nota lo que me pasa; amigos tengo, pero hablo poco de esto."
+    occupation: marcosBasicProfile.profile.occupation,
+    civilStatus: marcosBasicProfile.profile.civilStatus,
+    livesWith: marcosBasicProfile.profile.livesWith,
+    housingType: "un departamento arrendado",
+    residenceExperience: marcosBasicProfile.profile.housingContext,
+    familyComposition: `${marcosBasicProfile.profile.livesWith} ${marcosBasicProfile.profile.children} ${marcosBasicProfile.profile.familySummary}`,
+    supportNetwork: marcosBasicProfile.profile.supportNetwork
   },
   elena: {
     gender: "femenino",
@@ -780,7 +785,7 @@ function buildPatientRecord(caseId) {
       { period: "actualidad", event: facts.motive || profile.reasonForConsultation || UNKNOWN }
     ],
     family: {
-      composition: facts.family || profile.familyContext || identityOverride.livesWith || UNKNOWN,
+      composition: identityOverride.familyComposition || facts.family || profile.familyContext || identityOverride.livesWith || UNKNOWN,
       mother: unknownPerson("madre"),
       father: unknownPerson("padre"),
       siblings: [],
@@ -806,7 +811,7 @@ function buildPatientRecord(caseId) {
       unknownAnswer: "No tengo tan claro eso. Prefiero ir de a poco con lo que si puedo responder."
     },
     emotionalState: {
-      currentlyFeels: profile.emotionalCore || facts.concern || UNKNOWN,
+      currentlyFeels: facts.concern || profile.emotionalCore || UNKNOWN,
       worries: facts.concern || profile.emotionalCore || UNKNOWN,
       fears: facts.concreteConcern || facts.concern || UNKNOWN,
       shame: "No se explicita en el expediente inicial.",

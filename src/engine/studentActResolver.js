@@ -31,7 +31,7 @@ const ACT_PATTERNS = [
     act: "vivienda",
     confidence: 0.97,
     reason: "vivienda",
-    test: (text) => /\b(con quien vives|quienes viven contigo|vives solo|vives sola|vives con|donde vives|con quien estas viviendo|con quienes vives|con quienes vives)\b/.test(text)
+    test: (text) => /\b(con quien vives|quienes viven contigo|vives solo|vives sola|vives con|donde vives|donde estas viviendo|donde resides|en que comuna vives|en que ciudad vives|con quien estas viviendo|con quienes vives|con quienes vives)\b/.test(text)
   },
   {
     act: "familia_composicion",

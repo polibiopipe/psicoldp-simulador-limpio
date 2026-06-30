@@ -212,6 +212,8 @@ function createClinicalSimulationProfile(caseId) {
     || "Prefiero no entrar tan rapido en eso. Me resulta mas facil partir por lo que esta pasando ahora.";
   const unknownResponse = patientRecord?.personality?.unknownAnswer
     || "No tengo tan claro eso. Prefiero ir de a poco con lo que si puedo responder.";
+  const residenceResponse = buildResidenceResponse({ patientRecord, fallbackText: basics.livesWith });
+  const childrenResponse = buildChildrenResponse({ patientRecord, fallbackText: basics.familyComposition });
 
   return {
     id: caseId,
@@ -284,13 +286,16 @@ function createClinicalSimulationProfile(caseId) {
         response(`${caseId}-framing-2`, "Gracias por explicarlo. Me ayuda saber que podemos conversar con ese cuidado.", { topic: "encuadre" })
       ],
       vivienda: [
-        response(`${caseId}-home-1`, basics.livesWith || "Prefiero ir de a poco con eso, pero si puedo contar algo de mi casa si sirve.", { topic: "vivienda" })
+        response(`${caseId}-home-1`, residenceResponse, { topic: "vivienda" })
       ],
       convivencia: [
-        response(`${caseId}-home-legacy-1`, basics.livesWith || "Prefiero ir de a poco con eso, pero si puedo contar algo de mi casa si sirve.", { topic: "vivienda" })
+        response(`${caseId}-home-legacy-1`, residenceResponse, { topic: "vivienda" })
       ],
       familia_composicion: [
         response(`${caseId}-family-composition-1`, basics.familyComposition || facts.family || profile?.familyContext || "Tengo familia cerca, aunque me cuesta hablar demasiado de esto con ellos.", { topic: "familia" })
+      ],
+      hijos: [
+        response(`${caseId}-children-1`, childrenResponse, { topic: "hijos" })
       ],
       familia: [
         response(`${caseId}-family-1`, facts.family || profile?.familyContext || basics.familyComposition || "Tengo familia cerca, aunque no siempre hablo de lo que me pasa.", { topic: "familia" })
@@ -392,6 +397,76 @@ function lowerFirst(value) {
   const text = String(value || "").trim();
   if (!text) return "hay algo que me cuesta ordenar.";
   return `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+}
+
+function sentence(value) {
+  const text = String(value || "").trim();
+  if (!text || text === "No esta definido en el expediente inicial.") return "";
+  return /[.!?]$/.test(text) ? text : `${text}.`;
+}
+
+function withoutFinalDot(value) {
+  return String(value || "").trim().replace(/[.!?]+$/g, "");
+}
+
+function lowerFragment(value) {
+  const text = withoutFinalDot(value);
+  if (!text) return "";
+  return `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+}
+
+function stripResidenceLead(value) {
+  return withoutFinalDot(value)
+    .replace(/^actualmente\s+vivo\s+/i, "")
+    .replace(/^vivo\s+/i, "");
+}
+
+function buildResidenceResponse({ patientRecord, fallbackText }) {
+  const identity = patientRecord?.identity || {};
+  if (identity.residenceResponse) return identity.residenceResponse;
+
+  const city = identity.city && identity.city !== "No esta definido en el expediente inicial." ? identity.city : "";
+  const commune = identity.commune && identity.commune !== "No esta definido en el expediente inicial." ? identity.commune : "";
+  const place = commune && city ? `${commune}, ${city}` : commune || city;
+  const housingType = identity.housingType && identity.housingType !== "No esta definido en el expediente inicial."
+    ? identity.housingType
+    : "";
+  const livesWith = stripResidenceLead(identity.livesWith || fallbackText);
+  const experience = sentence(identity.residenceExperience);
+
+  let base = "";
+  if (place && housingType && livesWith) {
+    base = `Vivo en ${place}, en ${lowerFragment(housingType)}, ${lowerFragment(livesWith)}.`;
+  } else if (place && livesWith) {
+    base = `Vivo en ${place}. ${sentence(identity.livesWith || fallbackText)}`;
+  } else if (livesWith) {
+    base = sentence(identity.livesWith || fallbackText);
+  }
+
+  return `${base || "Puedo contarte algo de mi casa si sirve."}${experience ? ` ${experience}` : ""}`.trim();
+}
+
+function buildChildrenResponse({ patientRecord, fallbackText }) {
+  const children = patientRecord?.family?.children || [];
+  const livesWith = patientRecord?.identity?.livesWith || "";
+
+  if (!children.length) {
+    const residence = sentence(livesWith);
+    return `No tengo hijos.${residence ? ` ${residence}` : ""}`;
+  }
+
+  if (children.length === 1) {
+    const child = children[0];
+    if (!child.name && child.role === "hijo/a") {
+      return sentence(child.relationship || fallbackText || "Si, tengo hijos.");
+    }
+    const role = child.role && child.role !== "hijo/a" ? child.role : "hijo";
+    const name = child.name ? `, ${child.name}` : "";
+    const age = child.age ? `, de ${child.age} anos` : "";
+    return `Si, tengo un ${role}${name}${age}. ${sentence(child.relationship || fallbackText)}`.trim();
+  }
+
+  return `Si, tengo hijos. ${sentence(fallbackText || patientRecord?.family?.composition)}`.trim();
 }
 
 function buildRecordBasics({ patientRecord, caseId, facts, profile }) {

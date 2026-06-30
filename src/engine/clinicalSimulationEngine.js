@@ -78,6 +78,17 @@ export function generateClinicalSimulationResponse({
     taskDetails: actResult.taskDetails
   });
 
+  logClinicalTurnDebug({
+    studentMessage,
+    normalizedMessage: actResult.normalizedMessage,
+    detectedAct: actResult.detectedAct,
+    confidence: actResult.confidence,
+    patientId: caseId,
+    responseHandler: composed.responseHandler,
+    patientDataUsed: composed.patientDataUsed,
+    response: composed.responseText
+  });
+
   return {
     responseText: composed.responseText,
     responseId: `clinical-sim:${caseId}:${composed.responseId}`,
@@ -91,6 +102,8 @@ export function generateClinicalSimulationResponse({
     confidence: actResult.confidence,
     taskDetails: actResult.taskDetails,
     selectedResponseId: composed.responseId,
+    responseHandler: composed.responseHandler,
+    patientDataUsed: composed.patientDataUsed,
     stateBefore,
     stateAfter: memoryPatch
   };
@@ -111,7 +124,10 @@ export function detectClinicalTopic({
   if (detectedAct === "edad") return "edad";
   if (detectedAct === "vivienda") return "vivienda";
   if (detectedAct === "ocupacion_estudios") return "ocupacion_estudios";
-  if (detectedAct === "familia_composicion") return "familia_composicion";
+  if (detectedAct === "familia_composicion") {
+    if (/\b(hijos|hijo|hija|hijas|eres papa|eres mama)\b/.test(text)) return "hijos";
+    return "familia_composicion";
+  }
   if (detectedAct === "estado_civil_pareja") return "estado_civil_pareja";
   if (detectedAct === "red_apoyo") return "red_apoyo";
   if (detectedAct === "riesgo_autolesion") return "riesgo_autolesion";
@@ -182,4 +198,8 @@ function matchingSensitiveItem(text, profile) {
   return sensitiveItems.find((item) =>
     (item.keywords || []).some((keyword) => text.includes(normalizeText(keyword)))
   ) || null;
+}
+
+function logClinicalTurnDebug(payload) {
+  console.log(payload);
 }
