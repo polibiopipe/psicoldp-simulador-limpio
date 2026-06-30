@@ -16,28 +16,70 @@ const ACT_PATTERNS = [
     test: (text) => /\b(como te llamas|cual es tu nombre|tu nombre|dime tu nombre|quien eres)\b/.test(text)
   },
   {
-    act: "datos_basicos",
+    act: "encuadre_confidencialidad",
     confidence: 0.98,
-    reason: "edad_datos_basicos",
-    test: (text) => /\b(edad|cuantos anos|que edad tienes|anos tienes|en que trabajas|trabajas|a que te dedicas|ocupacion)\b/.test(text)
+    reason: "encuadre_confidencialidad",
+    test: (text) => /\b(todo lo que conversemos|todo lo que conversemos quedara|conversaciones seran privadas|nuestras conversaciones|lo que me digas quedara|conversacion quedara aqui|quedara entre nosotros|quedara aqui|queda resguardado|resguardare|resguardar|confidencialidad|confidencial|conversacion privada|privada|salvo que estes en riesgo|salvo que estes en peligro|situacion de riesgo|ponga en riesgo|te ponga en riesgo|estas de acuerdo)\b/.test(text)
   },
   {
-    act: "convivencia_familia",
-    confidence: 0.95,
-    reason: "convivencia_familia",
-    test: (text) => /\b(con quien vives|quienes viven contigo|vives solo|vives con|donde vives|familia|hijos|pareja|con tus padres|con tu familia)\b/.test(text)
+    act: "edad",
+    confidence: 0.98,
+    reason: "edad",
+    test: (text) => /\b(edad|cuantos anos|que edad tienes|anos tienes|tu edad|que edad)\b/.test(text)
+  },
+  {
+    act: "vivienda",
+    confidence: 0.97,
+    reason: "vivienda",
+    test: (text) => /\b(con quien vives|quienes viven contigo|vives solo|vives sola|vives con|donde vives|con quien estas viviendo|con quienes vives|con quienes vives)\b/.test(text)
+  },
+  {
+    act: "familia_composicion",
+    confidence: 0.96,
+    reason: "familia_composicion",
+    test: (text) => /\b(como se compone tu familia|quienes componen tu familia|quienes forman tu familia|quienes son parte de tu familia|quienes son tu familia|como es tu familia|familia cercana|tienes hermanos|tienes hermana|tienes hermano|hermanos|hermana|hermano|tu mama|tu papa|madre|padre|hijos|hija|hijo)\b/.test(text)
+  },
+  {
+    act: "estado_civil_pareja",
+    confidence: 0.96,
+    reason: "estado_civil_pareja",
+    test: (text) => /\b(eres casado|eres casada|estas casado|estas casada|tienes pareja|estas en pareja|tienes esposa|tienes esposo|tienes polola|tienes pololo|tienes novia|tienes novio|estado civil|vives con tu pareja|relacion de pareja)\b/.test(text)
+  },
+  {
+    act: "ocupacion_estudios",
+    confidence: 0.97,
+    reason: "ocupacion_estudios",
+    test: (text) => /\b(a que te dedicas|en que trabajas|trabajas|trabajo|ocupacion|que haces laboralmente|estudias|estudios|universidad|colegio|escuela|vas al colegio|vas a la escuela|que estudias|donde estudias|curso)\b/.test(text)
   },
   {
     act: "motivo_consulta",
     confidence: 0.97,
     reason: "motivo_consulta",
-    test: (text) => /\b(por que estas aqui|que te trae|que te trajo|que te hizo venir|que te pasa|motivo|consulta|por que viniste|que haces aqui|por que decidiste venir|que te llevo a consultar|por que llegaste|por que consultaste|venir a esta conversacion|trae a esta conversacion|que hizo que vinieras|que hizo que consultaras)\b/.test(text)
+    test: (text) => /\b(por que estas aqui|por que estas aca|que te trae|que te trajo|que te hizo venir|que te pasa|motivo|consulta|por que viniste|que haces aqui|que haces aca|por que decidiste venir|que te llevo a consultar|por que llegaste|por que consultaste|venir a esta conversacion|trae a esta conversacion|que hizo que vinieras|que hizo que consultaras|por que vienes|por que estas conversando)\b/.test(text)
   },
   {
-    act: "emocion",
+    act: "red_apoyo",
+    confidence: 0.94,
+    reason: "red_apoyo",
+    test: (text) => /\b(red de apoyo|apoyo|con quien cuentas|con quien hablas|a quien recurres|quien te ayuda|quienes te apoyan|personas cercanas|amigos|amistades|familia te apoya|recursos)\b/.test(text)
+  },
+  {
+    act: "riesgo_autolesion",
+    confidence: 0.99,
+    reason: "riesgo_autolesion",
+    test: (text) => /\b(hacerte dano|hacerte daNo|hacerte mal|hacer dano|has pensado en hacerte|quitarte la vida|suicid|morirte|no querer vivir|autolesion|autolesiones|lastimarte|danarte|danarte)\b/.test(text)
+  },
+  {
+    act: "consumo_sustancias",
+    confidence: 0.97,
+    reason: "consumo_sustancias",
+    test: (text) => /\b(consumes|consumo|alcohol|drogas|sustancias|marihuana|cannabis|pastillas|medicamentos sin receta|tomar de mas|otras sustancias)\b/.test(text)
+  },
+  {
+    act: "sintomas_malestar",
     confidence: 0.93,
-    reason: "emocion_malestar",
-    test: (text) => /\b(que sientes|que has sentido|has sentido|como te sientes|como te has sentido|como estas|como has estado|como lo has vivido|como lo viviste|como te afecta|que emociones|emociones aparecen|miedo|te da miedo|te preocupa|preocupacion|verguenza|triste|cansancio|cansado|desgaste|malestar|emocion|emociones|angustia|incomodidad)\b/.test(text)
+    reason: "sintomas_malestar",
+    test: (text) => /\b(que sientes|que has sentido|has sentido|como te sientes|como te has sentido|como estas|como has estado|como lo has vivido|como lo viviste|como te afecta|que emociones|emociones aparecen|miedo|te da miedo|te preocupa|preocupacion|verguenza|triste|tristeza|cansancio|cansado|cansada|desgaste|malestar|emocion|emociones|angustia|ansiedad|incomodidad|sintomas|que te pasa emocionalmente)\b/.test(text)
   },
   {
     act: "experiencia_vivida",
@@ -64,9 +106,9 @@ const ACT_PATTERNS = [
     test: (text) => /\b(agendar|agendamos|proxima sesion|puedes venir|podrias venir|te parece si vienes|vienes en|te espero|nos vemos el|nos vemos en|a las \d{1,2}|hrs|hora|lunes|martes|miercoles|jueves|viernes|sabado|domingo|\d+\s*(dias|semanas) mas)\b/.test(text)
   },
   {
-    act: "cierre",
+    act: "cierre_sesion",
     confidence: 0.94,
-    reason: "cierre",
+    reason: "cierre_sesion",
     test: (text) => /\b(cerrar|terminar|dejamos hasta aqui|dejemos hasta aqui|nos vemos|hasta la proxima|para cerrar|para finalizar|gracias por venir|terminamos por hoy|queda poco tiempo)\b/.test(text)
   },
   {

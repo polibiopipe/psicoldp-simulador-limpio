@@ -9,10 +9,19 @@ const DISCLOSURE_ORDER = {
 const BASIC_ACTS = new Set([
   "saludo",
   "identidad_nombre",
+  "edad",
+  "vivienda",
+  "ocupacion_estudios",
   "datos_basicos",
   "convivencia_familia",
+  "familia_composicion",
+  "estado_civil_pareja",
+  "red_apoyo",
+  "riesgo_autolesion",
+  "consumo_sustancias",
   "agenda_proxima_sesion",
-  "cierre"
+  "cierre",
+  "cierre_sesion"
 ]);
 
 export function composePatientResponse({
@@ -24,7 +33,13 @@ export function composePatientResponse({
   studentMessage = ""
 }) {
   const responseKey = resolveResponseKey({ detectedAct, clinicalTopic, state });
-  let responses = profile.responses[responseKey] || profile.responses.pregunta_confusa || [];
+  let responses = profile.responses[responseKey] || [];
+  if (!responses.length && detectedAct !== "pregunta_confusa") {
+    responses = profile.responses.no_definido || [];
+  }
+  if (!responses.length) {
+    responses = profile.responses.pregunta_confusa || [];
+  }
   if (responseKey === "motivo_consulta" && !state.revealedTopics?.includes("motivo_consulta")) {
     responses = responses.filter((candidate) => !candidate.id.includes("repeat"));
   }
@@ -33,7 +48,7 @@ export function composePatientResponse({
     usedResponseIds: state.usedResponseIds || [],
     usedResponseTexts: state.usedResponseTexts || [],
     disclosureLevel
-  }) || buildFallbackResponse({ detectedAct, clinicalTopic, state, disclosureLevel, studentMessage });
+  }) || buildFallbackResponse({ profile, detectedAct, clinicalTopic, state, disclosureLevel, studentMessage });
 
   const responseText = addRareActiveInteraction({
     text: candidate.text,
@@ -51,7 +66,7 @@ export function composePatientResponse({
 }
 
 function resolveResponseKey({ detectedAct, clinicalTopic, state }) {
-  if (state.studentHasClosedSession || detectedAct === "cierre") return "cierre";
+  if (state.studentHasClosedSession || detectedAct === "cierre" || detectedAct === "cierre_sesion") return "cierre_sesion";
   if (clinicalTopic === "limite_profundidad") return "limite_profundidad";
   if (detectedAct === "seguimiento_tarea") return "seguimiento_tarea";
   if (detectedAct === "confirmar_tarea") return "confirmar_tarea";
@@ -62,14 +77,23 @@ function resolveResponseKey({ detectedAct, clinicalTopic, state }) {
   if (detectedAct === "pregunta_confusa") return "pregunta_confusa";
   if (detectedAct === "saludo") return "saludo";
   if (detectedAct === "identidad_nombre") return "identidad_nombre";
+  if (detectedAct === "encuadre_confidencialidad") return "encuadre_confidencialidad";
+  if (detectedAct === "edad") return "edad";
+  if (detectedAct === "vivienda") return "vivienda";
+  if (detectedAct === "ocupacion_estudios") return "ocupacion_estudios";
   if (detectedAct === "datos_basicos") return clinicalTopic === "trabajo" ? "trabajo" : "edad";
+  if (detectedAct === "familia_composicion") return "familia_composicion";
+  if (detectedAct === "estado_civil_pareja") return "estado_civil_pareja";
+  if (detectedAct === "red_apoyo") return "red_apoyo";
+  if (detectedAct === "riesgo_autolesion") return "riesgo_autolesion";
+  if (detectedAct === "consumo_sustancias") return "consumo_sustancias";
   if (detectedAct === "convivencia_familia") return clinicalTopic === "familia" ? "familia" : "convivencia";
   if (detectedAct === "motivo_consulta" && state.revealedTopics?.includes("motivo_consulta")) return "repeticion";
   if (detectedAct === "motivo_consulta") return "motivo_consulta";
-  if (detectedAct === "emocion") {
+  if (detectedAct === "emocion" || detectedAct === "sintomas_malestar") {
     if (clinicalTopic === "miedo") return "miedo";
     if (clinicalTopic === "verguenza") return "verguenza";
-    return "emocion";
+    return "sintomas_malestar";
   }
   if (detectedAct === "experiencia_vivida") {
     if (clinicalTopic === "temporal") return "temporal";
@@ -105,8 +129,19 @@ function selectBestResponse({ responses, usedResponseIds, usedResponseTexts, dis
   return scored.sort((a, b) => a.score - b.score)[0]?.candidate || null;
 }
 
-function buildFallbackResponse({ detectedAct, clinicalTopic, state, disclosureLevel }) {
+function buildFallbackResponse({ profile, detectedAct, clinicalTopic, state, disclosureLevel }) {
   const id = `fallback-${detectedAct}-${clinicalTopic || "general"}-${state.turnCount || 0}`;
+
+  if (detectedAct !== "pregunta_confusa") {
+    const unknown = profile?.responses?.no_definido?.[0];
+    if (unknown) {
+      return {
+        ...unknown,
+        id,
+        topic: clinicalTopic || unknown.topic || "no_definido"
+      };
+    }
+  }
 
   if (detectedAct === "tarea_terapeutica" || detectedAct === "confirmar_tarea") {
     return {
@@ -129,11 +164,31 @@ function buildFallbackResponse({ detectedAct, clinicalTopic, state, disclosureLe
     };
   }
 
-  if (detectedAct === "cierre") {
+  if (detectedAct === "cierre" || detectedAct === "cierre_sesion") {
     return {
       id,
       text: "Esta bien. Me sirve dejarlo aqui y seguir ordenandolo con calma.",
       topic: "cierre",
+      minDisclosure: "low",
+      reveals: []
+    };
+  }
+
+  if (detectedAct === "riesgo_autolesion") {
+    return {
+      id,
+      text: "No, no he pensado en hacerme dano. Mi malestar va por otro lado.",
+      topic: "riesgo",
+      minDisclosure: "low",
+      reveals: []
+    };
+  }
+
+  if (detectedAct === "consumo_sustancias") {
+    return {
+      id,
+      text: "No, no consumo sustancias. No es un tema central para mi.",
+      topic: "consumo",
       minDisclosure: "low",
       reveals: []
     };
@@ -151,7 +206,7 @@ function buildFallbackResponse({ detectedAct, clinicalTopic, state, disclosureLe
 
   return {
     id,
-    text: "Me cuesta responderlo con claridad. Podria decir que sigo funcionando, pero con una sensacion de estar detenido.",
+    text: "Prefiero ir de a poco con eso. Puedo responder mejor si lo acotamos un poco.",
     topic: clinicalTopic || "fallback",
     minDisclosure: disclosureLevel || "low",
     reveals: []
@@ -184,18 +239,39 @@ function cleanPatientVoice(text) {
     .replace(/\bClaudio siente\b/g, "yo siento")
     .replace(/\bel paciente\b/gi, "yo")
     .replace(/\bse siente\b/gi, "me siento")
+    .replace(/^siente que\b/i, "Siento que")
+    .replace(/^cree que\b/i, "Creo que")
+    .replace(/^sabe que\b/i, "Se que")
+    .replace(/^teme\b/i, "Me da miedo")
+    .replace(/^le cuesta\b/i, "Me cuesta")
+    .replace(/^le preocupa\b/i, "Me preocupa")
+    .replace(/\bla esta agotando\b/gi, "me esta agotando")
+    .replace(/\blo esta agotando\b/gi, "me esta agotando")
+    .replace(/\bsu hijo\b/gi, "mi hijo")
+    .replace(/\bsu hija\b/gi, "mi hija")
+    .replace(/\bsus hijos\b/gi, "mis hijos")
+    .replace(/\bsus hijas\b/gi, "mis hijas")
+    .replace(/\ba si misma\b/gi, "a mi misma")
+    .replace(/\ba si mismo\b/gi, "a mi mismo")
+    .replace(/\bse mide a mi misma\b/gi, "me mido a mi misma")
+    .replace(/\bse mide a mi mismo\b/gi, "me mido a mi mismo")
+    .replace(/\bSe que ama a mi hijo\b/g, "Se que amo a mi hijo")
+    .replace(/\bse que ama a mi hijo\b/g, "se que amo a mi hijo")
+    .replace(/\bno entiende como\b/gi, "no entiendo como")
     .replace(/\bintervencion\b/gi, "pregunta")
     .replace(/\bresolvedIntent\b/g, "pregunta")
     .trim();
 }
 
 function buildFeedbackSignals({ detectedAct, clinicalTopic, responseKey, state }) {
+  const closureAct = detectedAct === "cierre" || detectedAct === "cierre_sesion";
   return {
     respondedConcreteAct: !["pregunta_confusa"].includes(detectedAct),
     disclosureWasLimited: responseKey === "limite_profundidad",
     empathyIncreasedTrust: detectedAct === "intervencion_empatica",
-    closureRespected: detectedAct === "cierre" || state.studentHasClosedSession,
+    closureRespected: closureAct || state.studentHasClosedSession,
     taskAccepted: responseKey === "tarea_terapeutica" || responseKey === "confirmar_tarea",
-    clinicalTopic
+    clinicalTopic,
+    usedPatientDossier: true
   };
 }

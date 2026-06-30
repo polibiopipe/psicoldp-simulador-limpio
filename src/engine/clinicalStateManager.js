@@ -77,8 +77,8 @@ export function updateClinicalState({
   const nextTrust = clamp((state.trustLevel || 0) + delta);
   const studentHasShownEmpathy = state.studentHasShownEmpathy || detectedAct === "intervencion_empatica";
   const studentHasAskedMotive = state.studentHasAskedMotive || detectedAct === "motivo_consulta";
-  const studentHasAskedEmotion = state.studentHasAskedEmotion || detectedAct === "emocion";
-  const studentHasClosedSession = state.studentHasClosedSession || detectedAct === "cierre";
+  const studentHasAskedEmotion = state.studentHasAskedEmotion || detectedAct === "emocion" || detectedAct === "sintomas_malestar";
+  const studentHasClosedSession = state.studentHasClosedSession || detectedAct === "cierre" || detectedAct === "cierre_sesion";
   const taskWasAccepted = detectedAct === "tarea_terapeutica" || detectedAct === "confirmar_tarea";
   const nextTopic = clinicalTopic || state.currentTopic;
 
@@ -124,7 +124,7 @@ export function selectDisclosureLevel({ state, clinicalTopic, sessionNumber = 1 
     state.trustLevel >= 22
     || state.studentHasAskedEmotion
     || state.studentHasShownEmpathy
-    || ["emocion", "miedo", "verguenza", "experiencia_vivida"].includes(clinicalTopic)
+    || ["emocion", "sintomas_malestar", "miedo", "verguenza", "experiencia_vivida"].includes(clinicalTopic)
   ) {
     return "medium";
   }
@@ -191,9 +191,19 @@ function trustDeltaByAct(detectedAct) {
   const deltas = {
     saludo: 2,
     identidad_nombre: 1,
+    encuadre_confidencialidad: 6,
+    edad: 1,
+    vivienda: 2,
+    ocupacion_estudios: 2,
     datos_basicos: 1,
+    familia_composicion: 2,
+    estado_civil_pareja: 2,
     convivencia_familia: 2,
     motivo_consulta: 5,
+    red_apoyo: 3,
+    sintomas_malestar: 6,
+    riesgo_autolesion: 2,
+    consumo_sustancias: 1,
     emocion: 6,
     experiencia_vivida: 4,
     rutina: 3,
@@ -202,6 +212,7 @@ function trustDeltaByAct(detectedAct) {
     confirmar_tarea: 3,
     agenda_proxima_sesion: 2,
     cierre: 1,
+    cierre_sesion: 1,
     pregunta_confusa: -1,
     intervencion_confrontativa: -12,
     intervencion_empatica: 14

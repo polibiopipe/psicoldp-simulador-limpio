@@ -536,20 +536,21 @@ function categoriesForClinicalResponse(intent) {
 }
 
 function categoriesForClinicalSimulation(detectedAct, clinicalTopic) {
-  const closure = detectedAct === "cierre";
+  const closure = detectedAct === "cierre" || detectedAct === "cierre_sesion";
   const taskProposal = detectedAct === "tarea_terapeutica" || detectedAct === "confirmar_tarea";
-  const emotionalExploration = detectedAct === "emocion" || ["emocion", "miedo", "verguenza"].includes(clinicalTopic);
+  const emotionalExploration = ["emocion", "sintomas_malestar", "riesgo_autolesion"].includes(detectedAct)
+    || ["emocion", "sintomas_malestar", "miedo", "verguenza", "riesgo_autolesion"].includes(clinicalTopic);
 
   return {
-    framing: detectedAct === "saludo",
-    openQuestion: ["motivo_consulta", "emocion", "experiencia_vivida", "rutina", "apoyo_redes"].includes(detectedAct),
-    closedQuestion: ["identidad_nombre", "datos_basicos", "convivencia_familia", "agenda_proxima_sesion"].includes(detectedAct),
+    framing: detectedAct === "saludo" || detectedAct === "encuadre_confidencialidad",
+    openQuestion: ["motivo_consulta", "emocion", "sintomas_malestar", "experiencia_vivida", "rutina", "apoyo_redes", "red_apoyo"].includes(detectedAct),
+    closedQuestion: ["identidad_nombre", "edad", "vivienda", "ocupacion_estudios", "datos_basicos", "convivencia_familia", "familia_composicion", "estado_civil_pareja", "agenda_proxima_sesion", "riesgo_autolesion", "consumo_sustancias"].includes(detectedAct),
     validation: detectedAct === "intervencion_empatica",
     judgment: detectedAct === "intervencion_confrontativa",
     rushedAdvice: detectedAct === "intervencion_confrontativa",
     emotionalExploration,
-    familyExploration: detectedAct === "convivencia_familia" || clinicalTopic === "familia",
-    contextExploration: ["convivencia_familia", "rutina", "apoyo_redes"].includes(detectedAct),
+    familyExploration: ["convivencia_familia", "familia_composicion", "estado_civil_pareja", "vivienda"].includes(detectedAct) || clinicalTopic === "familia",
+    contextExploration: ["convivencia_familia", "familia_composicion", "vivienda", "ocupacion_estudios", "rutina", "apoyo_redes", "red_apoyo"].includes(detectedAct),
     closure,
     goodClosure: closure,
     continuityAgreement: detectedAct === "agenda_proxima_sesion" || closure,
@@ -558,7 +559,7 @@ function categoriesForClinicalSimulation(detectedAct, clinicalTopic) {
     followUp: detectedAct === "experiencia_vivida" || detectedAct === "seguimiento_tarea",
     preferencesExploration: clinicalTopic === "experiencia_vivida",
     concernExploration: detectedAct === "motivo_consulta",
-    supportExploration: detectedAct === "apoyo_redes",
+    supportExploration: detectedAct === "apoyo_redes" || detectedAct === "red_apoyo",
     taskProposal
   };
 }

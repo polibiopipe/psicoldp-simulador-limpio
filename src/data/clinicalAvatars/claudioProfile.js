@@ -19,7 +19,8 @@ export const claudioClinicalSimulationProfile = {
     age: "40 anos",
     livesWith: "Vivo solo.",
     work: "Trabajo y tengo estabilidad laboral.",
-    family: "Tengo familia, pero no suelo hablar demasiado de estas cosas."
+    family: "Mi familia cercana son mis padres y una hermana.",
+    relationshipStatus: "No estoy casado. Actualmente no estoy en pareja."
   },
 
   clinicalFrame: {
@@ -97,12 +98,24 @@ export const claudioClinicalSimulationProfile = {
       response("basic-work-1", "Trabajo y tengo estabilidad laboral. Cumplo, aunque ultimamente funciono mas por inercia.", { topic: "trabajo" }),
       response("basic-work-2", "Tengo una pega estable. Desde afuera no parece haber un problema, pero algo de la rutina se me volvio demasiado automatico.", { topic: "trabajo" })
     ],
+    encuadre_confidencialidad: [
+      response("framing-confidentiality-1", "Si, entiendo. Me parece bien. Me tranquiliza saber que esto queda resguardado, aunque igual me cuesta hablarlo.", { topic: "encuadre" }),
+      response("framing-confidentiality-2", "Si, estoy de acuerdo. Saber que no se va a hablar de esto afuera me deja un poco mas tranquilo.", { topic: "encuadre" })
+    ],
     convivencia: [
       response("basic-home-1", "Vivo solo. Tengo una rutina bastante ordenada en la casa.", { topic: "convivencia" }),
       response("basic-home-2", "Vivo solo. Es tranquilo, aunque a veces esa misma tranquilidad se parece demasiado a estar detenido.", { topic: "convivencia", minDisclosure: "medium" })
     ],
     familia: [
       response("basic-family-1", "Tengo familia, pero no suelo hablar con ellos de estas dudas. Generalmente muestro que estoy bien y sigo funcionando.", { topic: "familia" })
+    ],
+    familia_composicion: [
+      response("family-composition-1", "Mi familia cercana son mis padres y una hermana. Vivo solo, y no suelo hablar demasiado con ellos de estas cosas.", { topic: "familia" }),
+      response("family-composition-2", "Tengo a mis padres y una hermana. Hay contacto, pero generalmente muestro que estoy bien y sigo funcionando.", { topic: "familia", minDisclosure: "medium" })
+    ],
+    estado_civil_pareja: [
+      response("relationship-status-1", "No estoy casado. Actualmente no estoy en pareja; vivo solo. Es un tema que prefiero mirar con calma, porque se mezcla con esta sensacion de estar detenido.", { topic: "pareja" }),
+      response("relationship-status-2", "No, no tengo pareja ahora. Desde afuera puede parecer solo un dato, pero para mi toca algo de como he ido ordenando mi vida.", { topic: "pareja", minDisclosure: "medium" })
     ],
     motivo_consulta: [
       response("motive-1", "Creo que vine porque hace tiempo siento que estoy funcionando en automatico. No es una crisis puntual, pero si una sensacion de estar detenido.", { topic: "motivo", reveals: ["motivo_consulta"] }),

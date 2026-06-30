@@ -19,7 +19,7 @@ const flow = [
   {
     label: "pregunta emocional",
     message: "que sientes cuando hablas de eso",
-    expectedAct: "emocion"
+    expectedAct: "sintomas_malestar"
   },
   {
     label: "pregunta temporal",
@@ -69,7 +69,7 @@ const flow = [
   {
     label: "cierre de sesion",
     message: "para cerrar, dejamos hasta aqui y seguimos la proxima",
-    expectedAct: "cierre"
+    expectedAct: "cierre_sesion"
   }
 ];
 
