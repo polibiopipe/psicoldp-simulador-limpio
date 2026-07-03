@@ -1,0 +1,30 @@
+export const marcosSymptomHistory = {
+  onset: "Hace alrededor de un ano lo habria descrito como cansancio normal. En los ultimos seis meses empezo a notar que la irritabilidad y la desconexion llegaban a la casa.",
+  earlyForm: "Cansancio al final del dia, menos ganas de juntarse con amigos, revisar pendientes de noche.",
+  intensification: "Despertares antes de la alarma, tension mandibular, respuestas cortas con Paula y sensacion de no descansar.",
+  triggers: ["mensajes de Esteban fuera de horario", "errores de otros que debe corregir", "preguntas de Paula cuando llega agotado", "reuniones donde se siente evaluado"],
+  frequency: "Malestar casi diario en semanas de alta carga; irritabilidad mas visible dos o tres veces por semana.",
+  intensity: "Moderada, con picos altos cuando se mezclan presion laboral y conflicto de pareja.",
+  sleep: "Duerme, pero despierta temprano pensando en pendientes; a veces siente que no descanso.",
+  energy: "Baja al llegar a casa; conserva energia funcional en el trabajo.",
+  irritability: "Responde corto, suspira, mira el celular, evita conversaciones largas.",
+  concentration: "Buena para tareas laborales, pero con rumiacion y dificultad para desconectar.",
+  mood: "No se describe deprimido; se siente apagado, culpable y sobrepasado.",
+  anxiety: "Aceleracion antes de reuniones y urgencias; lo nombra como estar pendiente.",
+  guilt: "Aparece especialmente despues de responder mal a Paula o a su madre.",
+  shame: "Verguenza de no poder manejar algo que desde afuera parece normal.",
+  body: ["dolor de cabeza al final del dia", "mandibula tensa", "presion en el pecho antes de reuniones", "cansancio ocular"],
+  isolation: "Reduce encuentros con amigos y usa la pega como explicacion aceptable.",
+  substances: "Alcohol ocasional social; no hay consumo problematico. No consume otras sustancias.",
+  partnerImpact: "Paula siente distancia emocional y le pide presencia.",
+  workImpact: "Sigue cumpliendo, pero a costa de mas horas, mas control y menos recuperacion.",
+  familyImpact: "Contesta mas corto a su madre y luego se siente culpable.",
+  attemptedSolutions: ["ordenar mas", "hacer listas", "responder correos antes de dormir", "prometerse que el fin de semana descansara", "evitar conversaciones al llegar"],
+  protectiveFactors: ["vinculo con Paula", "capacidad reflexiva", "estabilidad laboral", "red familiar", "amigos antiguos", "preocupacion por no repetir patrones"],
+  patientLanguage: {
+    firstLayer: "Estoy cansado y con poca paciencia.",
+    secondLayer: "La pega se me mete a la casa.",
+    thirdLayer: "Despues me da culpa porque no quiero tratar mal a la gente que quiero.",
+    deepLayer: "Me asusta parecerme a mi papa cuando llegaba agotado."
+  }
+};

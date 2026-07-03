@@ -1,0 +1,805 @@
+import { normalizeText } from "../utils/textUtils.js";
+import { isCompositeOpenQuestionMessage } from "./compositeResponses.js";
+
+const intentLexicon = {
+  saludo: ["hola", "buenos dias", "buen dia", "buenas tardes", "buenas noches", "como estas", "como te encuentras"],
+  presentacion_estudiante: [
+    "antes quisiera presentarme",
+    "antes de comenzar quisiera presentarme",
+    "quiero presentarme primero",
+    "me presento",
+    "mi nombre es",
+    "soy el estudiante",
+    "soy quien va a conversar contigo",
+    "soy quien va a entrevistarte",
+    "voy a acompanarte",
+    "voy a acompañarte",
+    "quisiera presentarme"
+  ],
+  cortesia_vinculo: [
+    "un gusto conocerte",
+    "un gusto estar contigo",
+    "un gusto estar conectado contigo",
+    "gracias por estar aqui",
+    "gracias por conectarte",
+    "me alegra poder conversar contigo",
+    "espero que podamos conversar tranquilos",
+    "quiero que este sea un espacio seguro",
+    "vamos a conversar con calma"
+  ],
+  identidad_nombre: ["cual es tu nombre", "como te llamas", "dime tu nombre", "tu nombre", "quien eres"],
+  nombre: ["cual es tu nombre", "como te llamas", "me dices tu nombre", "quien eres", "como prefieres que te diga", "dime tu nombre", "tu nombre"],
+  edad: ["cuantos anos tienes", "que edad tienes", "edad"],
+  presentacion_personal_abierta: [
+    "cuentame de ti",
+    "hablame de ti",
+    "quiero conocerte",
+    "quiero conocerte un poco",
+    "partamos por ti",
+    "me gustaria saber de ti",
+    "cuentame quien eres",
+    "que me puedes contar de ti",
+    "comencemos conociendonos"
+  ],
+  rol_entrevistador: [
+    "sabes quien soy",
+    "sabes quien soy yo",
+    "sabes que hago aqui",
+    "sabes quien te va a entrevistar",
+    "sabes por que estoy hablando contigo",
+    "sabes que rol tengo",
+    "sabes que vamos a hacer"
+  ],
+  encuadre_o_consentimiento: [
+    "quiero explicarte",
+    "antes de comenzar quisiera explicarte",
+    "este es un espacio",
+    "espacio de entrevista simulada",
+    "entrevista simulada",
+    "podemos conversar con calma",
+    "vamos a conversar con calma",
+    "puedes tomarte tu tiempo",
+    "si algo te incomoda",
+    "objetivo de esta entrevista",
+    "lo que conversemos",
+    "fines educativos",
+    "queda entre tu y yo",
+    "quedara entre tu y yo",
+    "esto queda entre",
+    "lo que digas queda",
+    "salvo que estes en peligro",
+    "si estas en peligro",
+    "confidencialidad",
+    "confidencial",
+    "espacio de confianza"
+  ],
+  motivo_de_consulta: [
+    "sabes por que estas aqui",
+    "sabes por que estas aca",
+    "por que estas aqui",
+    "por que estas aca",
+    "que haces aqui",
+    "que haces aca",
+    "y tu que haces aqui",
+    "y tu que haces aca",
+    "por que viniste",
+    "sabes por que viniste",
+    "motivo",
+    "motivo de consulta",
+    "que te trae",
+    "por que te derivaron",
+    "por que te mandaron",
+    "que sucede",
+    "que te sucede",
+    "que esta pasando",
+    "que te esta pasando",
+    "cual es tu consulta",
+    "quien te derivo",
+    "que paso para que llegaras"
+  ],
+  derivacion_llegada: [
+    "quien te mando",
+    "quien te pidio venir",
+    "quien pidio que vinieras",
+    "quien quiso que vinieras",
+    "como llegaste aqui",
+    "como llegaste aca",
+    "viniste solo",
+    "viniste sola",
+    "te enviaron",
+    "te mandaron",
+    "te trajeron",
+    "te derivo",
+    "te derivaron",
+    "quien te trajo",
+    "tus papas te trajeron",
+    "tus padres te trajeron",
+    "tu mama te trajo",
+    "tu papa te trajo",
+    "fue idea tuya",
+    "viniste por tu cuenta"
+  ],
+  vivienda_residencia: [
+    "donde vives",
+    "con quien vives",
+    "vives solo",
+    "vives sola",
+    "vives con alguien",
+    "vives con tus padres",
+    "vives con tus papas",
+    "vives con tu familia",
+    "vives con mi familia",
+    "vives con tu pareja",
+    "en que lugar vives",
+    "con quien compartes casa"
+  ],
+  ocupacion_actividad: [
+    "a que te dedicas",
+    "a que te dedicas actualmente",
+    "en que trabajas",
+    "que haces actualmente",
+    "cual es tu trabajo",
+    "cual es tu ocupacion",
+    "trabajas",
+    "estudias o trabajas",
+    "que haces durante el dia"
+  ],
+  preocupacion_principal: [
+    "que te preocupa",
+    "que te preocupa de esto",
+    "que te preocupa mas",
+    "que es lo que mas te preocupa",
+    "cual es tu preocupacion",
+    "cual es tu principal preocupacion",
+    "que es lo que mas te inquieta",
+    "que te inquieta",
+    "que te da miedo de esto",
+    "que es lo que mas te pesa"
+  ],
+  preferencias_valoracion: [
+    "que esperas de esta conversacion",
+    "que esperas de la entrevista",
+    "que te gustaria lograr",
+    "que te gustaria que pasara",
+    "que te gusta",
+    "que haces en tu tiempo libre",
+    "que valoras",
+    "que seria util",
+    "que te ayudaria",
+    "quieres que te ayude"
+  ],
+  pregunta_escolar: ["vas al colegio", "vas a la escuela", "vas a clases", "estas en el colegio", "estas en la escuela", "sigues en el colegio", "colegio", "escuela", "curso"],
+  pregunta_academica: ["estudias", "universidad", "carrera", "ramos", "que estudias", "clases", "rendimiento"],
+  pregunta_laboral: ["trabajas", "trabajo", "pega", "laboral", "en que trabajas", "oficina", "jefatura"],
+  pregunta_familiar: ["vives con", "con quien vives", "tus papas", "tus padres", "familia", "hijos", "hija", "pareja", "separacion", "mama", "papa"],
+  amistades_red_social: [
+    "tienes amigos",
+    "teni amigos",
+    "tenis amigos",
+    "tienes amistades",
+    "tienes companeros",
+    "no tienes amigos",
+    "con quien hablas",
+    "sales con alguien",
+    "tienes grupo",
+    "tienes amigos en el colegio",
+    "tienes amigos online",
+    "hablas con gente"
+  ],
+  pregunta_social: ["tienes amigos", "tienes amigas", "amigos", "companeros", "sales", "te juntas", "hablas con alguien"],
+  pregunta_videojuegos: ["juegas videojuegos", "videojuegos", "juegas mucho", "juegas harto", "computador", "que juegos", "redes sociales", "redes", "celular", "instagram", "tiktok"],
+  pregunta_habitos: ["duermes", "comes", "descansas", "audifonos", "rutina", "que haces cuando", "como duermes"],
+  validacion_emocional: [
+    "entiendo",
+    "tiene sentido",
+    "comprendo",
+    "no debe ser facil",
+    "debe ser dificil",
+    "no quiero juzgar",
+    "no estoy para juzgarte",
+    "te escucho",
+    "puedes tomarte tu tiempo",
+    "lo que sientes es importante",
+    "si para ti es importante",
+    "podemos comprenderlo juntos",
+    "no suena tonto",
+    "no es tonto",
+    "este es un lugar seguro",
+    "gracias por contar",
+    "gracias por contarlo",
+    "suena importante",
+    "podemos trabajarlo juntos",
+    "quiero acompanarte",
+    "puedes contarme lo que quieras",
+    "puedes contarme con calma",
+    "sin juzgarte",
+    "no voy a juzgarte"
+  ],
+  juicio_o_critica: ["flojo", "adict", "exageras", "eso te hace mal", "tienes que cambiar", "estas mal", "eres el problema", "deberias dejar"],
+  consejo_apresurado: ["deberias", "tienes que", "te recomiendo", "deja de", "lo mejor seria", "haz ejercicio", "organizate", "pon limites y listo"],
+  exploracion_emocional: ["que sientes", "como te sientes", "que te pasa", "que te sucede", "que es lo que sientes", "como lo vives", "que te cuesta mas", "que te cuesta contar", "que parte te duele", "te da miedo", "te da culpa", "te da rabia", "te da pena", "tu sientes", "sientes que", "tu sientes que"],
+  exploracion_contextual: ["como es en tu casa", "como es en tu trabajo", "como es en la universidad", "como es con tu familia", "como es con tus amigos", "que pasa ahi", "desde cuando pasa"],
+  cierre: ["adios", "cerrar", "cerramos por hoy", "terminar", "terminamos la sesion", "finalizar", "antes de terminar", "para cerrar", "gracias por conversar", "gracias por venir", "como quedas", "como te vas", "nos vemos", "hasta la proxima", "dejemos hasta aqui", "dejarlo hasta aqui", "terminemos por hoy", "proxima sesion", "siguiente sesion", "seguir conversando", "retomar en otra sesion", "que podriamos seguir conversando"]
+};
+
+const priority = [
+  "identidad_nombre",
+  "edad",
+  "convivencia_familia",
+  "vivienda_residencia",
+  "colegio_estudios",
+  "saludo",
+  "presentacion_estudiante",
+  "encuadre_mas_pregunta_abierta",
+  "encuadre_o_consentimiento",
+  "cortesia_vinculo",
+  "nombre",
+  "rol_entrevistador",
+  "presentacion_personal_abierta",
+  "derivacion_llegada",
+  "motivo_de_consulta",
+  "ocupacion_actividad",
+  "preocupacion_principal",
+  "preferencias_valoracion",
+  "pregunta_escolar",
+  "pregunta_academica",
+  "pregunta_laboral",
+  "pregunta_familiar",
+  "amistades_red_social",
+  "pregunta_social",
+  "pregunta_videojuegos",
+  "pregunta_habitos",
+  "seguimiento_contextual_breve",
+  "seguimiento_emocional_contextual",
+  "seguimiento_contextual_explicito",
+  "validacion_emocional",
+  "seguimiento_contextual",
+  "juicio_o_critica",
+  "consejo_apresurado",
+  "exploracion_emocional",
+  "exploracion_contextual",
+  "cierre",
+  "respuesta_general"
+];
+
+const contextualTopics = {
+  computador: ["computador", "videojuego", "jugar", "juego"],
+  digital: ["redes", "celular", "instagram", "tiktok", "pantalla", "online"],
+  encierro: ["encierro", "encierras", "encerrarme", "pieza", "audifonos"],
+  papas: ["papas", "padres", "mama", "papa"],
+  familia: ["familia", "hijos", "hija", "pareja", "casa", "separacion"],
+  colegio: ["colegio", "clases", "grupo", "companeros", "notas"],
+  universidad: ["universidad", "ramos", "estudiar", "carrera", "compañeros"],
+  trabajo: ["trabajo", "pega", "laboral", "jefatura", "oficina", "licencia"],
+  cansancio: ["cansancio", "cansado", "cansada", "agotado", "agotada"],
+  culpa: ["culpa", "culpable"],
+  descanso: ["descanso", "descansar"],
+  limites: ["limites", "decir que no", "disponible", "ayudar"],
+  separacion: ["separacion", "separado", "expareja", "hijos"],
+  retorno: ["volver", "retorno", "licencia", "rendir", "observada"],
+  jubilacion: ["jubilacion", "jubile", "rutina", "util"],
+  maternidad: ["maternidad", "hijo", "mama", "crianza"],
+  pertenencia: ["pertenecer", "encajar", "comparar", "primera generacion"],
+  migracion: ["migrar", "migracion", "pais", "cero", "lejos"],
+  decisiones: ["decidir", "decision", "cambio", "estancado", "rutina"],
+  comparacion: ["comparacion", "compararme", "comparar", "comparas", "con que te comparas"],
+  control: ["control", "controladora", "autoridad"],
+  miedo: ["miedo", "asusta", "temor"],
+  hija: ["hija", "adolescente"],
+  utilidad: ["util", "aportar", "lugar"],
+  cambio: ["cambio", "cambiar", "moverme"],
+  soledad: ["soledad", "sola", "solo"],
+  ayuda: ["ayuda", "pedir ayuda"],
+  silencio: ["callado", "silencio", "callas"],
+  default: []
+};
+
+const followUpCues = [
+  "por que",
+  "como asi",
+  "a que te refieres",
+  "que quieres decir",
+  "puedes explicarme mas",
+  "cuentame mas",
+  "que parte",
+  "que cosa",
+  "que tema",
+  "que te cuesta",
+  "que te cuesta contar",
+  "que pasa con eso",
+  "explicame",
+  "y despues que haces",
+  "como lo vives",
+  "cuando te pasa",
+  "en que sentido",
+  "me dijiste que",
+  "dijiste que",
+  "mencionaste que",
+  "cuando dices",
+  "cuando dijiste",
+  "a que te refieres con",
+  "que quieres decir con",
+  "que no es tan simple",
+  "por que no es tan simple",
+  "eso que dijiste",
+  "lo que mencionaste",
+  "que no estan viendo",
+  "tu que piensas",
+  "que piensas de eso"
+];
+
+const continuityTerms = [
+  "proxima sesion",
+  "siguiente sesion",
+  "retomar esto",
+  "podemos retomar",
+  "continuar profundizando",
+  "continuar con calma",
+  "otra sesion",
+  "volver a conversar",
+  "seguir hablando"
+];
+
+export function detectIntent(studentMessage, history = []) {
+  const text = normalizeText(studentMessage);
+  const matches = {};
+  const hardConcreteIntent = detectHardConcreteIntent(text);
+
+  for (const [intent, terms] of Object.entries(intentLexicon)) {
+    matches[intent] = terms.some((term) => text.includes(normalizeText(term)));
+  }
+
+  matches.identidad_nombre = matches.identidad_nombre || detectsIdentityName(text);
+  matches.presentacion_estudiante = matches.presentacion_estudiante || detectsStudentPresentation(text);
+  matches.encuadre_o_consentimiento = matches.encuadre_o_consentimiento || detectsFraming(text);
+  matches.encuadre_mas_pregunta_abierta =
+    isCompositeOpenQuestionMessage(studentMessage) ||
+    detectsCompoundFramingQuestion(text, matches);
+  matches.motivo_de_consulta = matches.motivo_de_consulta || detectsMotiveQuestion(text);
+  matches.derivacion_llegada = matches.derivacion_llegada || detectsDerivationArrival(text);
+  matches.amistades_red_social = matches.amistades_red_social || detectsFriendNetworkQuestion(text);
+  matches.ocupacion_actividad = matches.ocupacion_actividad || detectsOccupationActivity(text);
+  matches.vivienda_residencia = matches.vivienda_residencia || detectsResidenceQuestion(text);
+  matches.convivencia_familia = matches.vivienda_residencia;
+  matches.colegio_estudios = detectsSchoolStudyQuestion(text);
+  matches.preocupacion_principal = matches.preocupacion_principal || detectsMainConcernQuestion(text);
+  matches.respuesta_general = isGeneralOpenPrompt(text);
+  matches.reformulacion_empatica = detectsEmpathicReformulation(text);
+  matches.validacion_emocional = matches.validacion_emocional || matches.reformulacion_empatica;
+  const strongClosureDetected = detectsStrongClosure(text);
+  matches.cierre = matches.cierre || strongClosureDetected;
+  const supportiveStatementDetected = matches.validacion_emocional
+    && !detectsQuestionRequest(studentMessage, text);
+
+  if (matches.validacion_emocional && matches.motivo_de_consulta && !hasExplicitMotiveCue(text)) {
+    matches.motivo_de_consulta = false;
+  }
+  if (/\bespacio de confianza\b/.test(text) && !/\b(objetivo|entrevista|confidencial|confidencialidad|queda entre|peligro|quiero explicarte)\b/.test(text)) {
+    matches.validacion_emocional = true;
+    matches.encuadre_o_consentimiento = false;
+  }
+  if (matches.preocupacion_principal && !hasExplicitMotiveCue(text)) {
+    matches.motivo_de_consulta = false;
+  }
+
+  const lastPatientMessage = normalizeText(history.at(-1)?.answer || "");
+  const briefWhyFollowUpDetected = detectsBriefWhyFollowUp(text, lastPatientMessage);
+  const detectedEmotionInLastPatientMessage = detectEmotionInText(lastPatientMessage);
+  const emotionalFollowUpDetected = detectsEmotionalContextualFollowUp({
+    text,
+    lastPatientMessage,
+    detectedEmotionInLastPatientMessage
+  });
+  const explicitReferenceDetected = detectsExplicitContextualReference(text) || emotionalFollowUpDetected || briefWhyFollowUpDetected;
+  const contextualTopic = detectContextualTopic(text, history, explicitReferenceDetected);
+  matches.seguimiento_contextual_breve = briefWhyFollowUpDetected;
+  matches.seguimiento_emocional_contextual = emotionalFollowUpDetected;
+  matches.seguimiento_contextual_explicito = Boolean(explicitReferenceDetected && history.at(-1)?.answer);
+  matches.seguimiento_contextual = Boolean(contextualTopic) && !matches.seguimiento_contextual_explicito;
+
+  const intent = strongClosureDetected
+    ? "cierre"
+    : hardConcreteIntent
+      ? hardConcreteIntent
+      : supportiveStatementDetected
+      ? "validacion_emocional"
+      : priority.find((candidate) => matches[candidate]) || "desconocida";
+  const confidence = intent === "desconocida" ? 0.25 : contextualTopic ? 0.86 : 0.92;
+  const ambiguityDetected = emotionalFollowUpDetected || briefWhyFollowUpDetected ? false : isAmbiguousContextualMessage(text, explicitReferenceDetected);
+
+  return {
+    intent,
+    confidence,
+    normalizedText: text,
+    contextualTopic,
+    explicitReferenceDetected,
+    ambiguityDetected,
+    detectedEmotionInLastPatientMessage,
+    reformulationDetected: matches.reformulacion_empatica,
+    supportiveStatementDetected,
+    hardConcreteIntent,
+    studentName: extractStudentName(text),
+    matches,
+    categories: toLegacyCategories(intent, matches, text)
+  };
+}
+
+function detectHardConcreteIntent(text) {
+  if (detectsIdentityName(text)) return "identidad_nombre";
+  if (/\b(edad|cuantos anos|que edad tienes)\b/.test(text)) return "edad";
+  if (detectsResidenceQuestion(text)) return "convivencia_familia";
+  if (/\b(tienes hermanos|hermanos|hermanas|eres hijo unico|eres hija unica)\b/.test(text)) return "hermanos";
+  if (detectsSchoolStudyQuestion(text)) return "colegio_estudios";
+  if (detectsDerivationArrival(text)) return "derivacion_llegada";
+  if (detectsMotiveQuestion(text)) return "motivo_de_consulta";
+  if (detectsFriendNetworkQuestion(text)) return "amistades_red_social";
+  if (/\b(cuentame de tu familia|como es tu familia|tu familia|familia)\b/.test(text)) return "pregunta_familiar";
+  if (/\b(a que juegas|que te gusta jugar|videojuegos|computador|por que juegas|que juegos|juegas videojuegos)\b/.test(text)) return "pregunta_videojuegos";
+  if (/\b(como te sientes|que sientes|estas triste|estas incomodo|te da pena|te preocupa)\b/.test(text)) return "exploracion_emocional";
+  return null;
+}
+
+function detectContextualTopic(text, history, explicitReferenceDetected = false) {
+  if (intentLexicon.motivo_de_consulta.some((term) => text.includes(normalizeText(term)))) return null;
+  if (detectsIdentityName(text)) return null;
+  if (detectsDerivationArrival(text)) return null;
+  if (detectsFriendNetworkQuestion(text)) return null;
+  if (intentLexicon.presentacion_personal_abierta.some((term) => text.includes(normalizeText(term)))) return null;
+  if (detectsStudentPresentation(text) || detectsFraming(text)) return null;
+  if (detectsResidenceQuestion(text)) return null;
+  if (detectsOccupationActivity(text)) return null;
+  if (text.includes("que te cuesta mas")) return null;
+
+  const lastPatientMessage = normalizeText(history.at(-1)?.answer || "");
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  const isBrief = wordCount <= 9;
+  const hasFollowUpCue = followUpCues.some((cue) => text.includes(cue));
+  if (!lastPatientMessage || (!isBrief && !hasFollowUpCue && !explicitReferenceDetected)) return null;
+
+  for (const [topic, terms] of Object.entries(contextualTopics)) {
+    if (topic === "default") continue;
+    const asksTopic = terms.some((term) => text.includes(normalizeText(term)));
+    const lastHadTopic = terms.some((term) => lastPatientMessage.includes(normalizeText(term)));
+    if (asksTopic && isBrief) return topic;
+    if ((asksTopic && lastHadTopic) || (hasFollowUpCue && lastHadTopic)) return topic;
+  }
+
+  if (hasFollowUpCue) return "default";
+  if (explicitReferenceDetected) return "default";
+  return null;
+}
+
+function detectsEmotionalContextualFollowUp({ text, lastPatientMessage, detectedEmotionInLastPatientMessage }) {
+  const asksPersonalEmotionExample =
+    /\b(cuentame.*(te sientes|sientes).*juzgado|cuando te sientes|cuando sientes|te sientes juzgado|te sientes pasado a llevar)\b/.test(text);
+
+  if (lastPatientMessage && asksPersonalEmotionExample) return true;
+  if (!lastPatientMessage || !detectedEmotionInLastPatientMessage) return false;
+
+  const asksWhy = /\b(por que|porque)\b/.test(text);
+  const asksAboutFeeling =
+    /\b(te sientes asi|te sientes|dices eso|asi|por que asi)\b/.test(text) ||
+    /\b(por que|porque)\s+(estas|te sientes)?\s*(asi|mal|raro|rara|incomodo|incomoda|triste|cansado|cansada|nervioso|nerviosa|preocupado|preocupada|confundido|confundida|frustrado|frustrada)\b/.test(text);
+  const repeatsEmotion = text.includes(detectedEmotionInLastPatientMessage);
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+
+  return asksWhy && (asksAboutFeeling || repeatsEmotion || wordCount <= 4);
+}
+
+function detectsBriefWhyFollowUp(text, lastPatientMessage) {
+  if (!lastPatientMessage) return false;
+  if (!/^(por que|porque)$/.test(text.trim())) return false;
+  return lastPatientMessage.split(/\s+/).filter(Boolean).length >= 4;
+}
+
+function detectEmotionInText(text) {
+  const emotionTerms = [
+    "incomodo",
+    "incomoda",
+    "triste",
+    "cansado",
+    "cansada",
+    "nervioso",
+    "nerviosa",
+    "confundido",
+    "confundida",
+    "preocupado",
+    "preocupada",
+    "frustrado",
+    "frustrada",
+    "raro",
+    "rara",
+    "mal",
+    "mas o menos"
+  ];
+
+  return emotionTerms.find((term) => text.includes(term)) || "";
+}
+
+function detectsExplicitContextualReference(text) {
+  return (
+    /\b(me dijiste que|dijiste que|mencionaste que|cuando dices|cuando dijiste)\b/.test(text) ||
+    /\b(a que te refieres con|que quieres decir con|eso que dijiste|lo que mencionaste)\b/.test(text) ||
+    /\ba que .+ te refieres\b/.test(text) ||
+    /\b(que no es tan simple|por que no es tan simple)\b/.test(text)
+  );
+}
+
+function isAmbiguousContextualMessage(text, explicitReferenceDetected) {
+  if (explicitReferenceDetected) return false;
+  return /^(y|y eso|eso|como|por que|que cosa|explicate|no entiendo|como asi)$/.test(text);
+}
+
+function isGeneralOpenPrompt(text) {
+  return [
+    "cuentame",
+    "hablame mas",
+    "quiero entender",
+    "ayudame a entender",
+    "como ha sido",
+    "que ha pasado"
+  ].some((term) => text.includes(term));
+}
+
+function detectsStrongClosure(text) {
+  return /\b(adios|nos vemos|hasta la proxima|dejemos hasta aqui|dejarlo hasta aqui|lo dejamos hasta aqui|podemos dejarlo hasta aqui|cerramos por hoy|terminemos por hoy|terminamos la sesion|cerrar por hoy|para cerrar|antes de terminar|proxima sesion|siguiente sesion|retomar en otra sesion|continuar otro dia|gracias por conversar|gracias por venir|hoy pudimos conversar|como te vas|como quedas)\b/.test(text);
+}
+
+function detectsEmpathicReformulation(text) {
+  return /\b(entiendo que|comprendo que|si te entiendo bien|por lo que dices|por lo que cuentas|parece que|te escucho decir|suena a que|no es solo.+sino|no es solamente)\b/.test(text);
+}
+
+function detectsQuestionRequest(originalMessage, text) {
+  if (/[¿?]/.test(String(originalMessage))) return true;
+  return /\b(cuentame|podrias contarme|puedes contarme|a que te refieres|que quieres decir|como ocurre|como pasa|por que|quien|donde|cuando)\b/.test(text);
+}
+
+function detectsStudentPresentation(text) {
+  return (
+    /\bantes( de comenzar)? quisiera presentarme\b/.test(text) ||
+    /\bquiero presentarme( primero)?\b/.test(text) ||
+    /\bme presento\b/.test(text) ||
+    /\bmi nombre es\b/.test(text) ||
+    /\bsoy (el|la)? ?estudiante\b/.test(text) ||
+    /\bsoy quien va a (conversar|hablar|entrevistarse|entrevistarte) contigo\b/.test(text) ||
+    /\bsoy [a-z]+ y voy a (acompanarte|acompañarte|conversar contigo)\b/.test(text) ||
+    /\bpresentarme[, ]+[a-z]+\b/.test(text)
+  );
+}
+
+function detectsIdentityName(text) {
+  return (
+    /\bcomo te llamas\b/.test(text) ||
+    /\bcual es tu nombre\b/.test(text) ||
+    /\bdime tu nombre\b/.test(text) ||
+    /\btu nombre\b/.test(text) ||
+    /\bquien eres\b/.test(text)
+  );
+}
+
+function detectsFraming(text) {
+  return (
+    /\bquiero explicarte\b/.test(text) ||
+    /\bantes de comenzar.*(objetivo|entrevista|espacio)\b/.test(text) ||
+    /\b(este|esto) es un espacio\b/.test(text) ||
+    /\bentrevista simulada\b/.test(text) ||
+    /\bfines educativos\b/.test(text) ||
+    /\b(queda|quedara) entre tu y yo\b/.test(text) ||
+    /\besto queda entre\b/.test(text) ||
+    /\b(confidencial|confidencialidad)\b/.test(text) ||
+    /\bsalvo que estes en peligro\b/.test(text) ||
+    /\bespacio de confianza\b/.test(text) ||
+    /\bpodemos conversar con calma\b/.test(text) ||
+    /\bpuedes tomarte tu tiempo\b/.test(text) ||
+    /\bsi algo te incomoda\b/.test(text)
+  );
+}
+
+function detectsCompoundFramingQuestion(text, matches = {}) {
+  const hasFramingOrSupport =
+    detectsFraming(text) ||
+    matches.validacion_emocional ||
+    [
+      "antes de comenzar",
+      "podemos conversar con calma",
+      "no estoy para juzgarte",
+      "quiero comprender",
+      "este es un lugar seguro",
+      "este es un espacio seguro"
+    ].some((term) => text.includes(normalizeText(term)));
+
+  const hasOpenQuestion = [
+    "que te gustaria que entienda",
+    "que te gustaria que entendiera",
+    "que te gustaria que comprendiera",
+    "que quieres que comprenda",
+    "que quieres que entienda",
+    "que deberia entender",
+    "que deberia comprender",
+    "que te trae hoy",
+    "que te preocupa",
+    "que estas viviendo",
+    "que estas pasando",
+    "que te esta pasando",
+    "que te gustaria contar",
+    "que seria importante que entienda"
+  ].some((term) => text.includes(normalizeText(term)));
+
+  return hasFramingOrSupport && hasOpenQuestion;
+}
+
+function detectsMotiveQuestion(text) {
+  return (
+    /\bque te (trae|trajo) (aqui|aca)\b/.test(text) ||
+    /\bpor que estas( hoy)? (aqui|aca)\b/.test(text) ||
+    /\bpor qu estas( hoy)? (aqui|aca)\b/.test(text) ||
+    /\b(y tu )?que haces (aqui|aca)\b/.test(text) ||
+    /\bpor que viniste\b/.test(text) ||
+    /\bcual es tu consulta\b/.test(text) ||
+    /\bmotivo de consulta\b/.test(text) ||
+    /\bque paso para que (llegaras|vinieras)\b/.test(text)
+  );
+}
+
+function hasExplicitMotiveCue(text) {
+  return (
+    /\bsabes por que estas (aqui|aca)\b/.test(text) ||
+    /\bpor que estas( hoy)? (aqui|aca)\b/.test(text) ||
+    /\bpor qu estas( hoy)? (aqui|aca)\b/.test(text) ||
+    /\b(y tu )?que haces (aqui|aca)\b/.test(text) ||
+    /\bpor que viniste\b/.test(text) ||
+    /\bsabes por que viniste\b/.test(text) ||
+    /\bmotivo( de consulta)?\b/.test(text) ||
+    /\bcual es tu consulta\b/.test(text) ||
+    /\bque te trae\b/.test(text) ||
+    /\bpor que te (derivaron|mandaron)\b/.test(text) ||
+    /\bquien te derivo\b/.test(text) ||
+    /\bque paso para que llegaras\b/.test(text)
+  );
+}
+
+function extractStudentName(text) {
+  const patterns = [
+    /\bmi nombre es ([a-z]+)\b/,
+    /\bme llamo ([a-z]+)\b/,
+    /\bpresentarme[, ]+([a-z]+)\b/,
+    /\bsoy ([a-z]+) y voy\b/,
+    /\bsoy ([a-z]+),? (el|la)? ?estudiante\b/
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1] && !["quien", "estudiante"].includes(match[1])) {
+      return capitalizeName(match[1]);
+    }
+  }
+  return "";
+}
+
+function capitalizeName(name) {
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function detectsOccupationActivity(text) {
+  if (text.includes("que haces cuando")) return false;
+  return (
+    /\ba que te dedicas\b/.test(text) ||
+    /\ben que trabajas\b/.test(text) ||
+    /\bcual es tu trabajo\b/.test(text) ||
+    /\bcual es tu ocupacion\b/.test(text) ||
+    /\bestudias o trabajas\b/.test(text) ||
+    /\bque haces actualmente\b/.test(text) ||
+    /\bque haces durante el dia\b/.test(text) ||
+    /^(comprendo|entiendo|ok|ya|bien)?[, ]*que haces[? ]*$/.test(text.trim()) ||
+    /^(comprendo|entiendo|ok|ya|bien)?[, ]*trabajas[? ]*$/.test(text.trim())
+  );
+}
+
+function detectsDerivationArrival(text) {
+  return (
+    /\bquien te mando\b/.test(text) ||
+    /\bquien te pidio venir\b/.test(text) ||
+    /\bquien pidio que vinieras\b/.test(text) ||
+    /\bquien quiso que vinieras\b/.test(text) ||
+    /\bcomo llegaste (aqui|aca)\b/.test(text) ||
+    /\bviniste (solo|sola)\b/.test(text) ||
+    /\bte (enviaron|mandaron|trajeron|derivo|derivaron)\b/.test(text) ||
+    /\bquien te derivo\b/.test(text) ||
+    /\bquien te trajo\b/.test(text) ||
+    /\btus (papas|padres) te trajeron\b/.test(text) ||
+    /\btu (mama|papa) te trajo\b/.test(text) ||
+    /\bfue idea tuya\b/.test(text) ||
+    /\bviniste por tu cuenta\b/.test(text)
+  );
+}
+
+function detectsFriendNetworkQuestion(text) {
+  return (
+    /\b(no )?tienes amigos\b/.test(text) ||
+    /\bteni(s)? amigos\b/.test(text) ||
+    /\btienes amistades\b/.test(text) ||
+    /\btienes companeros\b/.test(text) ||
+    /\bcon quien hablas\b/.test(text) ||
+    /\bsales con alguien\b/.test(text) ||
+    /\btienes grupo\b/.test(text) ||
+    /\btienes amigos (en el colegio|online)\b/.test(text) ||
+    /\bhablas con gente\b/.test(text)
+  );
+}
+
+function detectsResidenceQuestion(text) {
+  return (
+    /\bdonde vives\b/.test(text) ||
+    /\bcon quien vives\b/.test(text) ||
+    /\bcon quienes vives\b/.test(text) ||
+    /\bquien vive contigo\b/.test(text) ||
+    /\bquienes viven contigo\b/.test(text) ||
+    /\bvives solo\b/.test(text) ||
+    /\bvives sola\b/.test(text) ||
+    /\bvives con alguien\b/.test(text) ||
+    /\bvives con (tus|tu) (padres|papas|familia|pareja)\b/.test(text) ||
+    /\ben que lugar vives\b/.test(text) ||
+    /\bcon quien compartes casa\b/.test(text)
+  );
+}
+
+function detectsSchoolStudyQuestion(text) {
+  return (
+    /\bvas al colegio\b/.test(text) ||
+    /\bvas a la escuela\b/.test(text) ||
+    /\bvas a clases\b/.test(text) ||
+    /\bestas en el colegio\b/.test(text) ||
+    /\bestas en la escuela\b/.test(text) ||
+    /\bsigues en el colegio\b/.test(text) ||
+    /\bestudias\b/.test(text) ||
+    /\ben que curso estas\b/.test(text) ||
+    /\bque curso\b/.test(text) ||
+    /\bcomo te va en el colegio\b/.test(text) ||
+    /\bcomo es el colegio para ti\b/.test(text)
+  );
+}
+
+function detectsMainConcernQuestion(text) {
+  return (
+    /\bque te preocupa( de (esto|todo esto))?\b/.test(text) ||
+    /\bque te preocupa mas\b/.test(text) ||
+    /\bque es lo que mas te preocupa\b/.test(text) ||
+    /\bcual es tu( principal)? preocupacion\b/.test(text) ||
+    /\bque te inquieta\b/.test(text) ||
+    /\bque es lo que mas te inquieta\b/.test(text) ||
+    /\bque te da miedo de esto\b/.test(text) ||
+    /\bque es lo que mas te pesa\b/.test(text)
+  );
+}
+
+function toLegacyCategories(intent, matches, text = "") {
+  const continuityAgreement = continuityTerms.some((term) => text.includes(term));
+  return {
+    greeting: intent === "saludo",
+    framing: intent === "rol_entrevistador" || intent === "cortesia_vinculo" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta_abierta",
+    openQuestion: /^(encuadre_mas_pregunta_abierta|presentacion_personal_abierta|motivo_de_consulta|derivacion_llegada|preocupacion_principal|seguimiento_contextual_breve|seguimiento_emocional_contextual|seguimiento_contextual|seguimiento_contextual_explicito|exploracion_emocional|exploracion_contextual|respuesta_general|desconocida)$/.test(intent),
+    closedQuestion: intent.startsWith("pregunta_") || intent === "colegio_estudios" || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "convivencia_familia" || intent === "identidad_nombre" || intent === "nombre" || intent === "edad",
+    validation: intent === "validacion_emocional",
+    reformulation: Boolean(matches.reformulacion_empatica),
+    judgment: intent === "juicio_o_critica",
+    rushedAdvice: intent === "consejo_apresurado",
+    emotionalExploration: intent === "exploracion_emocional" || intent === "seguimiento_contextual_breve" || intent === "seguimiento_emocional_contextual" || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito",
+    familyExploration: intent === "pregunta_familiar" || intent === "vivienda_residencia" || intent === "convivencia_familia",
+    academicExploration: intent === "colegio_estudios" || intent === "pregunta_escolar" || intent === "pregunta_academica" || intent === "ocupacion_actividad",
+    workExploration: intent === "pregunta_laboral" || intent === "ocupacion_actividad",
+    digitalExploration: intent === "pregunta_videojuegos",
+    supportExploration: intent === "pregunta_social" || intent === "amistades_red_social",
+    contextExploration: intent.startsWith("pregunta_") || intent === "colegio_estudios" || intent === "ocupacion_actividad" || intent === "vivienda_residencia" || intent === "convivencia_familia" || intent === "derivacion_llegada" || intent === "amistades_red_social" || intent === "seguimiento_contextual_breve" || intent === "seguimiento_emocional_contextual" || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito" || intent === "exploracion_contextual",
+    closure: intent === "cierre",
+    goodClosure: intent === "cierre" && matches.validacion_emocional,
+    continuityAgreement,
+    pressure: false,
+    prematureInterpretation: false,
+    paceRespect: intent === "cortesia_vinculo" || intent === "rol_entrevistador" || intent === "presentacion_estudiante" || intent === "encuadre_o_consentimiento" || intent === "encuadre_mas_pregunta_abierta",
+    empathicSummary: intent === "seguimiento_contextual_breve" || intent === "seguimiento_emocional_contextual" || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito",
+    followUp: intent === "seguimiento_contextual_breve" || intent === "seguimiento_emocional_contextual" || intent === "seguimiento_contextual" || intent === "seguimiento_contextual_explicito",
+    preferencesExploration: intent === "preferencias_valoracion",
+    concernExploration: intent === "preocupacion_principal" || intent === "derivacion_llegada",
+    repeatedQuestion: false
+  };
+}
