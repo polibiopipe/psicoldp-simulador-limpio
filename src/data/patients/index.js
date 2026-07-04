@@ -2,6 +2,8 @@ import { caseProfiles } from "../caseProfiles.js";
 import { patientFacts } from "../patientFacts.js";
 import { marcosBasicProfile } from "./marcosBasicProfile.js";
 import { marcosPremiumPatient } from "./marcos/index.js";
+import { tomasDeepPatient } from "./tomas/index.js";
+import { warnIncompletePatientRecords } from "./patientSchema.js";
 
 const UNKNOWN = "No esta definido en el expediente inicial.";
 
@@ -743,12 +745,15 @@ export const patientMasterRecords = Object.fromEntries(
   ])
 );
 
+warnIncompletePatientRecords(patientMasterRecords);
+
 export function getPatientMasterRecord(caseId) {
   return patientMasterRecords[caseId] || null;
 }
 
 function buildPatientRecord(caseId) {
   if (caseId === "marcos") return marcosPremiumPatient;
+  if (caseId === "tomas") return tomasDeepPatient;
 
   const profile = caseProfiles[caseId] || {};
   const facts = patientFacts[caseId] || {};

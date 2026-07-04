@@ -68,7 +68,7 @@ export const pedagogicalGuides = {
     text:
       "Al finalizar la sesion decide si corresponde continuar, cerrar, derivar, activar una red, solicitar supervision o realizar seguimiento.",
     example:
-      "No todos los casos avanzan automaticamente a cuatro sesiones. La continuidad debe justificarse clinicamente.",
+      "No todos los casos requieren el mismo numero de sesiones. La continuidad debe justificarse clinicamente.",
     objective: "Entrenar criterio clinico y toma de decisiones."
   },
   nota_clinica: {

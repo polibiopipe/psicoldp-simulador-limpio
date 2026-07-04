@@ -20,6 +20,7 @@ export function AvatarSessionView({
   avatarState = "idle",
   caseItem,
   sessionNumber = 1,
+  totalSessions = 4,
   turnCount = 0,
   onFinish
 }) {
@@ -46,6 +47,7 @@ export function AvatarSessionView({
         </span>
         <div>
           <span className="video-turn-count">{turnCount} {turnCount === 1 ? "turno" : "turnos"}</span>
+          <span className="video-turn-count">Sesion {sessionNumber} de {totalSessions}</span>
           <time dateTime={`PT${elapsedSeconds}S`}>
             <Clock3 aria-hidden="true" />
             {formatTimer(elapsedSeconds)}

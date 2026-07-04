@@ -5606,3 +5606,558 @@ body,
     min-height: 46px;
   }
 }
+
+/* Active pre-session preparation */
+@keyframes prepAssistantBreathe {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 18px 38px rgba(15, 43, 70, 0.14);
+  }
+
+  50% {
+    transform: scale(1.025);
+    box-shadow: 0 22px 46px rgba(23, 109, 117, 0.2);
+  }
+}
+
+@keyframes prepMessageIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.clinical-preparation-panel {
+  position: relative;
+  overflow: hidden;
+  gap: 20px;
+  border: 1px solid rgba(23, 109, 117, 0.14);
+  border-radius: 28px;
+  padding: clamp(20px, 3vw, 30px);
+  background:
+    radial-gradient(circle at 92% 8%, rgba(201, 164, 90, 0.14), transparent 30%),
+    linear-gradient(135deg, rgba(255, 253, 248, 0.98), rgba(240, 250, 249, 0.9)),
+    #ffffff;
+  box-shadow: 0 28px 70px rgba(15, 43, 70, 0.12);
+}
+
+.clinical-prep-hero {
+  display: grid;
+  gap: 10px;
+}
+
+.clinical-prep-hero .panel-heading {
+  align-items: flex-start;
+}
+
+.clinical-prep-hero .panel-heading > svg {
+  width: 42px;
+  height: 42px;
+  padding: 9px;
+  border-radius: 16px;
+  color: #063f46;
+  background: linear-gradient(135deg, rgba(42, 154, 164, 0.16), rgba(201, 164, 90, 0.18));
+}
+
+.clinical-prep-hero h2 {
+  margin: 2px 0 0;
+  color: #0f2b46;
+  font-size: clamp(1.55rem, 2.5vw, 2rem);
+  line-height: 1.12;
+}
+
+.clinical-prep-hero p {
+  max-width: 74ch;
+  margin: 0;
+  color: #4a5d66;
+  font-size: 1rem;
+  line-height: 1.62;
+}
+
+.prep-workflow-stepper {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.prep-step {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-height: 124px;
+  border: 1px solid rgba(15, 43, 70, 0.1);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.76);
+  color: #5f6f73;
+  box-shadow: 0 12px 28px rgba(15, 43, 70, 0.06);
+}
+
+.prep-step-index {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(15, 43, 70, 0.06);
+  color: #5f6f73;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.prep-step svg {
+  position: absolute;
+  top: 15px;
+  right: 14px;
+  width: 20px;
+  height: 20px;
+}
+
+.prep-step strong {
+  align-self: end;
+  color: #10212b;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.prep-step small {
+  color: #6b7b82;
+  font-weight: 750;
+}
+
+.prep-step.completed {
+  border-color: rgba(42, 154, 164, 0.3);
+  background: linear-gradient(135deg, rgba(232, 249, 247, 0.95), rgba(255, 255, 255, 0.9));
+}
+
+.prep-step.completed .prep-step-index,
+.prep-step.completed svg {
+  color: #007c7a;
+}
+
+.prep-step.completed .prep-step-index {
+  background: rgba(42, 154, 164, 0.15);
+}
+
+.prep-step.in-progress {
+  border-color: rgba(201, 164, 90, 0.42);
+  background: linear-gradient(135deg, rgba(255, 249, 240, 0.98), rgba(255, 255, 255, 0.92));
+  box-shadow: 0 18px 38px rgba(201, 164, 90, 0.12);
+}
+
+.prep-step.in-progress .prep-step-index,
+.prep-step.in-progress svg {
+  color: #9a6f1e;
+}
+
+.prep-step.in-progress .prep-step-index {
+  background: rgba(201, 164, 90, 0.18);
+}
+
+.prep-assistant-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  border: 1px solid rgba(23, 109, 117, 0.15);
+  border-radius: 22px;
+  padding: 14px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(240, 250, 249, 0.92)),
+    #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 43, 70, 0.1);
+}
+
+.prep-assistant-card.minimized {
+  grid-template-columns: auto auto;
+  justify-content: start;
+  width: fit-content;
+}
+
+.prep-assistant-orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #063f46, #176d75);
+  color: #fff9f0;
+  animation: prepAssistantBreathe 4200ms ease-in-out infinite;
+}
+
+.prep-assistant-orb span {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(201, 164, 90, 0.82);
+  border-left-color: transparent;
+  border-radius: 999px;
+}
+
+.prep-assistant-orb svg {
+  width: 20px;
+  height: 20px;
+  color: #f3d38a;
+}
+
+.prep-assistant-message {
+  animation: prepMessageIn 220ms ease-out both;
+}
+
+.prep-assistant-message > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.prep-assistant-message span {
+  color: #0f2b46;
+  font-weight: 900;
+}
+
+.prep-assistant-message button,
+.prep-assistant-show {
+  border: 1px solid rgba(23, 109, 117, 0.18);
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #176d75;
+  font-weight: 800;
+}
+
+.prep-assistant-message button:hover,
+.prep-assistant-show:hover {
+  background: #eefaf9;
+  color: #063f46;
+}
+
+.prep-assistant-message p {
+  margin: 6px 0 0;
+  color: #40545d;
+  line-height: 1.58;
+}
+
+.clinical-preparation-panel .clinical-prep-field {
+  border: 1px solid rgba(15, 43, 70, 0.08);
+  border-radius: 20px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 12px 30px rgba(15, 43, 70, 0.06);
+}
+
+.clinical-preparation-panel .clinical-prep-field > span {
+  color: #0f2b46;
+  font-size: 1rem;
+}
+
+.clinical-prep-field small {
+  color: #5f6f73;
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.clinical-preparation-panel .clinical-prep-field select,
+.clinical-preparation-panel .clinical-prep-field textarea {
+  border-color: rgba(23, 109, 117, 0.2);
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(15, 43, 70, 0.04);
+}
+
+.clinical-preparation-panel .clinical-prep-field select:focus,
+.clinical-preparation-panel .clinical-prep-field textarea:focus {
+  border-color: rgba(42, 154, 164, 0.55);
+  outline: 3px solid rgba(42, 154, 164, 0.16);
+}
+
+.session-plan-field {
+  gap: 12px;
+}
+
+.session-count-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  padding: 8px 12px;
+  border: 1px solid rgba(23, 109, 117, 0.22);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 249, 240, 0.95), rgba(244, 250, 249, 0.95));
+}
+
+.session-count-control input {
+  width: 82px;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 8px;
+  color: #0f2b46;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(23, 109, 117, 0.16);
+  font: inherit;
+  font-weight: 800;
+  text-align: center;
+}
+
+.session-count-control input:focus {
+  outline: 3px solid rgba(42, 154, 164, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(23, 109, 117, 0.34);
+}
+
+.session-count-control span {
+  color: #176d75;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.prep-help-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 3px solid #c9a45a;
+  border-radius: 12px;
+  color: #516468;
+  background: rgba(255, 249, 240, 0.74);
+}
+
+.prep-example-list {
+  display: grid;
+  gap: 8px;
+}
+
+.prep-example-list span {
+  border-left: 3px solid rgba(201, 164, 90, 0.62);
+  border-radius: 12px;
+  padding: 9px 11px;
+  background: rgba(255, 249, 240, 0.92);
+  color: #56676e;
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.clinical-preparation-panel .clinical-area-grid label,
+.ethical-care-grid label {
+  min-height: 44px;
+  border-color: rgba(23, 109, 117, 0.13);
+  background: rgba(255, 255, 255, 0.86);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.clinical-preparation-panel .clinical-area-grid label:has(input:checked),
+.ethical-care-grid label:has(input:checked) {
+  border-color: rgba(42, 154, 164, 0.4);
+  background: rgba(232, 249, 247, 0.88);
+  color: #0f2b46;
+}
+
+.clinical-preparation-panel .clinical-area-grid label:hover,
+.ethical-care-grid label:hover {
+  transform: translateY(-1px);
+}
+
+.ethical-care-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.ethical-care-grid label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  border: 1px solid rgba(15, 92, 99, 0.14);
+  border-radius: 12px;
+  padding: 10px 11px;
+  color: #52606d;
+  font-weight: 750;
+}
+
+.ethical-care-grid input {
+  margin-top: 3px;
+  accent-color: #176d75;
+}
+
+.prep-priority-status {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(42, 154, 164, 0.09);
+  color: #21444c;
+}
+
+.prep-priority-status strong {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #176d75;
+  color: #ffffff;
+}
+
+.prep-priority-status span {
+  font-size: 0.9rem;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
+.prep-priority-status.warning {
+  background: rgba(255, 246, 239, 0.98);
+  color: #7a4227;
+}
+
+.prep-priority-status.warning strong {
+  background: #d9855b;
+}
+
+.prep-summary-card {
+  border: 1px solid rgba(23, 109, 117, 0.16);
+  border-radius: 24px;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 95% 12%, rgba(42, 154, 164, 0.12), transparent 32%),
+    linear-gradient(135deg, rgba(255, 249, 240, 0.96), rgba(255, 255, 255, 0.94));
+  box-shadow: 0 22px 52px rgba(15, 43, 70, 0.1);
+}
+
+.prep-summary-card h3 {
+  margin: 0;
+  color: #0f2b46;
+  font-size: 1.25rem;
+}
+
+.prep-summary-card > p {
+  margin: 10px 0 16px;
+  color: #52606d;
+  line-height: 1.55;
+}
+
+.prep-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.prep-summary-grid div {
+  border: 1px solid rgba(15, 43, 70, 0.08);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.prep-summary-grid dt {
+  margin-bottom: 5px;
+  color: #176d75;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.prep-summary-grid dd {
+  margin: 0;
+  color: #283d46;
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.prep-ready-message {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 15px;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(42, 154, 164, 0.12);
+  color: #063f46;
+  font-weight: 850;
+}
+
+.prep-ready-message.pending {
+  background: rgba(255, 249, 240, 0.96);
+  color: #7a5a1e;
+}
+
+.prep-ready-message svg {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+}
+
+.prep-start-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+  filter: grayscale(0.25);
+  transform: none;
+  box-shadow: none;
+}
+
+@media (max-width: 1024px) {
+  .prep-workflow-stepper {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .clinical-preparation-panel {
+    border-radius: 22px;
+    padding: 16px;
+  }
+
+  .prep-workflow-stepper,
+  .ethical-care-grid,
+  .prep-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prep-step {
+    min-height: auto;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .prep-step svg {
+    position: static;
+    grid-row: 1 / span 2;
+    grid-column: 1;
+  }
+
+  .prep-step-index {
+    display: none;
+  }
+
+  .prep-assistant-card {
+    align-items: flex-start;
+  }
+
+  .prep-assistant-orb {
+    width: 48px;
+    height: 48px;
+    border-radius: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prep-assistant-orb,
+  .prep-assistant-message {
+    animation: none;
+  }
+
+  .clinical-preparation-panel .clinical-area-grid label,
+  .ethical-care-grid label {
+    transition: none;
+  }
+}

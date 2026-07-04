@@ -2,6 +2,7 @@ import { patientFacts } from "../data/patientFacts.js";
 import { getClinicalSessionPlan } from "./clinicalPlanning.js";
 import { evaluatePreSessionPlan, normalizePreSessionPlan } from "./clinicalPreparation.js";
 import { evaluateClinicalArtifacts, normalizeClinicalArtifacts } from "./clinicalArtifacts.js";
+import { buildPatientProcessMemory, mergeProcessMemories } from "./processMemory.js";
 
 const STORAGE_KEY = "simuladorClinicoLdp.sessions";
 
@@ -31,6 +32,15 @@ export function buildSessionSummary({
   const clinicalArtifactsEvaluation = normalizedClinicalArtifacts
     ? evaluateClinicalArtifacts({ artifacts: normalizedClinicalArtifacts, report, history })
     : null;
+  const processMemory = buildPatientProcessMemory({
+    history: meaningfulHistory,
+    report,
+    preSessionPlan: normalizedPreSessionPlan,
+    clinicalDecision,
+    clinicalArtifacts: normalizedClinicalArtifacts,
+    taskState,
+    sessionNumber
+  });
 
   return {
     id: `${caseItem.id}-s${sessionNumber}-${Date.now()}`,
@@ -56,6 +66,7 @@ export function buildSessionSummary({
     clinicalArtifactsEvaluation,
     clinicalDecision,
     clinicalPlanEvaluation,
+    processMemory,
     betweenSessionGuidance: sessionPlan.betweenSessions?.[`afterSession${sessionNumber}`] || "",
     ethicalNotice:
       "Registro ficticio y educativo. No corresponde a atención psicológica real, tratamiento ni diagnóstico."
@@ -101,7 +112,7 @@ export function mergeSessionSummaryList(summaries = [], nextSummary = null) {
 }
 
 export function buildProcessSummary({ caseItem, summaries = [] }) {
-  const orderedSummaries = mergeSessionSummaryList(summaries).slice(0, 4);
+  const orderedSummaries = mergeSessionSummaryList(summaries);
   const workedTopics = uniqueFlatMap(orderedSummaries, "temasExplorados");
   const pendingTopics = uniqueFlatMap(orderedSummaries, "temasPendientes").slice(0, 6);
   const studentStrengths = uniqueFlatMap(orderedSummaries, "fortalezasEstudiante").slice(0, 6);
@@ -119,6 +130,10 @@ export function buildProcessSummary({ caseItem, summaries = [] }) {
       justification: summary.clinicalDecision.justification
     }))
     .filter(Boolean);
+  const processMemory = mergeProcessMemories(orderedSummaries);
+  const summaryText = orderedSummaries.length >= 2
+    ? `Proceso formativo de ${orderedSummaries.length} sesion(es) con ${caseItem.name}. Se trabajaron objetivos, continuidad y decisiones clinicas segun el plan del estudiante.`
+    : `Proceso formativo parcial con ${caseItem.name}. Hay ${orderedSummaries.length} sesion(es) registrada(s).`;
 
   return {
     caseId: caseItem.id,
@@ -130,10 +145,8 @@ export function buildProcessSummary({ caseItem, summaries = [] }) {
     studentImprovements,
     opennessEvolution,
     clinicalDecisions,
-    summaryText:
-      orderedSummaries.length >= 4
-        ? `Proceso formativo de 4 sesiones con ${caseItem.name}. Se trabajaron entrevista inicial, profundización, contexto y cierre formativo.`
-        : `Proceso formativo parcial con ${caseItem.name}. Hay ${orderedSummaries.length} sesión(es) registrada(s).`
+    processMemory,
+    summaryText
   };
 }
 
@@ -165,6 +178,13 @@ export function formatProcessSummary(processSummary) {
         `Sesion ${item.sessionNumber}: ${item.action} (${item.proposedSessions} sesion(es)). ${item.justification || ""}`.trim()
       )
     ).map((item) => `- ${item}`),
+    "",
+    "Memoria del proceso:",
+    ...withEmptyFallback([
+      ...(processSummary.processMemory?.processObjectives || []).map((item) => `Objetivo: ${item}`),
+      ...(processSummary.processMemory?.tasks || []).map((item) => `Tarea: ${item.description}`),
+      ...(processSummary.processMemory?.agreements || []).map((item) => `Acuerdo: ${item}`)
+    ]).map((item) => `- ${item}`),
     "",
     "Uso exclusivamente educativo con casos ficticios. No reemplaza atención psicológica real, diagnóstico, tratamiento ni supervisión docente."
   ].join("\n");

@@ -1,0 +1,23 @@
+export const tomasProfile = {
+  id: "tomas",
+  name: "Tomas",
+  fullName: "Tomas Herrera Molina",
+  age: 16,
+  gender: "masculino",
+  city: "Santiago",
+  commune: "Macul",
+  education: "3 medio",
+  occupation: "Estudiante escolar",
+  schoolLevel: "Ensenanza media",
+  socioeconomicLevel: "medio",
+  civilStatus: "No, no tengo pareja.",
+  livesWith: "Vivo con mi mama, mi papa y mi hermana chica.",
+  housingType: "departamento familiar",
+  residenceExperience: "Paso harto tiempo en mi pieza, sobre todo cuando empiezan las discusiones por el computador.",
+  residenceResponse: "Vivo en Macul, Santiago, con mi mama, mi papa y mi hermana chica. Paso harto tiempo en mi pieza, sobre todo cuando empiezan las discusiones por el computador.",
+  dailyRoutine: "Voy al colegio, vuelvo a la casa, hago algunas cosas del colegio y casi siempre termino en el computador jugando online.",
+  supportNetwork: "Tengo mas confianza con algunos amigos online que con companeros del colegio.",
+  beliefsRelevant: "No se registran creencias religiosas relevantes. Le importa sentirse competente, no ridiculizado y no tratado como problema.",
+  mainTheme: "Aislamiento social, ansiedad presencial y videojuegos como refugio de identidad.",
+  difficulty: "intermedio"
+};

@@ -160,6 +160,7 @@ export function detectClinicalTopic({
 
   if (detectedAct === "experiencia_vivida") {
     if (/\b(desde cuando|hace cuanto|cuando empezo|fecha|tiempo)\b/.test(text)) return "temporal";
+    if (/\b(computador|videojuego|videojuegos|jugar|juego|online)\b/.test(text)) return "videojuegos";
     if (isSensitiveProbe(text, profile)) {
       const requiredTrust = requiredSensitiveTrust(text, profile);
       const requiredSession = requiredSensitiveSession(text, profile);

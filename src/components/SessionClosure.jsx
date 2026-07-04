@@ -45,6 +45,7 @@ export function SessionClosure({
   history,
   report,
   sessionNumber,
+  totalSessions = 4,
   previousSessionSummaries = [],
   preSessionPlan = null,
   onContinueSession,
@@ -58,19 +59,20 @@ export function SessionClosure({
   const [clinicalArtifacts, setClinicalArtifacts] = useState(() => buildInitialClinicalArtifacts());
   const sessionPlan = useMemo(() => getClinicalSessionPlan(caseItem), [caseItem.id]);
   const [clinicalDecision, setClinicalDecision] = useState(() =>
-    buildInitialClinicalDecision({ sessionNumber, sessionPlan })
+    buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan })
   );
   const fallbackAgreement = getNextSessionAgreement(caseItem.id);
   const interviewTurns = history.filter((entry) => !entry.isSessionPrelude);
   const achieved = report.criteria.filter((criterion) => criterion.level === "achieved").length;
   const partial = report.criteria.filter((criterion) => criterion.level === "partial").length;
-  const nextSessionNumber = getNextSessionNumber(sessionNumber);
-  const closureTitle = getSessionClosureTitle(sessionNumber);
-  const nextSessionStage = nextSessionNumber ? getSessionStage(nextSessionNumber) : null;
   const normalizedClinicalDecision = useMemo(
-    () => normalizeClinicalDecision(clinicalDecision, sessionPlan, sessionNumber),
-    [clinicalDecision, sessionPlan, sessionNumber]
+    () => normalizeClinicalDecision(clinicalDecision, sessionPlan, sessionNumber, preSessionPlan),
+    [clinicalDecision, sessionPlan, sessionNumber, preSessionPlan]
   );
+  const plannedSessionTotal = normalizedClinicalDecision.proposedSessions || totalSessions;
+  const nextSessionNumber = getNextSessionNumber(sessionNumber, plannedSessionTotal);
+  const closureTitle = getSessionClosureTitle(sessionNumber, plannedSessionTotal);
+  const nextSessionStage = nextSessionNumber ? getSessionStage(nextSessionNumber, plannedSessionTotal) : null;
   const clinicalPlanEvaluation = useMemo(
     () =>
       evaluateClinicalPlanDecision({
@@ -78,9 +80,10 @@ export function SessionClosure({
         sessionPlan,
         report,
         history,
-        sessionNumber
+        sessionNumber,
+        preSessionPlan
       }),
-    [normalizedClinicalDecision, sessionPlan, report, history, sessionNumber]
+    [normalizedClinicalDecision, sessionPlan, report, history, sessionNumber, preSessionPlan]
   );
   const normalizedClinicalArtifacts = useMemo(
     () => normalizeClinicalArtifacts(clinicalArtifacts),
@@ -135,12 +138,17 @@ export function SessionClosure({
     () => buildProcessSummary({ caseItem, summaries: [...previousSessionSummaries, summary] }),
     [caseItem, previousSessionSummaries, summary]
   );
+  const preSessionPlanKey = [
+    preSessionPlan?.proposedSessionCount,
+    preSessionPlan?.sessionCountJustification,
+    preSessionPlan?.processObjectives
+  ].join("|");
 
   useEffect(() => {
-    setClinicalDecision(buildInitialClinicalDecision({ sessionNumber, sessionPlan }));
+    setClinicalDecision(buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan }));
     setClinicalArtifacts(buildInitialClinicalArtifacts());
     setHasSavedSessionRecord(false);
-  }, [caseItem.id, sessionNumber, sessionPlan]);
+  }, [caseItem.id, sessionNumber, sessionPlan, preSessionPlanKey]);
 
   function updateDecision(patch) {
     setClinicalDecision((current) => ({
@@ -475,16 +483,17 @@ export function SessionClosure({
             <span className="eyebrow">Decision clinica formativa</span>
             <h2>Decision sobre continuidad del proceso</h2>
             <p>
-              El caso permite hasta 4 sesiones, pero debes decidir si corresponde cerrar,
-              continuar, derivar o activar una respuesta de riesgo.
+              Decide si corresponde cerrar, continuar, derivar o activar una respuesta de
+              riesgo. La cantidad de sesiones es una hipotesis clinica que puedes sostener,
+              ajustar o cuestionar durante el proceso.
             </p>
           </div>
           <div className="clinical-plan-range">
-            <span>Rango esperado</span>
+            <span>Plan propuesto</span>
             <strong>
-              {(sessionPlan.expectedSessions || sessionPlan.expectedRange)?.minimum || 1}-{(sessionPlan.expectedSessions || sessionPlan.expectedRange)?.maximum || 4}
+              {plannedSessionTotal}
             </strong>
-            <span>recomendado: {(sessionPlan.expectedSessions || sessionPlan.expectedRange)?.recommended || 3}</span>
+            <span>sesion(es)</span>
           </div>
         </div>
 
@@ -521,12 +530,16 @@ export function SessionClosure({
 
         <div className="clinical-plan-form">
           <label>
-            <span>Numero total de sesiones que propones</span>
+            <span>Cantidad de sesiones que propones para este caso</span>
+            <small>
+              Puedes mantener tu plan inicial o ajustarlo si la evolucion del paciente lo
+              justifica.
+            </small>
             <select
               value={normalizedClinicalDecision.proposedSessions}
               onChange={(event) => updateDecision({ proposedSessions: Number(event.target.value) })}
             >
-              {[1, 2, 3, 4].map((value) => (
+              {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
                 <option key={value} value={value}>
                   {value} sesion{value > 1 ? "es" : ""}
                 </option>
@@ -535,7 +548,7 @@ export function SessionClosure({
           </label>
 
           <label>
-            <span>Por que tomas esta decision?</span>
+            <span>Por que propones esta cantidad de sesiones?</span>
             <textarea
               value={clinicalDecision.justification}
               onChange={(event) => updateDecision({ justification: event.target.value })}
@@ -545,7 +558,7 @@ export function SessionClosure({
           </label>
 
           <label>
-            <span>Que objetivos trabajarias en la proxima sesion o siguiente paso?</span>
+            <span>Objetivos del proceso propuesto o siguiente paso</span>
             <textarea
               value={clinicalDecision.nextSessionObjectives}
               onChange={(event) => updateDecision({ nextSessionObjectives: event.target.value })}
@@ -601,12 +614,12 @@ export function SessionClosure({
           {canContinueInSimulator ? (
             <p>
               Puedes avanzar a {nextSessionStage.title.toLowerCase()} porque propusiste continuidad
-              dentro de las 4 sesiones disponibles.
+              dentro de las {plannedSessionTotal} sesiones propuestas.
             </p>
           ) : (
             <p>
               La sesion quedara guardada con tu decision de {formatClinicalDecision(normalizedClinicalDecision).toLowerCase()}.
-              {reachedSessionLimit ? " Ya llegaste al maximo de sesiones del simulador." : ""}
+              {reachedSessionLimit ? " Ya llegaste a la ultima sesion del proceso que propusiste." : ""}
             </p>
           )} 
         </div>
@@ -648,7 +661,7 @@ export function SessionClosure({
           <h2>{canContinueInSimulator ? "Continuar segun tu decision" : "Guardar decision y cerrar"}</h2>
           {isFinalSession ? (
             <p>
-              Has completado las cuatro sesiones simuladas. Puedes copiar una síntesis del
+              Has completado las sesiones simuladas de tu plan. Puedes copiar una sintesis del
               proceso formativo o volver al inicio para trabajar otro caso.
             </p>
           ) : (
@@ -690,7 +703,7 @@ export function SessionClosure({
       {reachedSessionLimit && (
         <section className="session-summary-card closure-panel closure-panel-wide">
           <span className="eyebrow">Síntesis de proceso</span>
-          <h2>Resumen de las 4 sesiones con {processSummary.patientName}</h2>
+          <h2>Resumen del proceso con {processSummary.patientName}</h2>
           <p>{processSummary.summaryText}</p>
           <div className="session-summary-grid">
             <div>

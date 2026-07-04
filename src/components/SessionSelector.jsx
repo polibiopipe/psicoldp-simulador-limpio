@@ -1,9 +1,16 @@
 import React from "react";
-import { sessionStages } from "../data/sessionPrompts.js";
+import { createSessionStages } from "../data/sessionPrompts.js";
 
-export function SessionSelector({ currentSession = 1, availableSessions = [1, 2], onSelect }) {
+export function SessionSelector({
+  currentSession = 1,
+  availableSessions = [1, 2],
+  totalSessions = 4,
+  onSelect
+}) {
+  const sessionStages = createSessionStages(totalSessions);
+
   return (
-    <div className="session-selector" aria-label="Tipo de sesión simulada">
+    <div className="session-selector" aria-label="Tipo de sesion simulada">
       {sessionStages.map((stage) => {
         const enabled = availableSessions.includes(stage.number);
         return (

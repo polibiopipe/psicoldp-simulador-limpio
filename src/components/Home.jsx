@@ -2,6 +2,7 @@ import React from "react";
 import {
   ArrowRight,
   BookOpenCheck,
+  CalendarClock,
   ExternalLink,
   Headphones,
   HeartHandshake,
@@ -36,7 +37,7 @@ const steps = [
   }
 ];
 
-export function Home({ onStart, onViewHistory, onOpenTrust }) {
+export function Home({ onStart, onViewHistory, onOpenAgenda, onOpenTrust }) {
   return (
     <section className="landing-page commercial-home">
       <header className="landing-header commercial-header">
@@ -55,6 +56,7 @@ export function Home({ onStart, onViewHistory, onOpenTrust }) {
         </a>
         <nav className="landing-nav" aria-label="Navegacion principal">
           <button type="button" onClick={onViewHistory}>Mis sesiones</button>
+          <button type="button" onClick={onOpenAgenda}>Mi agenda</button>
           <button type="button" onClick={onOpenTrust}>Confianza</button>
           <a
             href="https://nucleovivo.net/"
@@ -92,6 +94,10 @@ export function Home({ onStart, onViewHistory, onOpenTrust }) {
             <button className="secondary-action landing-secondary" type="button" onClick={onStart}>
               <PlayCircle aria-hidden="true" />
               Ver pacientes
+            </button>
+            <button className="secondary-action landing-secondary" type="button" onClick={onOpenAgenda}>
+              <CalendarClock aria-hidden="true" />
+              Mi agenda
             </button>
           </div>
         </div>

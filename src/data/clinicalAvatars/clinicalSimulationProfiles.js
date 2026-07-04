@@ -206,6 +206,7 @@ function createClinicalSimulationProfile(caseId) {
     || facts.concreteDisclosures?.[1]
     || facts.concreteConcern
     || concern;
+  const gameFunctionResponses = buildGameFunctionResponses(patientRecord, caseId);
   const validationBridge = facts.validationBridge || "Gracias. Me ayuda que lo podamos mirar con calma.";
   const temporalResponse = buildTemporalResponse(patientRecord);
   const boundaryResponse = patientRecord?.sensitiveInfo?.earlyBoundary
@@ -214,6 +215,7 @@ function createClinicalSimulationProfile(caseId) {
     || "No tengo tan claro eso. Prefiero ir de a poco con lo que si puedo responder.";
   const residenceResponse = buildResidenceResponse({ patientRecord, fallbackText: basics.livesWith });
   const childrenResponse = buildChildrenResponse({ patientRecord, fallbackText: basics.familyComposition });
+  const recordTaskResponses = buildRecordTaskResponses(patientRecord);
 
   return {
     id: caseId,
@@ -227,11 +229,23 @@ function createClinicalSimulationProfile(caseId) {
       biography: patientRecord.biography,
       timeline: patientRecord.timeline,
       family: patientRecord.family,
+      relationships: patientRecord.relationships || patientRecord.relationshipMap,
       personality: patientRecord.personality,
       emotionalState: patientRecord.emotionalState,
       consultation: patientRecord.consultation,
+      symptoms: patientRecord.symptoms || patientRecord.symptomHistory,
+      functioning: patientRecord.functioning,
+      mentalStatus: patientRecord.mentalStatus,
+      risk: patientRecord.risk || patientRecord.riskMap,
+      protectiveFactors: patientRecord.protectiveFactors,
+      communicationStyle: patientRecord.communicationStyle || patientRecord.speakingStyle,
       sensitiveInfo: patientRecord.sensitiveInfo,
-      pedagogy: patientRecord.pedagogy
+      disclosureRules: patientRecord.disclosureRules || patientRecord.disclosureMatrix,
+      interventionResponses: patientRecord.interventionResponses,
+      taskResponses: patientRecord.taskResponses,
+      sessionEvolution: patientRecord.sessionEvolution,
+      pedagogy: patientRecord.pedagogy,
+      evaluationCriteria: patientRecord.evaluationCriteria || patientRecord.evaluationRubric
     } : null,
     identity: {
       name,
@@ -284,6 +298,10 @@ function createClinicalSimulationProfile(caseId) {
       encuadre_confidencialidad: [
         response(`${caseId}-framing-1`, "Si, entiendo. Me parece bien saber que esto queda resguardado.", { topic: "encuadre" }),
         response(`${caseId}-framing-2`, "Gracias por explicarlo. Me ayuda saber que podemos conversar con ese cuidado.", { topic: "encuadre" })
+      ],
+      apertura_vinculo: [
+        response(`${caseId}-rapport-1`, openingResponseForRecord(patientRecord, name), { topic: "vinculo" }),
+        response(`${caseId}-rapport-2`, "Si, me parece bien. Me cuesta un poco hablar de mi al principio, pero puedo ir contandote.", { topic: "vinculo" })
       ],
       vivienda: [
         response(`${caseId}-home-1`, residenceResponse, { topic: "vivienda" })
@@ -342,6 +360,11 @@ function createClinicalSimulationProfile(caseId) {
         response(`${caseId}-experience-1`, firstDisclosure, { topic: "experiencia", minDisclosure: "low" }),
         response(`${caseId}-experience-2`, secondDisclosure, { topic: "experiencia", minDisclosure: "medium" })
       ],
+      videojuegos: gameFunctionResponses.length
+        ? gameFunctionResponses
+        : [
+            response(`${caseId}-game-function-1`, firstDisclosure, { topic: "videojuegos", minDisclosure: "low" })
+          ],
       temporal: [
         response(`${caseId}-time-1`, temporalResponse, { topic: "temporal" })
       ],
@@ -381,13 +404,19 @@ function createClinicalSimulationProfile(caseId) {
         response(`${caseId}-repeat-2`, secondDisclosure, { topic: "repeticion", minDisclosure: "medium" })
       ],
       tarea_terapeutica: [
-        response(`${caseId}-task-1`, "Si, me parece. Si es algo concreto y breve, creo que podria intentarlo.", { topic: "tarea", tags: ["taskAccepted"] })
+        ...(recordTaskResponses.concrete.length
+          ? recordTaskResponses.concrete
+          : [response(`${caseId}-task-1`, "Si, me parece. Si es algo concreto y breve, creo que podria intentarlo.", { topic: "tarea", tags: ["taskAccepted"] })])
       ],
       confirmar_tarea: [
-        response(`${caseId}-task-confirm-1`, "Si, me parece bien. Lo puedo intentar de una manera sencilla.", { topic: "tarea", tags: ["taskAccepted"] })
+        ...(recordTaskResponses.concrete.length
+          ? recordTaskResponses.concrete
+          : [response(`${caseId}-task-confirm-1`, "Si, me parece bien. Lo puedo intentar de una manera sencilla.", { topic: "tarea", tags: ["taskAccepted"] })])
       ],
       seguimiento_tarea: [
-        response(`${caseId}-task-follow-1`, "Lo intente parcialmente. Me sirvio notar algunas cosas, aunque no fui completamente constante.", { topic: "tarea", minDisclosure: "medium" })
+        ...(recordTaskResponses.followUp.length
+          ? recordTaskResponses.followUp
+          : [response(`${caseId}-task-follow-1`, "Lo intente parcialmente. Me sirvio notar algunas cosas, aunque no fui completamente constante.", { topic: "tarea", minDisclosure: "medium" })])
       ]
     }
   };
@@ -504,6 +533,57 @@ function buildTemporalResponse(patientRecord) {
   }
 
   return "No fue de un dia para otro. Creo que se fue acumulando hasta que se volvio mas dificil ignorarlo.";
+}
+
+function buildRecordTaskResponses(patientRecord) {
+  const taskResponses = patientRecord?.taskResponses || {};
+  return {
+    concrete: normalizeRecordResponseList(taskResponses.concrete),
+    followUp: normalizeRecordResponseList([
+      ...(taskResponses.partial || []),
+      ...(taskResponses.helpful || []),
+      ...(taskResponses.notDone || [])
+    ])
+  };
+}
+
+function buildGameFunctionResponses(patientRecord, caseId) {
+  const responses = patientRecord?.consultation?.gameFunctionResponses || [];
+  if (responses.length) {
+    return responses.map((text, index) =>
+      response(`${caseId}-game-function-${index + 1}`, text, { topic: "videojuegos", minDisclosure: index > 2 ? "medium" : "low" })
+    );
+  }
+
+  if (patientRecord?.consultation?.gameFunction) {
+    return [
+      response(`${caseId}-game-function-1`, patientRecord.consultation.gameFunction, { topic: "videojuegos", minDisclosure: "low" })
+    ];
+  }
+
+  return [];
+}
+
+function normalizeRecordResponseList(items = []) {
+  return items
+    .filter((item) => item?.text)
+    .map((item) => ({
+      minDisclosure: "low",
+      reveals: [],
+      tags: [],
+      ...item
+    }));
+}
+
+function openingResponseForRecord(patientRecord, name) {
+  const lowTrust = patientRecord?.communicationStyle?.lowTrust || patientRecord?.speakingStyle?.lowTrust;
+  if (lowTrust && patientRecord?.id === "tomas") {
+    return "Si, me parece bien. Me cuesta un poco hablar de mi al principio, pero puedo ir contandote.";
+  }
+  if (patientRecord?.personality?.initialOpenness === "baja") {
+    return "Si, esta bien. Me cuesta un poco hablar de mi, pero puedo intentarlo.";
+  }
+  return `Si, podemos partir. Soy ${name}, y puedo contarte un poco de lo que me trae.`;
 }
 
 function resolveWorkOrStudy(facts, profile) {

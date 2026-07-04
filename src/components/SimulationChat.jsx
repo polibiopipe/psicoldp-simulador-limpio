@@ -17,6 +17,7 @@ export function SimulationChat({
   caseItem,
   difficulty,
   sessionNumber = 1,
+  totalSessions = 4,
   sessionSummary,
   history,
   onAsk,
@@ -145,7 +146,11 @@ export function SimulationChat({
         <ProgressBar turnCount={interviewTurns.length} />
         <div className="learning-box">
           <h2>Tipo de sesión</h2>
-          <SessionSelector currentSession={sessionNumber} availableSessions={[sessionNumber]} />
+          <SessionSelector
+            currentSession={sessionNumber}
+            availableSessions={[sessionNumber]}
+            totalSessions={totalSessions}
+          />
           {sessionSummary && (
             <p>Esta sesión retoma un resumen ficticio guardado de la entrevista anterior.</p>
           )}
@@ -171,7 +176,9 @@ export function SimulationChat({
             <div className="chat-title-line">
               <h1>{caseItem.name}</h1>
               <span className="session-context">
-                {sessionNumber === 1 ? "Entrevista inicial simulada" : `Sesión ${sessionNumber} simulada`}
+                {sessionNumber === 1
+                  ? `Entrevista inicial simulada · Sesion 1 de ${totalSessions}`
+                  : `Sesion ${sessionNumber} de ${totalSessions}`}
               </span>
             </div>
           </div>
@@ -224,6 +231,7 @@ export function SimulationChat({
               avatarState={avatarState}
               caseItem={caseItem}
               sessionNumber={sessionNumber}
+              totalSessions={totalSessions}
               turnCount={interviewTurns.length}
               onFinish={finishSimulation}
             />

@@ -1,4 +1,5 @@
 import { getPatientMasterRecord } from "../data/patients/index.js";
+import { SESSION_COUNT_LIMITS, getPlannedSessionCount } from "./clinicalPreparation.js";
 
 export const CLINICAL_DECISION_OPTIONS = [
   {
@@ -51,23 +52,23 @@ export const CLINICAL_DECISION_OPTIONS = [
   },
   {
     value: "beyond_simulator",
-    label: "Continuidad mas alla del simulador",
-    shortLabel: "Mas de 4 sesiones",
-    description: "El caso excede el maximo formativo disponible."
+    label: "Continuidad mas alla del ciclo propuesto",
+    shortLabel: "Continuidad adicional",
+    description: "El caso requiere continuidad posterior al ciclo definido para esta practica."
   }
 ];
 
 const FALLBACK_SESSION_PLAN = {
-  maxSessions: 4,
+  maxSessions: SESSION_COUNT_LIMITS.max,
   expectedRange: {
     minimum: 1,
-    recommended: 3,
-    maximum: 4
+    recommended: 4,
+    maximum: SESSION_COUNT_LIMITS.max
   },
   expectedSessions: {
     minimum: 1,
-    maximum: 4,
-    recommended: 3
+    maximum: SESSION_COUNT_LIMITS.max,
+    recommended: 4
   },
   continueIf: [
     "El motivo de consulta aun no esta delimitado.",
@@ -108,10 +109,15 @@ export function getClinicalSessionPlan(caseItem) {
   return record?.sessionPlan || record?.clinicalPlan || FALLBACK_SESSION_PLAN;
 }
 
-export function buildInitialClinicalDecision({ sessionNumber = 1, sessionPlan = FALLBACK_SESSION_PLAN } = {}) {
+export function buildInitialClinicalDecision({
+  sessionNumber = 1,
+  sessionPlan = FALLBACK_SESSION_PLAN,
+  preSessionPlan = null
+} = {}) {
   const expected = getExpectedSessions(sessionPlan);
-  const recommended = clampNumber(expected.recommended || 3, 1, expected.maximum || 4);
-  const shouldContinue = sessionNumber < recommended && sessionNumber < 4;
+  const plannedTotal = getPlannedSessionCount(preSessionPlan, expected.recommended || SESSION_COUNT_LIMITS.defaultValue);
+  const recommended = clampNumber(plannedTotal, SESSION_COUNT_LIMITS.min, SESSION_COUNT_LIMITS.max);
+  const shouldContinue = sessionNumber < recommended;
 
   return {
     action: shouldContinue ? "continue_session" : "close_process",
@@ -123,15 +129,23 @@ export function buildInitialClinicalDecision({ sessionNumber = 1, sessionPlan = 
   };
 }
 
-export function normalizeClinicalDecision(decision = {}, sessionPlan = FALLBACK_SESSION_PLAN, sessionNumber = 1) {
+export function normalizeClinicalDecision(
+  decision = {},
+  sessionPlan = FALLBACK_SESSION_PLAN,
+  sessionNumber = 1,
+  preSessionPlan = null
+) {
   const expected = getExpectedSessions(sessionPlan);
   const knownActions = new Set(CLINICAL_DECISION_OPTIONS.map((option) => option.value));
   const action = knownActions.has(decision.action) ? decision.action : "continue_session";
-  const minimumTotal = action === "continue_session" ? Math.min(4, sessionNumber + 1) : sessionNumber;
-  const maximumTotal = Math.min(4, expected.maximum || 4);
+  const plannedTotal = getPlannedSessionCount(preSessionPlan, expected.recommended || SESSION_COUNT_LIMITS.defaultValue);
+  const minimumTotal = action === "continue_session"
+    ? Math.min(SESSION_COUNT_LIMITS.max, sessionNumber + 1)
+    : SESSION_COUNT_LIMITS.min;
+  const maximumTotal = SESSION_COUNT_LIMITS.max;
   const proposedSessions = clampNumber(
-    Number(decision.proposedSessions) || expected.recommended || minimumTotal,
-    Math.min(minimumTotal, maximumTotal),
+    Number(decision.proposedSessions) || plannedTotal || expected.recommended || minimumTotal,
+    minimumTotal,
     maximumTotal
   );
 
@@ -183,9 +197,10 @@ export function evaluateClinicalPlanDecision({
   sessionPlan = FALLBACK_SESSION_PLAN,
   report = {},
   history = [],
-  sessionNumber = 1
+  sessionNumber = 1,
+  preSessionPlan = null
 } = {}) {
-  const normalized = normalizeClinicalDecision(decision, sessionPlan, sessionNumber);
+  const normalized = normalizeClinicalDecision(decision, sessionPlan, sessionNumber, preSessionPlan);
   const expected = getExpectedSessions(sessionPlan);
   const meaningfulHistory = history.filter((entry) => !entry.isSessionPrelude);
   const hasRiskExploration = didExploreRisk(meaningfulHistory, report);
@@ -196,7 +211,7 @@ export function evaluateClinicalPlanDecision({
   const hasPendingRiskNote = normalized.pendingRisks.length >= 12;
   const proposedInRange =
     normalized.proposedSessions >= (expected.minimum || 1) &&
-    normalized.proposedSessions <= (expected.maximum || 4);
+    normalized.proposedSessions <= SESSION_COUNT_LIMITS.max;
   const strengths = [];
   const concerns = [];
   const recommendations = [];
@@ -208,9 +223,9 @@ export function evaluateClinicalPlanDecision({
   }
 
   if (proposedInRange) {
-    strengths.push("El numero de sesiones propuesto se ubica dentro del rango formativo del caso.");
+    strengths.push("El numero de sesiones propuesto queda dentro del rango permitido para este proceso simulado.");
   } else {
-    concerns.push("El numero de sesiones propuesto queda fuera del rango esperado del expediente.");
+    concerns.push("El numero de sesiones propuesto queda fuera del rango permitido para el prototipo.");
   }
 
   if (hasRiskExploration || hasPendingRiskNote) {
@@ -254,7 +269,7 @@ export function evaluateClinicalPlanDecision({
   }
 
   if (normalized.action === "beyond_simulator") {
-    recommendations.push("Explicita que el simulador permite hasta 4 sesiones y que la continuidad real dependeria de evaluacion profesional.");
+    recommendations.push("Explicita que la continuidad posterior dependeria de reevaluacion clinica, objetivos pendientes y condiciones de cuidado.");
   }
 
   const risky = (normalized.action === "close_process" && concerns.length >= 2) ||
@@ -292,7 +307,7 @@ export function evaluateClinicalPlanDecision({
 
 function buildDecisionSummary(decision, level, expected) {
   if (decision.action === "continue_session") {
-    return `Propusiste continuar hasta ${decision.proposedSessions} sesion(es). La decision es ${level === "achieved" ? "clinicamente razonable" : "formativamente revisable"} segun el rango sugerido (${expected.minimum}-${expected.maximum}).`;
+    return `Propusiste continuar hasta ${decision.proposedSessions} sesion(es). La decision es ${level === "achieved" ? "clinicamente razonable" : "formativamente revisable"} segun tu justificacion, los objetivos y los datos explorados.`;
   }
   if (decision.action === "close_process") {
     return `Propusiste cerrar el proceso simulado en la sesion ${decision.proposedSessions}. Revisa que el cierre incluya sintesis, riesgo y proximos pasos.`;
@@ -315,15 +330,15 @@ function buildDecisionSummary(decision, level, expected) {
   if (decision.action === "follow_up") {
     return "Propusiste seguimiento. Debe quedar claro que se monitorea sin reemplazar continuidad clinica si el caso lo requiere.";
   }
-  return "Propusiste continuidad mas alla del simulador. Debe quedar claro que el maximo disponible es de 4 sesiones.";
+  return "Propusiste continuidad adicional. Debe quedar claro que requiere objetivos, reevaluacion y fundamentos clinicos.";
 }
 
 function getExpectedSessions(sessionPlan = FALLBACK_SESSION_PLAN) {
   const expected = sessionPlan.expectedSessions || sessionPlan.expectedRange || FALLBACK_SESSION_PLAN.expectedSessions;
   return {
     minimum: expected.minimum || 1,
-    recommended: expected.recommended || 3,
-    maximum: sessionPlan.maxSessions || expected.maximum || 4
+    recommended: expected.recommended || SESSION_COUNT_LIMITS.defaultValue,
+    maximum: Math.max(expected.maximum || SESSION_COUNT_LIMITS.defaultValue, sessionPlan.maxSessions || 0, SESSION_COUNT_LIMITS.defaultValue)
   };
 }
 

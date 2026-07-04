@@ -8,7 +8,12 @@ import {
   mergeSessionSummaryList
 } from "./engine/sessionMemory.js";
 import { buildSessionHistoryRecord, saveSessionHistory } from "./engine/sessionHistory.js";
-import { buildInitialPreSessionPlan, normalizePreSessionPlan } from "./engine/clinicalPreparation.js";
+import {
+  SESSION_COUNT_LIMITS,
+  buildInitialPreSessionPlan,
+  getPlannedSessionCount,
+  normalizePreSessionPlan
+} from "./engine/clinicalPreparation.js";
 import { getNextSessionNumber, getSessionOpening } from "./data/sessionPrompts.js";
 import { Home } from "./components/Home.jsx";
 import { CaseSelector } from "./components/CaseSelector.jsx";
@@ -23,6 +28,7 @@ import { AuthScreen } from "./components/AuthScreen.jsx";
 import { PendingApprovalScreen } from "./components/PendingApprovalScreen.jsx";
 import { TrustCenter } from "./components/TrustCenter.jsx";
 import { AppFooter } from "./components/AppFooter.jsx";
+import { ClinicalAgenda } from "./components/ClinicalAgenda.jsx";
 import { isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
 import { getOrCreateUserApproval } from "./lib/userApproval.js";
 
@@ -33,6 +39,7 @@ const screens = {
   simulation: "simulation",
   results: "results",
   savedSessions: "savedSessions",
+  clinicalAgenda: "clinicalAgenda",
   trustCenter: "trustCenter"
 };
 
@@ -58,7 +65,14 @@ export default function App() {
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
   const report = useMemo(() => buildEducationalReport(history, selectedCase), [history, selectedCase]);
-  const availableSessions = useMemo(() => getAvailableSessions(sessionSummaries), [sessionSummaries]);
+  const sessionTotal = useMemo(
+    () => getProcessSessionTotal(preSessionPlan, sessionSummaries),
+    [preSessionPlan, sessionSummaries]
+  );
+  const availableSessions = useMemo(
+    () => getAvailableSessions(sessionSummaries, sessionTotal),
+    [sessionSummaries, sessionTotal]
+  );
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -111,20 +125,60 @@ export default function App() {
   }, []);
 
   function resetConversation(nextScreen = screens.brief) {
-    setHistory(sessionNumber > 1 ? [createSessionPrelude(selectedCase, sessionNumber, sessionSummary)] : []);
+    setHistory(sessionNumber > 1 ? [createSessionPrelude(selectedCase, sessionNumber, sessionSummary, sessionTotal)] : []);
     setScreen(nextScreen);
   }
 
   function selectCase(caseId) {
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
+    const latestSummary = summaries.at(-1);
+    const basePlan = latestSummary
+      ? {
+          ...(latestSummary.preSessionPlan || {}),
+          proposedSessionCount:
+            latestSummary.clinicalDecision?.proposedSessions || latestSummary.preSessionPlan?.proposedSessionCount
+        }
+      : null;
     setSelectedCaseId(caseId);
     setSessionNumber(1);
     setSessionSummaries(summaries);
     setSessionSummary(null);
-    setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: nextCase, sessionNumber: 1 }));
+    setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: nextCase, sessionNumber: 1, basePlan }));
     setHistory([]);
     setScreen(screens.brief);
+  }
+
+  function openCaseFromAgenda(caseId, targetSession = 1, nextScreen = screens.brief) {
+    const summaries = getSessionSummariesForCase(caseId);
+    const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
+    const safeSession = Math.max(1, Number(targetSession) || 1);
+    const previousSummary = getPreviousSessionSummary({
+      caseId,
+      sessionNumber: safeSession,
+      sessionSummaries: summaries
+    });
+    const latestSummary = summaries.at(-1);
+    const basePlan = buildBasePlanFromSummary(previousSummary || latestSummary);
+    const nextPlan = buildInitialPreSessionPlan({
+      caseItem: nextCase,
+      sessionNumber: safeSession,
+      basePlan
+    });
+    const processTotal = getProcessSessionTotal(nextPlan, summaries);
+
+    setSelectedCaseId(caseId);
+    setSessionNumber(safeSession);
+    setSessionSummaries(summaries);
+    setSessionSummary(previousSummary);
+    setPreSessionPlan(nextPlan);
+    setSaveStatus(null);
+    setHistory(
+      nextScreen === screens.simulation && safeSession > 1
+        ? [createSessionPrelude(nextCase, safeSession, previousSummary, processTotal)]
+        : []
+    );
+    setScreen(nextScreen);
   }
 
   function startSession(session) {
@@ -138,7 +192,7 @@ export default function App() {
     setPreSessionPlan((current) =>
       normalizePreSessionPlan(current, { caseItem: selectedCase, sessionNumber: session })
     );
-    setHistory(session > 1 ? [createSessionPrelude(selectedCase, session, summary)] : []);
+    setHistory(session > 1 ? [createSessionPrelude(selectedCase, session, summary, sessionTotal)] : []);
     setSaveStatus(null);
     setScreen(screens.simulation);
   }
@@ -151,12 +205,23 @@ export default function App() {
     });
     setSessionNumber(session);
     setSessionSummary(summary);
-    setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: selectedCase, sessionNumber: session }));
+    setPreSessionPlan(
+      buildInitialPreSessionPlan({
+        caseItem: selectedCase,
+        sessionNumber: session,
+        basePlan: summary?.preSessionPlan || preSessionPlan
+      })
+    );
   }
 
   function advanceToNextSession(summary) {
     const mergedSummaries = mergeSessionSummaryList(sessionSummaries, summary);
-    const nextSession = getNextSessionNumber(summary.sessionNumber);
+    const decidedPlan = {
+      ...(summary.preSessionPlan || {}),
+      proposedSessionCount: summary.clinicalDecision?.proposedSessions || summary.preSessionPlan?.proposedSessionCount
+    };
+    const processTotal = getProcessSessionTotal(decidedPlan, mergedSummaries);
+    const nextSession = getNextSessionNumber(summary.sessionNumber, processTotal);
     setSessionSummaries(mergedSummaries);
 
     if (!nextSession) {
@@ -166,17 +231,32 @@ export default function App() {
 
     setSessionNumber(nextSession);
     setSessionSummary(summary);
-    setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: selectedCase, sessionNumber: nextSession }));
-    setHistory([createSessionPrelude(selectedCase, nextSession, summary)]);
+    setPreSessionPlan(
+      buildInitialPreSessionPlan({
+        caseItem: selectedCase,
+        sessionNumber: nextSession,
+        basePlan: decidedPlan
+      })
+    );
+    setHistory([createSessionPrelude(selectedCase, nextSession, summary, processTotal)]);
     setScreen(screens.simulation);
   }
 
   function goHome() {
+    const summaries = getSessionSummariesForCase(selectedCase.id);
+    const latestSummary = summaries.at(-1);
+    const basePlan = latestSummary
+      ? {
+          ...(latestSummary.preSessionPlan || {}),
+          proposedSessionCount:
+            latestSummary.clinicalDecision?.proposedSessions || latestSummary.preSessionPlan?.proposedSessionCount
+        }
+      : null;
     setHistory([]);
     setSessionNumber(1);
     setSessionSummary(null);
-    setSessionSummaries(getSessionSummariesForCase(selectedCase.id));
-    setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: selectedCase, sessionNumber: 1 }));
+    setSessionSummaries(summaries);
+    setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: selectedCase, sessionNumber: 1, basePlan }));
     setSaveStatus(null);
     setScreen(screens.home);
   }
@@ -355,6 +435,9 @@ export default function App() {
             <button className="secondary-action" type="button" onClick={() => setScreen(screens.savedSessions)}>
               Mis sesiones
             </button>
+            <button className="secondary-action" type="button" onClick={() => setScreen(screens.clinicalAgenda)}>
+              Mi agenda
+            </button>
             <button className="danger-action" type="button" onClick={handleSignOut}>
               Cerrar sesion
             </button>
@@ -368,6 +451,7 @@ export default function App() {
         <Home
           onStart={() => setScreen(screens.select)}
           onViewHistory={() => setScreen(screens.savedSessions)}
+          onOpenAgenda={() => setScreen(screens.clinicalAgenda)}
           onOpenTrust={openTrustCenter}
         />
       )}
@@ -378,6 +462,15 @@ export default function App() {
 
       {screen === screens.savedSessions && (
         <SavedSessions authSession={authSession} onBackHome={goHome} />
+      )}
+
+      {screen === screens.clinicalAgenda && (
+        <ClinicalAgenda
+          cases={cases}
+          onBackHome={goHome}
+          onPrepareCase={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.brief)}
+          onStartSession={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.simulation)}
+        />
       )}
 
       {screen === screens.select && (
@@ -398,6 +491,7 @@ export default function App() {
           sessionNumber={sessionNumber}
           sessionSummary={sessionSummary}
           availableSessions={availableSessions}
+          totalSessions={sessionTotal}
           preSessionPlan={preSessionPlan}
           onBack={() => setScreen(screens.select)}
           onBegin={() => startSession(sessionNumber)}
@@ -413,6 +507,7 @@ export default function App() {
           caseItem={selectedCase}
           difficulty={difficulty}
           sessionNumber={sessionNumber}
+          totalSessions={sessionTotal}
           sessionSummary={sessionSummary}
           history={history}
           onAsk={handleAsk}
@@ -449,6 +544,7 @@ export default function App() {
             history={history}
             report={report}
             sessionNumber={sessionNumber}
+            totalSessions={sessionTotal}
             previousSessionSummaries={sessionSummaries}
             preSessionPlan={normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber })}
             onContinueSession={advanceToNextSession}
@@ -465,11 +561,26 @@ export default function App() {
   );
 }
 
-function getAvailableSessions(sessionSummaries) {
+function getAvailableSessions(sessionSummaries, totalSessions = SESSION_COUNT_LIMITS.defaultValue) {
   const completed = new Set(sessionSummaries.map((summary) => summary.sessionNumber));
   const maxCompleted = Math.max(0, ...completed);
-  const maxAvailable = Math.min(4, Math.max(1, maxCompleted + 1));
+  const maxAvailable = Math.min(totalSessions, Math.max(1, maxCompleted + 1));
   return Array.from({ length: maxAvailable }, (_, index) => index + 1);
+}
+
+function getProcessSessionTotal(preSessionPlan = null, sessionSummaries = []) {
+  const directPlan = Number(preSessionPlan?.proposedSessionCount);
+  if (Number.isFinite(directPlan) && directPlan > 0) return getPlannedSessionCount(preSessionPlan);
+
+  const planFromSummary = [...sessionSummaries]
+    .reverse()
+    .find((summary) => Number(summary?.preSessionPlan?.proposedSessionCount) > 0)?.preSessionPlan;
+  if (planFromSummary) return getPlannedSessionCount(planFromSummary);
+
+  const decisionTotal = [...sessionSummaries]
+    .reverse()
+    .find((summary) => Number(summary?.clinicalDecision?.proposedSessions) > 0)?.clinicalDecision?.proposedSessions;
+  return getPlannedSessionCount({ proposedSessionCount: decisionTotal }, SESSION_COUNT_LIMITS.defaultValue);
 }
 
 function getPreviousSessionSummary({ caseId, sessionNumber, sessionSummaries }) {
@@ -481,15 +592,25 @@ function getPreviousSessionSummary({ caseId, sessionNumber, sessionSummaries }) 
   );
 }
 
-function createSessionPrelude(caseItem, sessionNumber, summary) {
+function buildBasePlanFromSummary(summary) {
+  if (!summary) return null;
+  return {
+    ...(summary.preSessionPlan || {}),
+    proposedSessionCount:
+      summary.clinicalDecision?.proposedSessions || summary.preSessionPlan?.proposedSessionCount
+  };
+}
+
+function createSessionPrelude(caseItem, sessionNumber, summary, totalSessions = SESSION_COUNT_LIMITS.defaultValue) {
   const answer = getSessionOpening(caseItem.id, sessionNumber, summary);
+  const preludeLabel = `Inicio de Sesion ${sessionNumber} de ${totalSessions}`;
   return {
     id: crypto.randomUUID(),
-    question: `Inicio de Sesión ${sessionNumber}`,
+    question: preludeLabel,
     answer,
     responseId: `${caseItem.id}-session-${sessionNumber}-prelude`,
     analysis: {
-      original: `Inicio de Sesión ${sessionNumber}`,
+      original: preludeLabel,
       text: `inicio sesion ${sessionNumber}`,
       detectedIntent: "inicio_sesion",
       contextualTopic: "continuidad",

@@ -91,7 +91,7 @@ const ACT_PATTERNS = [
     act: "experiencia_vivida",
     confidence: 0.91,
     reason: "seguimiento_experiencia",
-    test: (text) => /\b(a que te refieres|que quieres decir|cuentame mas|explicame|explica|explicar|un poco mas|desde cuando|hace cuanto|cuando empezo|que paso|como lo vives|que significa|que hay detras|profundizar|de donde nace|que lo gatillo|que lo provoco|que hizo que|que hizo que esto|que lo hizo mas evidente|que volvio esto mas evidente|que lo volvio mas evidente|separacion|separaste|ex pareja|historia familiar|familia de origen|infancia)\b/.test(text)
+    test: (text) => /\b(a que te refieres|que quieres decir|cuentame mas|explicame|explica|explicar|un poco mas|desde cuando|hace cuanto|cuando empezo|que paso|como lo vives|que significa|que hay detras|que lugar tiene|que lugar ocupa|que significa para ti|profundizar|de donde nace|que lo gatillo|que lo provoco|que hizo que|que hizo que esto|que lo hizo mas evidente|que volvio esto mas evidente|que lo volvio mas evidente|computador|videojuego|videojuegos|jugar|juego online|amistades online|mundo online|separacion|separaste|ex pareja|historia familiar|familia de origen|infancia)\b/.test(text)
   },
   {
     act: "rutina",
@@ -169,6 +169,10 @@ export function resolveStudentAct({ studentMessage = "", memory = {} } = {}) {
     return buildResult("confirmar_tarea", normalizedMessage, 0.96, ["confirmacion_tarea"], memory.taskDetails || null);
   }
 
+  if (isMotiveQuestion(normalizedMessage)) {
+    return buildResult("motivo_consulta", normalizedMessage, 0.98, ["motivo_consulta_prioritario"], null);
+  }
+
   for (const pattern of ACT_PATTERNS) {
     if (pattern.test(normalizedMessage, words)) {
       return buildResult(pattern.act, normalizedMessage, pattern.confidence, [pattern.reason], null);
@@ -195,6 +199,10 @@ function detectTaskDetails(normalizedMessage, originalMessage) {
 
 function isAgendaMessage(normalizedMessage) {
   return /\b(agendar|agendamos|proxima sesion|proxima semana|puedes venir|podrias venir|te parece si vienes|vienes en|te espero|nos vemos|nos vemos el|nos vemos en|revisar como te fue|a las \d{1,2}|hrs|hora|lunes|martes|miercoles|jueves|viernes|sabado|domingo|\d+\s*(dias|semanas) mas)\b/.test(normalizedMessage);
+}
+
+function isMotiveQuestion(normalizedMessage) {
+  return /\b(por que estas aqui|por que estas aca|que te trae|que te trajo|que te hizo venir|motivo de consulta|por que viniste|que haces aqui|que haces aca|por que decidiste venir|que te llevo a consultar|por que llegaste|por que consultaste|que hizo que vinieras|que hizo que consultaras|por que vienes)\b/.test(normalizedMessage);
 }
 
 function buildResult(detectedAct, normalizedMessage, confidence, reasons, taskDetails) {

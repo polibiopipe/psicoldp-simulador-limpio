@@ -785,7 +785,7 @@ a {
 
 .session-selector {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
   margin-top: 12px;
 }
@@ -2239,6 +2239,595 @@ textarea:focus {
   flex: 1 1 190px;
 }
 
+.clinical-agenda-screen {
+  display: grid;
+  gap: 18px;
+  padding-top: 28px;
+}
+
+.clinical-agenda-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.clinical-agenda-header h1 {
+  margin: 0;
+  color: var(--nv-heading);
+  font-size: clamp(2rem, 4vw, 3.7rem);
+  line-height: 1;
+}
+
+.clinical-agenda-header p {
+  max-width: 760px;
+  margin: 10px 0 0;
+  color: var(--nv-muted);
+}
+
+.agenda-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.agenda-overview article,
+.agenda-guide-card,
+.agenda-patient-card,
+.clinical-registry-panel,
+.agenda-reminder-panel,
+.schedule-editor-card {
+  border: 1px solid rgba(23, 33, 29, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 18px 48px rgba(19, 34, 43, 0.08);
+}
+
+.agenda-overview article {
+  display: grid;
+  gap: 6px;
+  min-height: 110px;
+  padding: 16px;
+  color: var(--nv-primary);
+}
+
+.agenda-overview svg {
+  width: 22px;
+  height: 22px;
+}
+
+.agenda-overview strong {
+  color: var(--nv-heading);
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.agenda-overview span {
+  color: var(--nv-muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.agenda-guide-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(15, 92, 99, 0.09), rgba(200, 139, 58, 0.12)),
+    rgba(255, 255, 255, 0.88);
+}
+
+.agenda-guide-orb {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #0f5c63, #2a9aa4);
+}
+
+.agenda-guide-card span {
+  color: var(--nv-primary);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.agenda-guide-card p {
+  margin: 4px 0 0;
+  color: var(--nv-heading);
+  font-weight: 720;
+}
+
+.clinical-agenda-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 0.44fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.agenda-patient-list {
+  display: grid;
+  gap: 14px;
+}
+
+.agenda-patient-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-top: 5px solid var(--accent);
+}
+
+.agenda-patient-card.selected {
+  outline: 3px solid color-mix(in srgb, var(--accent), transparent 72%);
+}
+
+.agenda-card-main {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.agenda-card-main img {
+  width: 72px;
+  height: 82px;
+  border-radius: 14px;
+  object-fit: cover;
+  object-position: center top;
+  box-shadow: 0 12px 28px rgba(19, 34, 43, 0.12);
+}
+
+.agenda-card-main h2 {
+  margin: 3px 0 0;
+  color: var(--nv-heading);
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.agenda-card-main p {
+  margin: 2px 0 0;
+  color: var(--nv-muted);
+  font-weight: 780;
+}
+
+.agenda-card-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(238, 243, 241, 0.72);
+}
+
+.agenda-card-progress div {
+  display: grid;
+  gap: 2px;
+}
+
+.agenda-card-progress span,
+.agenda-card-facts span,
+.registry-summary-grid span,
+.agenda-reminder-grid span {
+  color: var(--nv-primary);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.agenda-card-progress strong {
+  color: var(--nv-heading);
+  font-size: 1rem;
+}
+
+.agenda-state-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #0b4a50;
+  background: #e7f3f1;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.agenda-state-pill.state-riesgo-abierto {
+  color: #7a2031;
+  background: #fff0f2;
+}
+
+.agenda-state-pill.state-nota-clinica-pendiente,
+.agenda-state-pill.state-tarea-asignada,
+.agenda-state-pill.state-requiere-reevaluacion {
+  color: #7a4f04;
+  background: #fff7e5;
+}
+
+.agenda-state-pill.state-cerrado,
+.agenda-state-pill.state-derivado {
+  color: #52606d;
+  background: #eef1f0;
+}
+
+.agenda-card-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agenda-card-facts div {
+  border: 1px solid rgba(217, 226, 225, 0.8);
+  border-radius: 14px;
+  padding: 11px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.agenda-card-facts p {
+  display: -webkit-box;
+  min-height: 44px;
+  margin: 5px 0 0;
+  overflow: hidden;
+  color: var(--nv-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.agenda-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agenda-card-badges span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--nv-muted);
+  background: #eef3f1;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.agenda-card-badges span.ok {
+  color: #1f6f47;
+  background: #e9f6ee;
+}
+
+.agenda-card-badges span.warning {
+  color: #7a4f04;
+  background: #fff7e5;
+}
+
+.agenda-card-badges span.risk {
+  color: #7a2031;
+  background: #fff0f2;
+}
+
+.agenda-card-badges svg {
+  width: 16px;
+  height: 16px;
+}
+
+.agenda-card-actions,
+.agenda-reminder-actions,
+.schedule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.clinical-registry-panel {
+  position: sticky;
+  top: 76px;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.registry-heading {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.registry-heading h2,
+.registry-alerts h3,
+.registry-session-list h3 {
+  margin: 0;
+  color: var(--nv-heading);
+}
+
+.registry-next-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border-radius: 14px;
+  padding: 12px;
+  color: var(--nv-primary);
+  background: #eef7f5;
+}
+
+.registry-next-card svg {
+  width: 24px;
+  height: 24px;
+}
+
+.registry-next-card strong,
+.registry-next-card span {
+  display: block;
+}
+
+.registry-next-card strong {
+  color: var(--nv-heading);
+}
+
+.registry-next-card span {
+  color: var(--nv-muted);
+  font-weight: 760;
+}
+
+.registry-summary-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.registry-summary-grid div {
+  border: 1px solid rgba(217, 226, 225, 0.8);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(247, 248, 246, 0.72);
+}
+
+.registry-summary-grid strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--nv-heading);
+  font-size: 0.94rem;
+  line-height: 1.42;
+}
+
+.registry-alerts,
+.registry-session-list {
+  display: grid;
+  gap: 10px;
+}
+
+.agenda-alert {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid rgba(200, 139, 58, 0.24);
+  border-radius: 14px;
+  padding: 11px;
+  background: #fffaf1;
+}
+
+.agenda-alert.risk {
+  border-color: rgba(122, 32, 49, 0.2);
+  background: #fff5f6;
+}
+
+.agenda-alert svg {
+  margin-top: 2px;
+  color: var(--nv-accent);
+}
+
+.agenda-alert.risk svg {
+  color: #7a2031;
+}
+
+.agenda-alert strong,
+.agenda-alert span {
+  display: block;
+}
+
+.agenda-alert strong {
+  color: var(--nv-heading);
+}
+
+.agenda-alert span,
+.registry-alerts p,
+.registry-session-list p {
+  color: var(--nv-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.registry-session-item {
+  border: 1px solid rgba(217, 226, 225, 0.8);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.registry-session-item summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  cursor: pointer;
+  color: var(--nv-primary);
+  font-weight: 900;
+}
+
+.registry-session-item summary strong {
+  color: var(--nv-muted);
+  font-size: 0.82rem;
+}
+
+.registry-session-item dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  border-top: 1px solid rgba(217, 226, 225, 0.8);
+  padding: 12px;
+}
+
+.registry-session-item dt {
+  color: var(--nv-primary);
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.registry-session-item dd {
+  margin: 3px 0 0;
+  color: var(--nv-muted);
+  line-height: 1.45;
+}
+
+.agenda-empty-registry {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 34px 0;
+  text-align: center;
+}
+
+.agenda-empty-registry svg {
+  color: var(--nv-primary);
+}
+
+.agenda-reminder-panel {
+  display: grid;
+  gap: 16px;
+  border-color: rgba(15, 92, 99, 0.24);
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(15, 92, 99, 0.08), rgba(255, 255, 255, 0.92)),
+    #fff;
+}
+
+.agenda-reminder-heading {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.agenda-reminder-heading svg {
+  width: 36px;
+  height: 36px;
+  color: var(--nv-primary);
+}
+
+.agenda-reminder-heading h2 {
+  margin: 0;
+  color: var(--nv-heading);
+}
+
+.agenda-reminder-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agenda-reminder-grid div {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.agenda-reminder-grid strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--nv-heading);
+  line-height: 1.38;
+}
+
+.schedule-editor-panel {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(19, 34, 43, 0.34);
+  backdrop-filter: blur(8px);
+}
+
+.schedule-editor-card {
+  width: min(860px, 100%);
+  max-height: min(720px, calc(100vh - 40px));
+  overflow: auto;
+  padding: 22px;
+}
+
+.schedule-editor-card h2 {
+  margin: 0;
+  color: var(--nv-heading);
+  font-size: clamp(1.7rem, 4vw, 2.7rem);
+}
+
+.schedule-editor-card header p {
+  margin: 4px 0 0;
+  color: var(--nv-muted);
+  font-weight: 820;
+}
+
+.schedule-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.schedule-form-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--nv-heading);
+  font-weight: 850;
+}
+
+.schedule-form-grid label.wide {
+  grid-column: 1 / -1;
+}
+
+.schedule-form-grid input,
+.schedule-form-grid select,
+.schedule-form-grid textarea {
+  width: 100%;
+  border: 1px solid rgba(23, 33, 29, 0.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--nv-text);
+  background: #fff;
+  font: inherit;
+}
+
+.schedule-form-grid textarea {
+  resize: vertical;
+}
+
+.schedule-form-grid input:focus,
+.schedule-form-grid select:focus,
+.schedule-form-grid textarea:focus {
+  outline: 3px solid rgba(15, 92, 99, 0.18);
+  border-color: var(--nv-primary);
+}
+
+.schedule-actions {
+  margin-top: 16px;
+}
+
 @keyframes floatIn {
   from {
     opacity: 0;
@@ -2322,6 +2911,19 @@ textarea:focus {
 
   .saved-session-detail {
     position: static;
+  }
+
+  .clinical-agenda-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .clinical-registry-panel {
+    position: static;
+  }
+
+  .agenda-card-facts,
+  .agenda-reminder-grid {
+    grid-template-columns: 1fr;
   }
 
   .closure-actions {
@@ -2438,6 +3040,9 @@ textarea:focus {
   .case-grid,
   .session-selector,
   .saved-sessions-header,
+  .clinical-agenda-header,
+  .agenda-overview,
+  .schedule-form-grid,
   .closure-panels,
   .closure-case-strip,
   .closure-metrics,
@@ -2490,8 +3095,25 @@ textarea:focus {
   }
 
   .saved-sessions-toolbar,
+  .agenda-card-actions,
+  .agenda-reminder-actions,
+  .schedule-actions,
   .saved-session-actions {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-card-main {
+    grid-template-columns: 60px minmax(0, 1fr);
+  }
+
+  .agenda-card-main img {
+    width: 60px;
+    height: 70px;
+  }
+
+  .agenda-guide-card,
+  .agenda-reminder-heading {
     grid-template-columns: 1fr;
   }
 

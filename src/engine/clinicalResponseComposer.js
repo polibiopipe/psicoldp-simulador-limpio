@@ -161,6 +161,7 @@ function resolveResponseKey({ detectedAct, clinicalTopic, state }) {
   }
   if (detectedAct === "experiencia_vivida") {
     if (clinicalTopic === "temporal") return "temporal";
+    if (clinicalTopic === "videojuegos") return "videojuegos";
     if (state.revealedTopics?.includes(clinicalTopic) && !BASIC_ACTS.has(detectedAct)) return "repeticion";
     return "experiencia_vivida";
   }
