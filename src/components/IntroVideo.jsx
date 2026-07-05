@@ -50,10 +50,9 @@ export function IntroVideo({ children }) {
         <img className="intro-video-logo" src="/logo-escucha-viva-horizontal.png" alt="Escucha Viva" />
         <div className="intro-video-frame">
           <video
-            autoPlay
-            muted
+            controls
             playsInline
-            preload="auto"
+            preload="metadata"
             src="/videos/escucha-viva-intro.mp4"
             onEnded={finishIntro}
             onError={finishIntro}
