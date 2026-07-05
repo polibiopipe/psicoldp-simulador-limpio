@@ -20,8 +20,10 @@ function markIntroAsSeen() {
 
 export function IntroVideo({ children }) {
   const [introSeen, setIntroSeen] = useState(hasSeenIntro);
+  const [hasStarted, setHasStarted] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const closeTimerRef = useRef(null);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     return () => {
@@ -38,6 +40,15 @@ export function IntroVideo({ children }) {
     }, 240);
   }
 
+  async function handleStartIntro() {
+    setHasStarted(true);
+    try {
+      await videoRef.current?.play();
+    } catch (playError) {
+      console.warn("No se pudo iniciar el video introductorio automaticamente.", playError);
+    }
+  }
+
   if (introSeen) return children;
 
   return (
@@ -47,9 +58,17 @@ export function IntroVideo({ children }) {
       </button>
 
       <section className="intro-video-card">
-        <img className="intro-video-logo" src="/logo-escucha-viva-horizontal.png" alt="Escucha Viva" />
         <div className="intro-video-frame">
+          {!hasStarted && (
+            <div className="intro-start-panel">
+              <img className="intro-video-logo" src="/logo-escucha-viva-horizontal.png" alt="Escucha Viva" />
+              <button className="intro-start-button" type="button" onClick={handleStartIntro}>
+                Iniciar experiencia
+              </button>
+            </div>
+          )}
           <video
+            ref={videoRef}
             controls
             playsInline
             preload="metadata"

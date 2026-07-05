@@ -7066,6 +7066,7 @@ body,
 }
 
 .intro-video-frame {
+  position: relative;
   width: 100%;
   overflow: hidden;
   border: 1px solid rgba(15, 43, 70, 0.1);
@@ -7078,6 +7079,47 @@ body,
     0 30px 90px rgba(15, 43, 70, 0.16),
     0 12px 30px rgba(15, 43, 70, 0.08);
   backdrop-filter: blur(16px);
+}
+
+.intro-start-panel {
+  position: absolute;
+  inset: clamp(7px, 1.2vw, 12px);
+  z-index: 1;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: clamp(22px, 4vw, 34px);
+  border-radius: clamp(16px, 2.2vw, 26px);
+  background:
+    radial-gradient(circle at 28% 18%, rgba(42, 154, 164, 0.18), transparent 34%),
+    radial-gradient(circle at 78% 78%, rgba(201, 164, 90, 0.16), transparent 38%),
+    rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+}
+
+.intro-start-button {
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 999px;
+  padding: 12px 24px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #176d75, #0f5c63);
+  box-shadow:
+    0 16px 34px rgba(15, 92, 99, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  font-weight: 850;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease;
+}
+
+.intro-start-button:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.05);
+  box-shadow:
+    0 20px 42px rgba(15, 92, 99, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .intro-video-frame video {
