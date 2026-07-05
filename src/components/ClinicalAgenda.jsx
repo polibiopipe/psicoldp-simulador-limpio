@@ -1,12 +1,18 @@
 import React, { useMemo, useState } from "react";
 import {
   ArrowLeft,
+  AlertTriangle,
   CalendarClock,
+  CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
   ClipboardCheck,
   FileText,
   Flag,
   Play,
+  Settings2,
   ShieldAlert,
   Sparkles,
   Stethoscope,
@@ -16,14 +22,35 @@ import {
 import {
   buildAgendaReminder,
   buildClinicalAgendaItems,
+  buildAvailableSlots,
+  buildWeeklyAgenda,
   clearClinicalAgendaEntry,
   formatAgendaDate,
-  saveClinicalAgendaEntry
+  getWeekStartDate,
+  getWeeklyAvailability,
+  addDays,
+  saveClinicalAgendaEntry,
+  saveWeeklyAvailability,
+  SESSION_DURATION_OPTIONS,
+  validateAgendaSchedule,
+  WEEK_DAYS
 } from "../engine/clinicalAgenda.js";
+import {
+  CLINICAL_TERM_OPTIONS,
+  getClinicalTermCopy,
+  getClinicalTermPreference,
+  saveClinicalTermPreference
+} from "../engine/clinicalLanguage.js";
 
 export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSession }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const agendaItems = useMemo(() => buildClinicalAgendaItems(cases), [cases, refreshKey]);
+  const [availability, setAvailability] = useState(() => getWeeklyAvailability());
+  const [weekStart, setWeekStart] = useState(() => getWeekStartDate());
+  const [calendarView, setCalendarView] = useState("semana");
+  const [suggestedSlot, setSuggestedSlot] = useState(null);
+  const [languagePreference, setLanguagePreference] = useState(() => getClinicalTermPreference());
+  const termCopy = getClinicalTermCopy(languagePreference);
   const [selectedCaseId, setSelectedCaseId] = useState(() => agendaItems[0]?.caseItem.id || cases[0]?.id || "");
   const [scheduleCaseId, setScheduleCaseId] = useState("");
   const [reminderCaseId, setReminderCaseId] = useState("");
@@ -32,9 +59,32 @@ export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSessio
   const scheduleItem = agendaItems.find((item) => item.caseItem.id === scheduleCaseId) || null;
   const reminderItem = agendaItems.find((item) => item.caseItem.id === reminderCaseId) || null;
   const stats = buildAgendaStats(agendaItems);
+  const weeklyAgenda = useMemo(
+    () => buildWeeklyAgenda({ cases, weekStart, availability }),
+    [cases, weekStart, availability, refreshKey]
+  );
+  const availableSlots = useMemo(
+    () => buildAvailableSlots({ cases, weekStart, availability, durationMinutes: 45, limit: 10 }),
+    [cases, weekStart, availability, refreshKey]
+  );
 
   function refreshAgenda() {
     setRefreshKey((current) => current + 1);
+  }
+
+  function updateAvailability(nextAvailability) {
+    const normalized = saveWeeklyAvailability(nextAvailability);
+    setAvailability(normalized);
+    refreshAgenda();
+  }
+
+  function updateLanguagePreference(patch) {
+    const next = saveClinicalTermPreference({
+      ...languagePreference,
+      ...patch,
+      saveAsDefault: true
+    });
+    setLanguagePreference(next);
   }
 
   function openReminder(item) {
@@ -65,7 +115,7 @@ export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSessio
           <span className="eyebrow">Escucha Viva - continuidad clinica simulada</span>
           <h1>Agenda clinica formativa</h1>
           <p>
-            Organiza pacientes, sesiones, tareas, riesgos y decisiones para sostener
+            Organiza {termCopy.plural}, sesiones, tareas, riesgos y decisiones para sostener
             procesos simulados en el tiempo.
           </p>
         </div>
@@ -85,11 +135,87 @@ export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSessio
         <div>
           <span>Guia Vivo</span>
           <p>
-            Antes de iniciar una nueva sesion, revisa que quedo pendiente, que tarea
-            debes preguntar y si existe riesgo o nota clinica por completar.
+            Antes de agendar una nueva sesion, revisa tus horarios disponibles,
+            pendientes clinicos y posibles conflictos. La agenda tambien sostiene
+            continuidad del proceso.
           </p>
         </div>
       </article>
+
+      <section className="agenda-control-grid">
+        <ClinicalLanguagePanel
+          preference={languagePreference}
+          termCopy={termCopy}
+          onChange={updateLanguagePreference}
+        />
+        <AvailabilityEditor availability={availability} onChange={updateAvailability} />
+      </section>
+
+      <section className="agenda-calendar-panel" aria-label="Calendario clinico semanal">
+        <div className="agenda-calendar-toolbar">
+          <div>
+            <span className="eyebrow">Calendario clinico</span>
+            <h2>Semana del {formatWeekRange(weekStart)}</h2>
+          </div>
+          <div className="agenda-calendar-actions">
+            <button
+              className={calendarView === "dia" ? "selected" : ""}
+              type="button"
+              onClick={() => setCalendarView("dia")}
+            >
+              Dia
+            </button>
+            <button
+              className={calendarView === "semana" ? "selected" : ""}
+              type="button"
+              onClick={() => setCalendarView("semana")}
+            >
+              Semana
+            </button>
+            <button
+              className="secondary-action compact"
+              type="button"
+              onClick={() => setWeekStart((current) => addDays(current, -7))}
+            >
+              <ChevronLeft aria-hidden="true" />
+            </button>
+            <button
+              className="secondary-action compact"
+              type="button"
+              onClick={() => setWeekStart(getWeekStartDate())}
+            >
+              Hoy
+            </button>
+            <button
+              className="secondary-action compact"
+              type="button"
+              onClick={() => setWeekStart((current) => addDays(current, 7))}
+            >
+              <ChevronRight aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <AgendaCalendar
+          agenda={weeklyAgenda}
+          view={calendarView}
+          termCopy={termCopy}
+          onOpenCase={(caseId) => {
+            setSelectedCaseId(caseId);
+            setScheduleCaseId(caseId);
+          }}
+        />
+
+        <AvailableSlots
+          slots={availableSlots}
+          selectedItem={selectedItem}
+          onUseSlot={(slot) => {
+            if (!selectedItem) return;
+            setSuggestedSlot(slot);
+            setScheduleCaseId(selectedItem.caseItem.id);
+          }}
+        />
+      </section>
 
       {reminderItem && (
         <AgendaReminder
@@ -111,6 +237,7 @@ export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSessio
               onSchedule={() => {
                 setScheduleCaseId((current) => current === item.caseItem.id ? "" : item.caseItem.id);
                 setSelectedCaseId(item.caseItem.id);
+                setSuggestedSlot(null);
               }}
               onPrepare={() => onPrepareCase?.(item.caseItem.id, item.nextSessionNumber || 1)}
               onOpenReminder={() => openReminder(item)}
@@ -135,7 +262,7 @@ export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSessio
                 <CalendarClock aria-hidden="true" />
                 <div>
                   <strong>{formatAgendaDate(selectedItem.agendaEntry)}</strong>
-                  <span>{selectedItem.nextSessionLabel}</span>
+                  <span>{selectedItem.nextSessionLabel} con {termCopy.article}</span>
                 </div>
               </div>
 
@@ -229,7 +356,7 @@ export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSessio
                     </details>
                   ))
                 ) : (
-                  <p>Aun no hay sesiones guardadas para este paciente.</p>
+                  <p>Aun no hay sesiones guardadas para {termCopy.article}.</p>
                 )}
               </section>
             </>
@@ -247,15 +374,21 @@ export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSessio
         <ScheduleEditor
           key={scheduleItem.caseItem.id}
           item={scheduleItem}
+          cases={cases}
+          availability={availability}
+          suggestedSlot={suggestedSlot}
+          termCopy={termCopy}
           onCancel={() => setScheduleCaseId("")}
           onSave={(entry) => {
             saveClinicalAgendaEntry(scheduleItem.caseItem.id, entry);
             setScheduleCaseId("");
+            setSuggestedSlot(null);
             refreshAgenda();
           }}
           onClear={() => {
             clearClinicalAgendaEntry(scheduleItem.caseItem.id);
             setScheduleCaseId("");
+            setSuggestedSlot(null);
             refreshAgenda();
           }}
         />
@@ -399,16 +532,232 @@ function AgendaReminder({ item, onCancel, onEnter }) {
   );
 }
 
-function ScheduleEditor({ item, onSave, onCancel, onClear }) {
+function ClinicalLanguagePanel({ preference, termCopy, onChange }) {
+  return (
+    <article className="clinical-language-panel">
+      <div className="agenda-panel-heading">
+        <Settings2 aria-hidden="true" />
+        <div>
+          <span className="eyebrow">Lenguaje clinico</span>
+          <h2>Como nombraras a la persona</h2>
+        </div>
+      </div>
+      <p>
+        Nombrar tambien es parte del encuadre. Usa un termino respetuoso y coherente
+        con tu enfoque durante el proceso.
+      </p>
+      <label className="language-selector">
+        <span>Usare el termino</span>
+        <select
+          value={preference.term}
+          onChange={(event) => onChange({ term: event.target.value })}
+        >
+          {CLINICAL_TERM_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {preference.term === "otro" && (
+        <label className="language-selector">
+          <span>Termino personalizado</span>
+          <input
+            type="text"
+            value={preference.customTerm}
+            onChange={(event) => onChange({ customTerm: event.target.value })}
+            placeholder="Ej.: persona consultante"
+          />
+        </label>
+      )}
+      <div className="language-preview">
+        <strong>Ejemplo</strong>
+        <span>Antes de iniciar la entrevista {termCopy.prep}, revisa acuerdos y pendientes.</span>
+      </div>
+    </article>
+  );
+}
+
+function AvailabilityEditor({ availability, onChange }) {
+  function updateDay(dayKey, patch) {
+    onChange({
+      ...availability,
+      [dayKey]: {
+        ...availability[dayKey],
+        ...patch
+      }
+    });
+  }
+
+  return (
+    <article className="availability-editor">
+      <div className="agenda-panel-heading">
+        <CalendarDays aria-hidden="true" />
+        <div>
+          <span className="eyebrow">Mi disponibilidad</span>
+          <h2>Horarios semanales</h2>
+        </div>
+      </div>
+      <div className="availability-grid">
+        {WEEK_DAYS.map((day) => {
+          const dayAvailability = availability[day.key] || {};
+          return (
+            <div className={`availability-day-row ${dayAvailability.enabled ? "enabled" : ""}`} key={day.key}>
+              <label className="availability-toggle">
+                <input
+                  type="checkbox"
+                  checked={Boolean(dayAvailability.enabled)}
+                  onChange={(event) => updateDay(day.key, { enabled: event.target.checked })}
+                />
+                <span>{day.shortLabel}</span>
+              </label>
+              <input
+                type="time"
+                value={dayAvailability.start || "09:00"}
+                onChange={(event) => updateDay(day.key, { start: event.target.value })}
+                disabled={!dayAvailability.enabled}
+              />
+              <span aria-hidden="true">-</span>
+              <input
+                type="time"
+                value={dayAvailability.end || "10:00"}
+                onChange={(event) => updateDay(day.key, { end: event.target.value })}
+                disabled={!dayAvailability.enabled}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </article>
+  );
+}
+
+function AgendaCalendar({ agenda, view, termCopy, onOpenCase }) {
+  const todayKey = getLocalDateKey(new Date());
+  const visibleDays = view === "dia"
+    ? [agenda.days.find((day) => day.dateKey === todayKey) || agenda.days[0]].filter(Boolean)
+    : agenda.days;
+
+  return (
+    <div className={`agenda-calendar-grid view-${view}`}>
+      {visibleDays.map((day) => (
+        <article className="agenda-day-column" key={day.key}>
+          <header className="agenda-day-header">
+            <div>
+              <span>{day.shortLabel}</span>
+              <strong>{day.dateLabel}</strong>
+            </div>
+            <small>
+              {day.availability?.enabled
+                ? `${day.availability.start} - ${day.availability.end}`
+                : "Sin disponibilidad"}
+            </small>
+          </header>
+
+          <div className="agenda-day-body">
+            {day.sessions.length ? (
+              day.sessions.map((session) => (
+                <button
+                  className={`agenda-session-block state-${stateClass(session.status)}`}
+                  key={`${session.caseId}-${session.date}-${session.time}`}
+                  type="button"
+                  onClick={() => onOpenCase(session.caseId)}
+                >
+                  <span>
+                    <Clock aria-hidden="true" />
+                    {session.time} - {session.endTime}
+                  </span>
+                  <strong>{session.patientName}</strong>
+                  <small>{session.sessionLabel}</small>
+                  <em>{session.focus}</em>
+                </button>
+              ))
+            ) : (
+              <div className="agenda-empty-day">
+                <span>{day.availability?.enabled ? "Libre" : "Sin agenda"}</span>
+                <small>
+                  {day.availability?.enabled
+                    ? `Disponible para sesiones ${termCopy.prep}.`
+                    : "Activa disponibilidad si quieres agendar aqui."}
+                </small>
+              </div>
+            )}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function AvailableSlots({ slots, selectedItem, onUseSlot }) {
+  return (
+    <aside className="agenda-available-slots">
+      <div>
+        <span className="eyebrow">Espacios disponibles</span>
+        <h3>Esta semana</h3>
+      </div>
+      {slots.length ? (
+        <div className="available-slot-list">
+          {slots.map((slot) => (
+            <button
+              key={`${slot.date}-${slot.time}`}
+              type="button"
+              onClick={() => onUseSlot(slot)}
+              disabled={!selectedItem}
+            >
+              <span>{formatSlotDate(slot.date)}</span>
+              <strong>{slot.time} - {slot.endTime}</strong>
+              <small>{slot.dayLabel}</small>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p>No hay espacios libres en esta semana con la disponibilidad definida.</p>
+      )}
+      {!selectedItem && <p>Selecciona un caso para usar un horario libre.</p>}
+    </aside>
+  );
+}
+
+function ScheduleValidationMessage({ validation }) {
+  const Icon = validation.ok ? CheckCircle2 : AlertTriangle;
+  return (
+    <div className={`schedule-validation ${validation.type}`}>
+      <Icon aria-hidden="true" />
+      <div>
+        <strong>{validation.message}</strong>
+        {validation.detail && <span>{validation.detail}</span>}
+      </div>
+    </div>
+  );
+}
+
+function ScheduleEditor({
+  item,
+  cases,
+  availability,
+  suggestedSlot,
+  termCopy,
+  onSave,
+  onCancel,
+  onClear
+}) {
   const [draft, setDraft] = useState(() => ({
-    date: item.agendaEntry?.date || "",
-    time: item.agendaEntry?.time || "",
-    durationMinutes: item.agendaEntry?.durationMinutes || 50,
+    date: suggestedSlot?.date || item.agendaEntry?.date || "",
+    time: suggestedSlot?.time || item.agendaEntry?.time || "",
+    durationMinutes: suggestedSlot?.durationMinutes || item.agendaEntry?.durationMinutes || 45,
     modality: item.agendaEntry?.modality || "simulada",
     plannedSessionNumber: item.agendaEntry?.plannedSessionNumber || item.nextSessionNumber || 1,
+    status: item.agendaEntry?.status || "programada",
     nextObjective: item.agendaEntry?.nextObjective || item.nextFocus || "",
     reminderNote: item.agendaEntry?.reminderNote || item.task?.description || ""
   }));
+  const validation = validateAgendaSchedule({
+    caseId: item.caseItem.id,
+    draft,
+    cases,
+    availability
+  });
 
   function updateDraft(patch) {
     setDraft((current) => ({ ...current, ...patch }));
@@ -420,7 +769,7 @@ function ScheduleEditor({ item, onSave, onCancel, onClear }) {
         <header>
           <span className="eyebrow">Programar sesion</span>
           <h2 id="schedule-editor-title">{item.caseItem.name}</h2>
-          <p>{item.nextSessionLabel}</p>
+          <p>{item.nextSessionLabel} {termCopy.prep}</p>
         </header>
 
         <div className="schedule-form-grid">
@@ -446,7 +795,7 @@ function ScheduleEditor({ item, onSave, onCancel, onClear }) {
               value={draft.durationMinutes}
               onChange={(event) => updateDraft({ durationMinutes: Number(event.target.value) })}
             >
-              {[30, 45, 50, 60, 75, 90].map((minutes) => (
+              {SESSION_DURATION_OPTIONS.map((minutes) => (
                 <option key={minutes} value={minutes}>{minutes} min</option>
               ))}
             </select>
@@ -476,6 +825,23 @@ function ScheduleEditor({ item, onSave, onCancel, onClear }) {
               ))}
             </select>
           </label>
+          <label>
+            <span>Estado en agenda</span>
+            <select
+              value={draft.status}
+              onChange={(event) => updateDraft({ status: event.target.value })}
+            >
+              <option value="programada">Programada</option>
+              <option value="en_curso">En curso</option>
+              <option value="realizada">Realizada</option>
+              <option value="nota_clinica_pendiente">Nota clinica pendiente</option>
+              <option value="pendiente_cierre">Pendiente de cierre</option>
+              <option value="reprogramada">Reprogramada</option>
+              <option value="cancelada">Cancelada</option>
+              <option value="riesgo_abierto">Riesgo abierto</option>
+              <option value="seguimiento_pendiente">Seguimiento pendiente</option>
+            </select>
+          </label>
           <label className="wide">
             <span>Objetivo de la proxima sesion</span>
             <textarea
@@ -496,8 +862,15 @@ function ScheduleEditor({ item, onSave, onCancel, onClear }) {
           </label>
         </div>
 
+        <ScheduleValidationMessage validation={validation} />
+
         <div className="schedule-actions">
-          <button className="primary-action" type="button" onClick={() => onSave(draft)}>
+          <button
+            className="primary-action"
+            type="button"
+            onClick={() => onSave(draft)}
+            disabled={!validation.ok}
+          >
             <CheckCircle2 aria-hidden="true" />
             Guardar programacion
           </button>
@@ -529,6 +902,41 @@ function stateClass(state = "") {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function formatWeekRange(weekStart) {
+  const start = new Date(weekStart);
+  const end = addDays(start, 6);
+  try {
+    const formatter = new Intl.DateTimeFormat("es-CL", {
+      day: "numeric",
+      month: "short"
+    });
+    return `${formatter.format(start)} al ${formatter.format(end)}`;
+  } catch {
+    return "la semana seleccionada";
+  }
+}
+
+function formatSlotDate(value) {
+  if (!value) return "Fecha pendiente";
+  try {
+    return new Intl.DateTimeFormat("es-CL", {
+      weekday: "short",
+      day: "numeric",
+      month: "short"
+    }).format(new Date(`${value}T12:00:00`));
+  } catch {
+    return value;
+  }
+}
+
+function getLocalDateKey(date) {
+  const value = new Date(date);
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatRegistryDate(value) {

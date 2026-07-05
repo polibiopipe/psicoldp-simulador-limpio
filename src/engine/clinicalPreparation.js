@@ -73,6 +73,18 @@ export function normalizePreSessionPlan(plan = {}, { caseItem = null, sessionNum
     ethicalCareItems,
     ethicalCare: ethicalCareText,
     priorityInformation: preserveWritableText(plan.priorityInformation),
+    clinicalLanguageTerm: preserveWritableText(plan.clinicalLanguageTerm),
+    clinicalLanguageCustomTerm: preserveWritableText(plan.clinicalLanguageCustomTerm),
+    clinicalLanguageLabel: preserveWritableText(plan.clinicalLanguageLabel),
+    preparationQuality: preserveWritableText(plan.preparationQuality),
+    preparationOverrideUsed: Boolean(plan.preparationOverrideUsed),
+    preparationWeakReasons: Array.isArray(plan.preparationWeakReasons)
+      ? plan.preparationWeakReasons.map((item) => preserveWritableText(item)).filter(Boolean)
+      : [],
+    preparationMissingFields: Array.isArray(plan.preparationMissingFields)
+      ? plan.preparationMissingFields.map((item) => preserveWritableText(item)).filter(Boolean)
+      : [],
+    preparationStartedAt: preserveWritableText(plan.preparationStartedAt),
     createdAt: plan.createdAt || new Date().toISOString()
   };
 }
@@ -83,6 +95,13 @@ export function evaluatePreSessionPlan({ preSessionPlan = null, report = {}, his
   const exploredText = meaningfulHistory.map((entry) => `${entry.question || ""} ${entry.answer || ""}`).join(" ");
   const strengths = [];
   const gaps = [];
+
+  if (plan.preparationOverrideUsed) {
+    gaps.push("Iniciaste la entrevista con preparacion debil o insuficiente y decidiste continuar de todos modos.");
+    if (plan.preparationWeakReasons?.length) {
+      gaps.push(`Aspectos debiles al iniciar: ${plan.preparationWeakReasons.slice(0, 3).join("; ")}.`);
+    }
+  }
 
   if (plan.evaluationObjective.trim().length >= 18) {
     strengths.push("Definiste un objetivo inicial de evaluacion.");
@@ -131,6 +150,70 @@ export function evaluatePreSessionPlan({ preSessionPlan = null, report = {}, his
     gaps,
     level: gaps.length <= 1 ? "achieved" : gaps.length <= 3 ? "partial" : "needsWork",
     summary: `Planificaste una entrevista ${plan.interviewType}. Se observaron ${coveredAreas.length} de ${plan.explorationAreas.length} area(s) planificada(s) en la conversacion.`
+  };
+}
+
+export function evaluatePreSessionReadiness(plan = {}, { languagePreference = {} } = {}) {
+  const selectedAreas = Array.isArray(plan?.explorationAreas) ? plan.explorationAreas : [];
+  const selectedCareItems = Array.isArray(plan?.ethicalCareItems) ? plan.ethicalCareItems : [];
+  const proposedSessionCount = Number(plan?.proposedSessionCount);
+  const term = plan?.clinicalLanguageTerm || languagePreference?.term || "paciente";
+  const customTerm = plan?.clinicalLanguageCustomTerm || languagePreference?.customTerm || "";
+  const languageReady = term !== "otro" || hasText(customTerm);
+  const requiredCompletion = {
+    objective: hasText(plan?.evaluationObjective),
+    process:
+      proposedSessionCount >= SESSION_COUNT_LIMITS.min &&
+      proposedSessionCount <= SESSION_COUNT_LIMITS.max &&
+      hasText(plan?.sessionCountJustification) &&
+      hasText(plan?.processObjectives) &&
+      languageReady,
+    interview:
+      Boolean(plan?.interviewType) &&
+      hasText(plan?.interviewJustification),
+    areas: selectedAreas.length >= 1,
+    ethics: selectedCareItems.length >= 1,
+    priority: hasText(plan?.priorityInformation)
+  };
+  const qualityCompletion = {
+    objective: String(plan?.evaluationObjective || "").trim().length >= 18,
+    process:
+      requiredCompletion.process &&
+      String(plan?.sessionCountJustification || "").trim().length >= 24 &&
+      String(plan?.processObjectives || "").trim().length >= 24,
+    interview:
+      Boolean(plan?.interviewType) &&
+      String(plan?.interviewJustification || "").trim().length >= 18,
+    areas: selectedAreas.length >= 4 && selectedAreas.length <= 6,
+    ethics: selectedCareItems.length >= Math.min(4, ethicalCareChecklist.length),
+    priority: String(plan?.priorityInformation || "").trim().length >= 18
+  };
+  const missingReasons = buildPreparationReasons(requiredCompletion, {
+    objective: "Falta objetivo inicial.",
+    process: languageReady
+      ? "Falta completar plan de sesiones, justificacion u objetivos del proceso."
+      : "Falta definir el termino personalizado que usaras para nombrar a la persona.",
+    interview: "Falta justificar la modalidad de entrevista.",
+    areas: "Selecciona al menos un area prioritaria.",
+    ethics: "Selecciona al menos un cuidado etico.",
+    priority: "Falta informacion clave para cerrar la primera entrevista."
+  });
+  const weakReasons = buildPreparationReasons(qualityCompletion, {
+    objective: "Objetivo inicial demasiado breve.",
+    process: "Justificacion de sesiones u objetivos del proceso demasiado breves.",
+    interview: "Justificacion de la modalidad de entrevista demasiado breve.",
+    areas: "Prioriza entre 4 y 6 areas para sostener foco clinico.",
+    ethics: "Conviene marcar al menos 4 cuidados eticos.",
+    priority: "Informacion clave demasiado breve."
+  });
+
+  return {
+    requiredCompletion,
+    qualityCompletion,
+    requiredComplete: Object.values(requiredCompletion).every(Boolean),
+    qualityComplete: Object.values(qualityCompletion).every(Boolean),
+    missingReasons,
+    weakReasons
   };
 }
 
@@ -190,4 +273,15 @@ function inferEthicalCareItems(ethicalCare = "") {
       return false;
     })
     .map((item) => item.id);
+}
+
+function buildPreparationReasons(completion, messages) {
+  return Object.entries(completion)
+    .filter(([, ok]) => !ok)
+    .map(([key]) => messages[key])
+    .filter(Boolean);
+}
+
+function hasText(value) {
+  return String(value || "").trim().length > 0;
 }

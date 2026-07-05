@@ -198,10 +198,12 @@ export function evaluateClinicalPlanDecision({
   report = {},
   history = [],
   sessionNumber = 1,
-  preSessionPlan = null
+  preSessionPlan = null,
+  completedSessionCount = sessionNumber
 } = {}) {
   const normalized = normalizeClinicalDecision(decision, sessionPlan, sessionNumber, preSessionPlan);
   const expected = getExpectedSessions(sessionPlan);
+  const completedCount = Math.max(Number(completedSessionCount) || sessionNumber, sessionNumber);
   const meaningfulHistory = history.filter((entry) => !entry.isSessionPrelude);
   const hasRiskExploration = didExploreRisk(meaningfulHistory, report);
   const hasSupportExploration = didExploreSupport(meaningfulHistory, report);
@@ -226,6 +228,11 @@ export function evaluateClinicalPlanDecision({
     strengths.push("El numero de sesiones propuesto queda dentro del rango permitido para este proceso simulado.");
   } else {
     concerns.push("El numero de sesiones propuesto queda fuera del rango permitido para el prototipo.");
+  }
+
+  if (normalized.proposedSessions < completedCount) {
+    concerns.push(`Ya existen ${completedCount} sesiones registradas; reducir el plan no debe borrar ni invalidar memoria clinica previa.`);
+    recommendations.push("Mantener las sesiones realizadas como eventos historicos y ajustar solo las sesiones futuras o el cierre del proceso.");
   }
 
   if (hasRiskExploration || hasPendingRiskNote) {

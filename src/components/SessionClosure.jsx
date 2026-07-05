@@ -69,7 +69,15 @@ export function SessionClosure({
     () => normalizeClinicalDecision(clinicalDecision, sessionPlan, sessionNumber, preSessionPlan),
     [clinicalDecision, sessionPlan, sessionNumber, preSessionPlan]
   );
-  const plannedSessionTotal = normalizedClinicalDecision.proposedSessions || totalSessions;
+  const completedSessionCount = Math.max(
+    sessionNumber,
+    ...previousSessionSummaries.map((summary) => Number(summary?.sessionNumber) || 0)
+  );
+  const planBelowCompletedSessions = normalizedClinicalDecision.proposedSessions < completedSessionCount;
+  const plannedSessionTotal = Math.max(
+    normalizedClinicalDecision.proposedSessions || totalSessions,
+    completedSessionCount
+  );
   const nextSessionNumber = getNextSessionNumber(sessionNumber, plannedSessionTotal);
   const closureTitle = getSessionClosureTitle(sessionNumber, plannedSessionTotal);
   const nextSessionStage = nextSessionNumber ? getSessionStage(nextSessionNumber, plannedSessionTotal) : null;
@@ -81,9 +89,10 @@ export function SessionClosure({
         report,
         history,
         sessionNumber,
-        preSessionPlan
+        preSessionPlan,
+        completedSessionCount
       }),
-    [normalizedClinicalDecision, sessionPlan, report, history, sessionNumber, preSessionPlan]
+    [normalizedClinicalDecision, sessionPlan, report, history, sessionNumber, preSessionPlan, completedSessionCount]
   );
   const normalizedClinicalArtifacts = useMemo(
     () => normalizeClinicalArtifacts(clinicalArtifacts),
@@ -545,6 +554,12 @@ export function SessionClosure({
                 </option>
               ))}
             </select>
+            {planBelowCompletedSessions && (
+              <div className="prep-plan-memory-warning" role="alert">
+                Ya existen {completedSessionCount} sesiones registradas. No se eliminara
+                memoria clinica previa; el plan visual se ajustara sin borrar lo trabajado.
+              </div>
+            )}
           </label>
 
           <label>

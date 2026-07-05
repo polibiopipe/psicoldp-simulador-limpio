@@ -11,22 +11,19 @@ export function EthicalNotice({ compact = false }) {
             href="https://nucleovivo.net/"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Visitar el sitio oficial de Núcleo Vivo"
+            aria-label="Visitar el sitio oficial de Nucleo Vivo"
           >
             <img
               className="platform-logo-small"
               src="/logo-escucha-viva-horizontal.png"
-              alt="Escucha Viva, simuladores formativos. Una iniciativa de Núcleo Vivo"
+              alt="Escucha Viva"
             />
           </a>
-          <span>Entrevista Psicológica Formativa</span>
+          <span>Entrevista Psicologica Formativa</span>
         </div>
       )}
       <ShieldCheck aria-hidden="true" />
-      <p>
-        Simulación educativa con casos ficticios. No reemplaza atención psicológica real,
-        diagnóstico, tratamiento clínico ni supervisión docente.
-      </p>
+      <p>Uso exclusivamente educativo. No reemplaza atencion clinica real ni supervision docente.</p>
     </aside>
   );
 }

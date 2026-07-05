@@ -142,7 +142,13 @@ export function SimulationChat({
   return (
     <section className="screen chat-screen">
       <aside className="chat-sidebar">
-        <PatientCard caseItem={caseItem} difficulty={difficulty} />
+        <PatientCard
+          caseItem={caseItem}
+          difficulty={difficulty}
+          sessionNumber={sessionNumber}
+          totalSessions={totalSessions}
+          sessionSummary={sessionSummary}
+        />
         <ProgressBar turnCount={interviewTurns.length} />
         <div className="learning-box">
           <h2>Tipo de sesión</h2>

@@ -11,11 +11,14 @@ import { buildSessionHistoryRecord, saveSessionHistory } from "./engine/sessionH
 import {
   SESSION_COUNT_LIMITS,
   buildInitialPreSessionPlan,
-  getPlannedSessionCount,
   normalizePreSessionPlan
 } from "./engine/clinicalPreparation.js";
 import { getNextSessionNumber, getSessionOpening } from "./data/sessionPrompts.js";
-import { Home } from "./components/Home.jsx";
+import {
+  getAvailableSessionNumbers,
+  getCompletedSessionCount,
+  getProcessSessionTotal
+} from "./engine/sessionPlanUtils.js";
 import { CaseSelector } from "./components/CaseSelector.jsx";
 import { CaseBrief } from "./components/CaseBrief.jsx";
 import { SimulationChat } from "./components/SimulationChat.jsx";
@@ -29,6 +32,8 @@ import { PendingApprovalScreen } from "./components/PendingApprovalScreen.jsx";
 import { TrustCenter } from "./components/TrustCenter.jsx";
 import { AppFooter } from "./components/AppFooter.jsx";
 import { ClinicalAgenda } from "./components/ClinicalAgenda.jsx";
+import { AuthenticatedLayout } from "./components/AuthenticatedLayout.jsx";
+import { ClinicalDashboard } from "./components/ClinicalDashboard.jsx";
 import { isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
 import { getOrCreateUserApproval } from "./lib/userApproval.js";
 
@@ -70,7 +75,7 @@ export default function App() {
     [preSessionPlan, sessionSummaries]
   );
   const availableSessions = useMemo(
-    () => getAvailableSessions(sessionSummaries, sessionTotal),
+    () => getAvailableSessionNumbers(sessionSummaries, sessionTotal),
     [sessionSummaries, sessionTotal]
   );
 
@@ -181,20 +186,33 @@ export default function App() {
     setScreen(nextScreen);
   }
 
-  function startSession(session) {
+  function startSession(session, planOverride = null) {
     const summary = getPreviousSessionSummary({
       caseId: selectedCase.id,
       sessionNumber: session,
       sessionSummaries
     });
+    const normalizedPlan = normalizePreSessionPlan(planOverride || preSessionPlan, {
+      caseItem: selectedCase,
+      sessionNumber: session
+    });
     setSessionNumber(session);
     setSessionSummary(summary);
-    setPreSessionPlan((current) =>
-      normalizePreSessionPlan(current, { caseItem: selectedCase, sessionNumber: session })
-    );
+    setPreSessionPlan(normalizedPlan);
     setHistory(session > 1 ? [createSessionPrelude(selectedCase, session, summary, sessionTotal)] : []);
     setSaveStatus(null);
     setScreen(screens.simulation);
+  }
+
+  function beginSessionFromPreparation(session, preparationState = {}) {
+    const nextPlan = normalizePreSessionPlan(
+      {
+        ...preSessionPlan,
+        ...preparationState
+      },
+      { caseItem: selectedCase, sessionNumber: session }
+    );
+    startSession(session, nextPlan);
   }
 
   function chooseSessionForBrief(session) {
@@ -375,6 +393,24 @@ export default function App() {
     setScreen(screens.home);
   }
 
+  function navigateWorkspace(targetScreen) {
+    if (targetScreen === "progress") {
+      setScreen(screens.savedSessions);
+      return;
+    }
+    if (targetScreen === screens.results && history.length === 0) {
+      setScreen(screens.savedSessions);
+      return;
+    }
+    if (screens[targetScreen]) {
+      if (targetScreen === screens.home) {
+        goHome();
+        return;
+      }
+      setScreen(targetScreen);
+    }
+  }
+
   if (authLoading) {
     return (
       <main className="app-shell">
@@ -425,34 +461,29 @@ export default function App() {
     );
   }
 
+  const userEmail = isSupabaseConfigured && authSession ? authSession.user.email : "";
+
   return (
-    <main className={`app-shell ${screen === screens.simulation ? "simulation-mode" : ""}`}>
+    <main className={`app-shell authenticated-shell ${screen === screens.simulation ? "simulation-mode" : ""}`}>
       <EthicalNotice compact={screen !== screens.home} />
-      <div className="user-session-bar">
-        {isSupabaseConfigured && authSession ? (
-          <>
-            <span>{authSession.user.email}</span>
-            <button className="secondary-action" type="button" onClick={() => setScreen(screens.savedSessions)}>
-              Mis sesiones
-            </button>
-            <button className="secondary-action" type="button" onClick={() => setScreen(screens.clinicalAgenda)}>
-              Mi agenda
-            </button>
-            <button className="danger-action" type="button" onClick={handleSignOut}>
-              Cerrar sesion
-            </button>
-          </>
-        ) : (
-          <span>Modo local: Supabase no esta configurado. El historial no se guardara en la nube.</span>
-        )}
-      </div>
+      <AuthenticatedLayout
+        currentScreen={screen}
+        userEmail={userEmail}
+        isLocalMode={!isSupabaseConfigured}
+        hasEvaluation={history.length > 0}
+        onNavigate={navigateWorkspace}
+        onSignOut={handleSignOut}
+      >
 
       {screen === screens.home && (
-        <Home
-          onStart={() => setScreen(screens.select)}
-          onViewHistory={() => setScreen(screens.savedSessions)}
+        <ClinicalDashboard
+          cases={cases}
+          userEmail={userEmail}
+          onOpenCases={() => setScreen(screens.select)}
           onOpenAgenda={() => setScreen(screens.clinicalAgenda)}
-          onOpenTrust={openTrustCenter}
+          onViewHistory={() => setScreen(screens.savedSessions)}
+          onPrepareCase={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.brief)}
+          onStartSession={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.simulation)}
         />
       )}
 
@@ -492,9 +523,10 @@ export default function App() {
           sessionSummary={sessionSummary}
           availableSessions={availableSessions}
           totalSessions={sessionTotal}
+          completedSessionCount={getCompletedSessionCount(sessionSummaries)}
           preSessionPlan={preSessionPlan}
           onBack={() => setScreen(screens.select)}
-          onBegin={() => startSession(sessionNumber)}
+          onBegin={(preparationState) => beginSessionFromPreparation(sessionNumber, preparationState)}
           onSelectSession={chooseSessionForBrief}
           onPreSessionPlanChange={(nextPlan) =>
             setPreSessionPlan(normalizePreSessionPlan(nextPlan, { caseItem: selectedCase, sessionNumber }))
@@ -554,33 +586,9 @@ export default function App() {
         </section>
       )}
 
-      {screen !== screens.simulation && (
-        <AppFooter onOpenTrust={openTrustCenter} />
-      )}
+      </AuthenticatedLayout>
     </main>
   );
-}
-
-function getAvailableSessions(sessionSummaries, totalSessions = SESSION_COUNT_LIMITS.defaultValue) {
-  const completed = new Set(sessionSummaries.map((summary) => summary.sessionNumber));
-  const maxCompleted = Math.max(0, ...completed);
-  const maxAvailable = Math.min(totalSessions, Math.max(1, maxCompleted + 1));
-  return Array.from({ length: maxAvailable }, (_, index) => index + 1);
-}
-
-function getProcessSessionTotal(preSessionPlan = null, sessionSummaries = []) {
-  const directPlan = Number(preSessionPlan?.proposedSessionCount);
-  if (Number.isFinite(directPlan) && directPlan > 0) return getPlannedSessionCount(preSessionPlan);
-
-  const planFromSummary = [...sessionSummaries]
-    .reverse()
-    .find((summary) => Number(summary?.preSessionPlan?.proposedSessionCount) > 0)?.preSessionPlan;
-  if (planFromSummary) return getPlannedSessionCount(planFromSummary);
-
-  const decisionTotal = [...sessionSummaries]
-    .reverse()
-    .find((summary) => Number(summary?.clinicalDecision?.proposedSessions) > 0)?.clinicalDecision?.proposedSessions;
-  return getPlannedSessionCount({ proposedSessionCount: decisionTotal }, SESSION_COUNT_LIMITS.defaultValue);
 }
 
 function getPreviousSessionSummary({ caseId, sessionNumber, sessionSummaries }) {

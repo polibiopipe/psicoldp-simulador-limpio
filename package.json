@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview",
+    "audit:preparation-session-plan": "node src/engine/preparationSessionPlanAudit.js",
     "basicInterviewSmokeTest": "node src/engine/basicInterviewSmokeTest.js",
     "audit:claudio": "node src/engine/claudioConversationAudit.js",
     "audit:clinical-claudio": "node src/engine/clinicalSimulationEngine.claudioAudit.js",

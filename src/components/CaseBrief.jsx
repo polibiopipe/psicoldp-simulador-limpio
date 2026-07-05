@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -15,7 +15,13 @@ import { PatientCard } from "./PatientCard.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
 import { clinicalExplorationAreas, interviewTypeOptions } from "../data/clinicalWorkflow.js";
-import { SESSION_COUNT_LIMITS, ethicalCareChecklist } from "../engine/clinicalPreparation.js";
+import { SESSION_COUNT_LIMITS, ethicalCareChecklist, evaluatePreSessionReadiness } from "../engine/clinicalPreparation.js";
+import {
+  CLINICAL_TERM_OPTIONS,
+  getClinicalTermCopy,
+  getClinicalTermPreference,
+  saveClinicalTermPreference
+} from "../engine/clinicalLanguage.js";
 
 const prepSteps = [
   { id: "objective", label: "Objetivo inicial" },
@@ -58,6 +64,7 @@ export function CaseBrief({
   sessionSummary,
   availableSessions = [1],
   totalSessions = SESSION_COUNT_LIMITS.defaultValue,
+  completedSessionCount = 0,
   preSessionPlan,
   onBack,
   onBegin,
@@ -65,9 +72,19 @@ export function CaseBrief({
   onPreSessionPlanChange
 }) {
   const [assistantVisible, setAssistantVisible] = useState(true);
-  const completion = getPreparationCompletion(preSessionPlan);
-  const activeStepId = prepSteps.find((step) => !completion[step.id])?.id || "summary";
-  const allComplete = prepSteps.every((step) => completion[step.id]);
+  const [showWeakPreparationWarning, setShowWeakPreparationWarning] = useState(false);
+  const [languagePreference, setLanguagePreference] = useState(() => getClinicalTermPreference(caseItem.id));
+  const termCopy = getClinicalTermCopy(languagePreference);
+  const readiness = evaluatePreSessionReadiness(preSessionPlan, { languagePreference });
+  const completion = readiness.requiredCompletion;
+  const qualityCompletion = readiness.qualityCompletion;
+  const activeStepId =
+    prepSteps.find((step) => !completion[step.id])?.id ||
+    prepSteps.find((step) => !qualityCompletion[step.id])?.id ||
+    "summary";
+  const requiredComplete = readiness.requiredComplete;
+  const qualityComplete = readiness.qualityComplete;
+  const preparationWeak = requiredComplete && !qualityComplete;
   const selectedAreas = preSessionPlan?.explorationAreas || [];
   const selectedCareItems = preSessionPlan?.ethicalCareItems || [];
   const selectedAreaLabels = selectedAreas
@@ -76,17 +93,40 @@ export function CaseBrief({
   const selectedCareLabels = selectedCareItems
     .map((careId) => ethicalCareChecklist.find((item) => item.id === careId)?.label)
     .filter(Boolean);
-  const assistantMessage = allComplete
-    ? assistantMessages.ready
+  const assistantMessage = requiredComplete
+    ? preparationWeak
+      ? "Tu preparacion permite iniciar, pero hay aspectos que conviene fortalecer. Puedes mejorarla o continuar de todos modos."
+      : assistantMessages.ready
     : assistantMessages[activeStepId] || assistantMessages.summary;
   const proposedSessionCount =
     Number(preSessionPlan?.proposedSessionCount) || totalSessions || SESSION_COUNT_LIMITS.defaultValue;
+  const planBelowCompletedSessions = Number(proposedSessionCount) < Number(completedSessionCount || 0);
+
+  useEffect(() => {
+    setLanguagePreference(getClinicalTermPreference(caseItem.id));
+  }, [caseItem.id]);
 
   function updatePlan(patch) {
     if (!onPreSessionPlanChange) return;
+    setShowWeakPreparationWarning(false);
     onPreSessionPlanChange({
       ...preSessionPlan,
       ...patch
+    });
+  }
+
+  function updateLanguagePreference(patch) {
+    const next = saveClinicalTermPreference({
+      caseId: caseItem.id,
+      ...languagePreference,
+      ...patch,
+      saveAsDefault: true
+    });
+    setLanguagePreference(next);
+    updatePlan({
+      clinicalLanguageTerm: next.term,
+      clinicalLanguageCustomTerm: next.customTerm,
+      clinicalLanguageLabel: getClinicalTermCopy(next).singular
     });
   }
 
@@ -104,6 +144,26 @@ export function CaseBrief({
     updatePlan({ ethicalCareItems: Array.from(current) });
   }
 
+  function handleBeginClick() {
+    if (!requiredComplete) return;
+    if (preparationWeak && !showWeakPreparationWarning) {
+      setShowWeakPreparationWarning(true);
+      return;
+    }
+    beginWithPreparationState(preparationWeak);
+  }
+
+  function beginWithPreparationState(overrideUsed = false) {
+    if (!onBegin) return;
+    onBegin({
+      preparationQuality: preparationWeak ? "debil" : "suficiente",
+      preparationOverrideUsed: Boolean(overrideUsed),
+      preparationWeakReasons: readiness.weakReasons,
+      preparationMissingFields: readiness.missingReasons,
+      preparationStartedAt: new Date().toISOString()
+    });
+  }
+
   return (
     <section className="screen">
       <button className="text-action" type="button" onClick={onBack}>
@@ -112,13 +172,20 @@ export function CaseBrief({
       </button>
 
       <div className="brief-layout">
-        <PatientCard caseItem={caseItem} difficulty={difficulty} />
+        <PatientCard
+          caseItem={caseItem}
+          difficulty={difficulty}
+          sessionNumber={sessionNumber}
+          totalSessions={proposedSessionCount}
+          sessionSummary={sessionSummary}
+          preSessionPlan={preSessionPlan}
+        />
 
         <div className="brief-content">
           <header className="section-header">
             <span className="eyebrow">Escucha Viva - Entrevista Psicologica Formativa</span>
             <h1>{caseItem.name}</h1>
-            <span className="case-practice-label">Paciente ficticio para practica formativa.</span>
+            <span className="case-practice-label">Persona ficticia para practica formativa.</span>
             <p>{caseItem.motive}</p>
           </header>
 
@@ -193,7 +260,7 @@ export function CaseBrief({
                   </div>
                 </div>
                 <p>
-                  Completa estos pasos antes de hablar con el paciente simulado. Esta
+                  Completa estos pasos antes de hablar {termCopy.prep}. Esta
                   preparacion sera considerada en tu retroalimentacion final.
                 </p>
               </div>
@@ -203,11 +270,13 @@ export function CaseBrief({
               <div className="prep-workflow-stepper" aria-label="Avance de preparacion">
                 {prepSteps.map((step, index) => {
                   const status = completion[step.id]
-                    ? "completed"
+                    ? qualityCompletion[step.id]
+                      ? "completed"
+                      : "weak"
                     : activeStepId === step.id
                       ? "in-progress"
                       : "pending";
-                  const StatusIcon = status === "completed" ? CheckCircle2 : Circle;
+                  const StatusIcon = status === "completed" ? CheckCircle2 : status === "weak" ? TriangleAlert : Circle;
                   return (
                     <div className={`prep-step ${status}`} key={step.id}>
                       <span className="prep-step-index">{index + 1}</span>
@@ -216,6 +285,8 @@ export function CaseBrief({
                       <small>
                         {status === "completed"
                           ? "Completado"
+                          : status === "weak"
+                            ? "Necesita mejorar"
                           : status === "in-progress"
                             ? "En progreso"
                             : "Pendiente"}
@@ -251,6 +322,44 @@ export function CaseBrief({
                 )}
               </div>
 
+              <div className="clinical-prep-field clinical-language-field">
+                <span>Lenguaje del proceso</span>
+                <small>
+                  La forma en que nombras a la persona tambien comunica tu enfoque.
+                  Elige un termino respetuoso y usalo con coherencia.
+                </small>
+                <div className="clinical-language-controls">
+                  <label>
+                    <span>Usare el termino</span>
+                    <select
+                      value={languagePreference.term}
+                      onChange={(event) => updateLanguagePreference({ term: event.target.value })}
+                    >
+                      {CLINICAL_TERM_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {languagePreference.term === "otro" && (
+                    <label>
+                      <span>Termino personalizado</span>
+                      <input
+                        type="text"
+                        value={languagePreference.customTerm}
+                        onChange={(event) => updateLanguagePreference({ customTerm: event.target.value })}
+                        placeholder="Ej.: persona consultante"
+                      />
+                    </label>
+                  )}
+                </div>
+                <p className="prep-help-note">
+                  Guia Vivo usara esta preferencia en agenda, preparacion y recordatorios:
+                  entrevista {termCopy.prep}.
+                </p>
+              </div>
+
               <label className="clinical-prep-field">
                 <span>Objetivo inicial de evaluacion</span>
                 <small>
@@ -271,7 +380,7 @@ export function CaseBrief({
                   Define cuantas sesiones consideras necesarias para trabajar este caso.
                   El simulador generara ese numero de sesiones y luego evaluara si tu
                   decision fue coherente con los objetivos clinicos, la evolucion del
-                  paciente y los resultados del proceso.
+                  proceso {termCopy.prep} y sus resultados.
                 </small>
                 <div className="session-count-control">
                   <input
@@ -289,13 +398,20 @@ export function CaseBrief({
                   una hipotesis clinica inicial; durante el proceso deberas demostrar si se
                   sostiene, si requiere ajustes o si corresponde derivar, cerrar o continuar.
                 </p>
+                {planBelowCompletedSessions && (
+                  <div className="prep-plan-memory-warning" role="alert">
+                    Ya existen {completedSessionCount} sesiones registradas. No se eliminara
+                    memoria clinica previa; puedes cerrar el proceso o ajustar el plan, pero
+                    las sesiones realizadas se mantendran.
+                  </div>
+                )}
               </div>
 
               <label className="clinical-prep-field">
                 <span>Por que propones esta cantidad de sesiones?</span>
                 <small>
                   Justifica tu decision considerando motivo de consulta, gravedad, riesgo,
-                  objetivos clinicos, recursos del paciente, red de apoyo y posibilidad de
+                  objetivos clinicos, recursos de {termCopy.article}, red de apoyo y posibilidad de
                   reevaluacion.
                 </small>
                 <textarea
@@ -457,15 +573,52 @@ export function CaseBrief({
                     <dd>{preSessionPlan.priorityInformation || "Pendiente"}</dd>
                   </div>
                 </dl>
-                {allComplete ? (
+                {requiredComplete && qualityComplete ? (
                   <div className="prep-ready-message">
                     <CheckCircle2 aria-hidden="true" />
                     Preparacion lograda. Puedes iniciar con mayor claridad.
+                  </div>
+                ) : requiredComplete ? (
+                  <div className="prep-ready-message weak">
+                    <TriangleAlert aria-hidden="true" />
+                    Preparacion debil: puedes mejorarla o continuar de todos modos.
                   </div>
                 ) : (
                   <div className="prep-ready-message pending">
                     <Compass aria-hidden="true" />
                     Completa los pasos pendientes antes de iniciar la entrevista.
+                  </div>
+                )}
+                {preparationWeak && showWeakPreparationWarning && (
+                  <div className="prep-weak-confirm" role="alert">
+                    <div>
+                      <strong>Necesita mejorar</strong>
+                      <p>
+                        Hay contenido suficiente para iniciar, pero la preparacion esta
+                        debil. Esto quedara registrado en la retroalimentacion final.
+                      </p>
+                      <ul>
+                        {readiness.weakReasons.slice(0, 4).map((reason) => (
+                          <li key={reason}>{reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        onClick={() => setShowWeakPreparationWarning(false)}
+                      >
+                        Mejorar preparacion
+                      </button>
+                      <button
+                        className="primary-action"
+                        type="button"
+                        onClick={() => beginWithPreparationState(true)}
+                      >
+                        Continuar de todos modos
+                      </button>
+                    </div>
                   </div>
                 )}
               </section>
@@ -475,11 +628,11 @@ export function CaseBrief({
           <button
             className="primary-action prep-start-action"
             type="button"
-            onClick={onBegin}
-            disabled={!allComplete}
+            onClick={handleBeginClick}
+            disabled={!requiredComplete}
           >
             <Play aria-hidden="true" />
-            Estoy listo para iniciar la entrevista
+            {preparationWeak ? "Revisar advertencia para iniciar" : "Estoy listo para iniciar la entrevista"}
           </button>
         </div>
       </div>
@@ -487,24 +640,6 @@ export function CaseBrief({
   );
 }
 
-function getPreparationCompletion(plan = {}) {
-  const selectedAreas = Array.isArray(plan?.explorationAreas) ? plan.explorationAreas : [];
-  const selectedCareItems = Array.isArray(plan?.ethicalCareItems) ? plan.ethicalCareItems : [];
-  return {
-    objective: String(plan?.evaluationObjective || "").trim().length >= 18,
-    process:
-      Number(plan?.proposedSessionCount) >= SESSION_COUNT_LIMITS.min &&
-      Number(plan?.proposedSessionCount) <= SESSION_COUNT_LIMITS.max &&
-      String(plan?.sessionCountJustification || "").trim().length >= 24 &&
-      String(plan?.processObjectives || "").trim().length >= 24,
-    interview:
-      Boolean(plan?.interviewType) &&
-      String(plan?.interviewJustification || "").trim().length >= 18,
-    areas: selectedAreas.length >= 4 && selectedAreas.length <= 6,
-    ethics: selectedCareItems.length === ethicalCareChecklist.length,
-    priority: String(plan?.priorityInformation || "").trim().length >= 18
-  };
-}
 
 function getInterviewTypeLabel(value) {
   return interviewTypeOptions.find((option) => option.value === value)?.label || "Pendiente";

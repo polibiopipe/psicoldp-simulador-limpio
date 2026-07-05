@@ -1,11 +1,8 @@
 import React, { useState } from "react";
 import {
-  AlertTriangle,
-  LockKeyhole,
   LogIn,
   Mail,
   ShieldCheck,
-  Sparkles,
   UserPlus
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
@@ -66,29 +63,29 @@ export function AuthScreen({ onOpenTrust }) {
   }
 
   return (
-    <section className="screen auth-screen">
-      <div className="auth-card">
-        <span className="eyebrow">Escucha Viva - Simuladores formativos</span>
-        <h1>Simulacion clinica asistida por IA</h1>
-        <span className="auth-module-label">Modulo: Entrevista Psicologica Formativa</span>
+    <section className="screen auth-screen identity-auth-screen refined-auth-screen">
+      <div className="auth-intro-panel">
+        <div className="auth-brand-lockup">
+          <img src="/logo-escucha-viva-horizontal.png" alt="Escucha Viva" />
+          <div>
+            <strong>Escucha Viva</strong>
+            <span>Plataforma formativa de simulacion clinica</span>
+          </div>
+        </div>
+        <span className="auth-kicker">Entrevista Psicologica Formativa</span>
+        <h1>Entrena entrevistas psicologicas con criterio clinico.</h1>
         <p>
-          Entrena entrevistas psicologicas en un entorno seguro, etico y formativo.
+          Practica formativa con casos ficticios y retroalimentacion pedagogica.
         </p>
 
-        <div className="auth-trust-chips" aria-label="Caracteristicas de confianza">
-          <span><UserPlus aria-hidden="true" /> Pacientes simulados</span>
-          <span><Sparkles aria-hidden="true" /> Feedback formativo</span>
-          <span><LockKeyhole aria-hidden="true" /> Privacidad y seguridad</span>
-          <span><ShieldCheck aria-hidden="true" /> Cumplimiento</span>
-        </div>
-
-        <div className="auth-ethical-notice">
-          <AlertTriangle aria-hidden="true" />
-          <span>
-            Casos ficticios con fines educativos. No ingreses datos personales reales
-            ni informacion sensible de pacientes reales.
-          </span>
-        </div>
+        <a
+          className="auth-institution-note auth-institution-link"
+          href="https://nucleovivo.net/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Escucha Viva, una iniciativa de Nucleo Vivo.
+        </a>
 
         {!isSupabaseConfigured && (
           <div className="auth-warning">
@@ -96,6 +93,13 @@ export function AuthScreen({ onOpenTrust }) {
             la nube.
           </div>
         )}
+      </div>
+
+      <div className="auth-card refined-auth-card">
+        <header className="auth-card-heading">
+          <span className="eyebrow">Acceso</span>
+          <h2>{mode === "register" ? "Crear cuenta" : mode === "reset" ? "Recuperar acceso" : "Iniciar sesion"}</h2>
+        </header>
 
         <div className="auth-tabs" aria-label="Opciones de acceso">
           <button
@@ -174,36 +178,6 @@ export function AuthScreen({ onOpenTrust }) {
           Privacidad y cumplimiento
         </button>
       </div>
-
-      <aside className="auth-visual-panel" aria-label="Vista previa del simulador">
-        <div className="auth-visual-card">
-          <div className="auth-visual-top">
-            <span>Sesion simulada</span>
-            <strong>En practica</strong>
-          </div>
-          <div className="auth-visual-patient">
-            <img src="/avatar/claudio.png" alt="Retrato ficticio de Claudio" />
-            <div>
-              <strong>Claudio, 40</strong>
-              <span>Estancamiento vital</span>
-            </div>
-          </div>
-          <p>
-            Siento que estoy funcionando en automatico. No es una crisis, pero algo
-            se quedo detenido.
-          </p>
-          <div className="auth-visual-response">
-            <span>Intervencion sugerida</span>
-            <strong>Explorar con calma y sin apresurar soluciones.</strong>
-          </div>
-        </div>
-
-        <div className="auth-value-strip" aria-label="Beneficios principales">
-          <span>Pacientes realistas</span>
-          <span>Feedback formativo</span>
-          <span>Aprendizaje seguro</span>
-        </div>
-      </aside>
     </section>
   );
 }
