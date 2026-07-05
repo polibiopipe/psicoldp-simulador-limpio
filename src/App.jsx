@@ -28,6 +28,7 @@ import { EthicalNotice } from "./components/EthicalNotice.jsx";
 import { SessionClosure } from "./components/SessionClosure.jsx";
 import { SavedSessions } from "./components/SavedSessions.jsx";
 import { AuthScreen } from "./components/AuthScreen.jsx";
+import { IntroVideo } from "./components/IntroVideo.jsx";
 import { PendingApprovalScreen } from "./components/PendingApprovalScreen.jsx";
 import { TrustCenter } from "./components/TrustCenter.jsx";
 import { AppFooter } from "./components/AppFooter.jsx";
@@ -438,11 +439,13 @@ export default function App() {
     }
 
     return (
-      <main className="app-shell">
-        <EthicalNotice compact />
-        <AuthScreen onOpenTrust={openTrustCenter} />
-        <AppFooter onOpenTrust={openTrustCenter} />
-      </main>
+      <IntroVideo>
+        <main className="app-shell">
+          <EthicalNotice compact />
+          <AuthScreen onOpenTrust={openTrustCenter} />
+          <AppFooter onOpenTrust={openTrustCenter} />
+        </main>
+      </IntroVideo>
     );
   }
 

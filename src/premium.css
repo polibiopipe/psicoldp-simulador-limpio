@@ -7016,3 +7016,134 @@ body,
     width: min(260px, 62vw);
   }
 }
+
+/* Escucha Viva intro gate */
+.intro-video-shell {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  overflow: hidden;
+  padding: clamp(22px, 5vw, 56px);
+  background:
+    radial-gradient(circle at 22% 18%, rgba(42, 154, 164, 0.13), transparent 34%),
+    radial-gradient(circle at 84% 78%, rgba(201, 164, 90, 0.14), transparent 36%),
+    linear-gradient(135deg, #f7f8f6 0%, #ffffff 52%, #edf4f2 100%);
+  opacity: 1;
+  transition: opacity 240ms ease;
+}
+
+.intro-video-shell.is-closing {
+  opacity: 0;
+}
+
+.intro-video-shell::before {
+  content: "";
+  position: absolute;
+  right: clamp(-90px, -6vw, -38px);
+  bottom: clamp(18px, 4vw, 58px);
+  width: clamp(250px, 32vw, 520px);
+  aspect-ratio: 3.4 / 1;
+  pointer-events: none;
+  background: url("/nucleo-vivo-logo-horizontal.png") center / contain no-repeat;
+  filter: grayscale(1) saturate(0.25);
+  opacity: 0.026;
+}
+
+.intro-video-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: clamp(18px, 2vw, 26px);
+  width: min(980px, 100%);
+  justify-items: center;
+}
+
+.intro-video-logo {
+  width: min(300px, 70vw);
+  max-height: 78px;
+  object-fit: contain;
+}
+
+.intro-video-frame {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(15, 43, 70, 0.1);
+  border-radius: clamp(22px, 3vw, 34px);
+  padding: clamp(7px, 1.2vw, 12px);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(247, 248, 246, 0.78)),
+    rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 30px 90px rgba(15, 43, 70, 0.16),
+    0 12px 30px rgba(15, 43, 70, 0.08);
+  backdrop-filter: blur(16px);
+}
+
+.intro-video-frame video {
+  display: block;
+  width: 100%;
+  max-height: min(72vh, 680px);
+  border-radius: clamp(16px, 2.2vw, 26px);
+  background: #ffffff;
+  object-fit: contain;
+}
+
+.intro-skip-button {
+  position: fixed;
+  top: clamp(14px, 3vw, 28px);
+  right: clamp(14px, 3vw, 32px);
+  z-index: 2;
+  min-height: 38px;
+  border: 1px solid rgba(15, 43, 70, 0.12);
+  border-radius: 999px;
+  padding: 8px 15px;
+  color: #35515b;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 12px 26px rgba(15, 43, 70, 0.08);
+  font-size: 0.84rem;
+  font-weight: 760;
+  backdrop-filter: blur(14px);
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.intro-skip-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(23, 109, 117, 0.28);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+@media (max-width: 760px) {
+  .intro-video-shell {
+    align-items: center;
+    padding: 72px 16px 28px;
+  }
+
+  .intro-video-card {
+    gap: 16px;
+  }
+
+  .intro-video-logo {
+    width: min(230px, 74vw);
+  }
+
+  .intro-video-frame {
+    border-radius: 22px;
+    padding: 6px;
+  }
+
+  .intro-video-frame video {
+    max-height: 68vh;
+    border-radius: 17px;
+  }
+
+  .intro-video-shell::before {
+    right: -92px;
+    bottom: 16px;
+    width: min(280px, 72vw);
+    opacity: 0.02;
+  }
+}
