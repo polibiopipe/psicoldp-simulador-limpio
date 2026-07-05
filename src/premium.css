@@ -6888,6 +6888,15 @@ body,
   font-weight: 700;
 }
 
+.app-footer-legal {
+  display: block;
+  margin-top: 3px;
+  color: rgba(82, 96, 103, 0.72);
+  font-size: 0.68rem;
+  font-weight: 520;
+  line-height: 1.35;
+}
+
 .app-footer nav {
   gap: 14px;
 }
