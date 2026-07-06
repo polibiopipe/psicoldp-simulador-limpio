@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   AlertTriangle,
@@ -42,7 +42,7 @@ import {
   saveClinicalTermPreference
 } from "../engine/clinicalLanguage.js";
 
-export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSession }) {
+export function ClinicalAgenda({ cases, initialCaseId = "", onBackHome, onPrepareCase, onStartSession }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const agendaItems = useMemo(() => buildClinicalAgendaItems(cases), [cases, refreshKey]);
   const [availability, setAvailability] = useState(() => getWeeklyAvailability());
@@ -51,7 +51,9 @@ export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSessio
   const [suggestedSlot, setSuggestedSlot] = useState(null);
   const [languagePreference, setLanguagePreference] = useState(() => getClinicalTermPreference());
   const termCopy = getClinicalTermCopy(languagePreference);
-  const [selectedCaseId, setSelectedCaseId] = useState(() => agendaItems[0]?.caseItem.id || cases[0]?.id || "");
+  const [selectedCaseId, setSelectedCaseId] = useState(
+    () => initialCaseId || agendaItems[0]?.caseItem.id || cases[0]?.id || ""
+  );
   const [scheduleCaseId, setScheduleCaseId] = useState("");
   const [reminderCaseId, setReminderCaseId] = useState("");
   const selectedItem =
@@ -67,6 +69,12 @@ export function ClinicalAgenda({ cases, onBackHome, onPrepareCase, onStartSessio
     () => buildAvailableSlots({ cases, weekStart, availability, durationMinutes: 45, limit: 10 }),
     [cases, weekStart, availability, refreshKey]
   );
+
+  useEffect(() => {
+    if (initialCaseId && agendaItems.some((item) => item.caseItem.id === initialCaseId)) {
+      setSelectedCaseId(initialCaseId);
+    }
+  }, [initialCaseId, agendaItems]);
 
   function refreshAgenda() {
     setRefreshKey((current) => current + 1);

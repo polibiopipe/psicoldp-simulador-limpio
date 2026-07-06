@@ -6224,6 +6224,266 @@ body,
   }
 }
 
+/* Compact pre-session planning */
+.preparation-brief-layout {
+  grid-template-columns: minmax(250px, 310px) minmax(0, 1fr);
+  gap: clamp(18px, 2.2vw, 30px);
+}
+
+.brief-sidebar-stack {
+  display: grid;
+  gap: 14px;
+  align-self: start;
+}
+
+.prep-sidebar-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgba(23, 109, 117, 0.13);
+  border-radius: 22px;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 253, 248, 0.96), rgba(241, 250, 249, 0.92)),
+    #ffffff;
+  box-shadow: 0 18px 44px rgba(15, 43, 70, 0.09);
+}
+
+.prep-sidebar-card h2 {
+  margin: 4px 0 3px;
+  color: #0f2b46;
+  font-size: clamp(1.5rem, 2vw, 1.9rem);
+  letter-spacing: 0;
+}
+
+.prep-sidebar-card p {
+  margin: 0;
+  color: #5f6f73;
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.48;
+}
+
+.prep-progress-meter {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15, 43, 70, 0.08);
+}
+
+.prep-progress-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #176d75, #2a9aa4 70%, #c9a45a);
+  transition: width 180ms ease;
+}
+
+.prep-sidebar-checklist {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prep-sidebar-checklist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(15, 43, 70, 0.08);
+  border-radius: 13px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.prep-sidebar-checklist span {
+  color: #2b4048;
+  font-size: 0.8rem;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.prep-sidebar-checklist strong {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(15, 43, 70, 0.06);
+  color: #5f6f73;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.prep-sidebar-checklist li.completed strong {
+  background: rgba(42, 154, 164, 0.14);
+  color: #007c7a;
+}
+
+.prep-sidebar-checklist li.weak strong,
+.prep-sidebar-checklist li.in-progress strong {
+  background: rgba(201, 164, 90, 0.16);
+  color: #8b641f;
+}
+
+.prep-sidebar-card .prep-start-action {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 2px;
+}
+
+.clinical-preparation-panel {
+  gap: 16px;
+}
+
+.clinical-prep-hero {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 18px;
+}
+
+.clinical-prep-hero .panel-heading {
+  min-width: 0;
+}
+
+.clinical-prep-hero > p {
+  grid-column: 1;
+  max-width: 66ch;
+}
+
+.prep-context-guide {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-self: end;
+  margin: 0;
+}
+
+.clinical-preparation-panel .prep-context-guide .guide-trigger {
+  min-height: 38px;
+  box-shadow: none;
+}
+
+.clinical-preparation-panel .prep-context-guide .pedagogical-guide-card {
+  width: min(520px, 100%);
+}
+
+.clinical-preparation-panel .prep-workflow-stepper {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.clinical-preparation-panel .prep-step {
+  appearance: none;
+  border: 1px solid rgba(15, 43, 70, 0.09);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.clinical-preparation-panel .prep-step:hover {
+  transform: translateY(-1px);
+  border-color: rgba(23, 109, 117, 0.24);
+  box-shadow: 0 16px 34px rgba(15, 43, 70, 0.09);
+}
+
+.clinical-preparation-panel .prep-step.is-active {
+  border-color: rgba(23, 109, 117, 0.42);
+  box-shadow:
+    0 18px 40px rgba(15, 43, 70, 0.11),
+    0 0 0 3px rgba(42, 154, 164, 0.12);
+}
+
+.clinical-preparation-panel .prep-step em {
+  display: block;
+  margin-top: -1px;
+  color: #697a80;
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.prep-step-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.prep-step-panel > .clinical-prep-field:only-child,
+.prep-step-panel > .prep-summary-card,
+.prep-step-panel .clinical-area-grid,
+.prep-step-panel .ethical-care-grid {
+  grid-column: 1 / -1;
+}
+
+.prep-step-panel .clinical-language-field {
+  min-height: 100%;
+}
+
+.prep-step-panel textarea {
+  min-height: 112px;
+}
+
+@media (min-width: 901px) {
+  .preparation-brief-layout .brief-sidebar-stack {
+    position: sticky;
+    top: 96px;
+  }
+
+  .preparation-brief-layout .patient-card {
+    position: static;
+    top: auto;
+  }
+}
+
+@media (max-width: 1180px) {
+  .clinical-preparation-panel .prep-workflow-stepper {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .clinical-preparation-panel .prep-step {
+    min-height: 112px;
+  }
+}
+
+@media (max-width: 900px) {
+  .preparation-brief-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .brief-sidebar-stack {
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .clinical-prep-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .clinical-prep-hero > p,
+  .prep-context-guide {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+  }
+
+  .clinical-preparation-panel .prep-workflow-stepper,
+  .prep-step-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .clinical-preparation-panel .prep-step {
+    min-height: auto;
+  }
+
+  .clinical-preparation-panel .prep-step em {
+    display: none;
+  }
+}
+
 /* Minimal Escucha Viva identity layer */
 .identity-auth-screen {
   grid-template-columns: minmax(320px, 620px);

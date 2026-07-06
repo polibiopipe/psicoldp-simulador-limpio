@@ -25,6 +25,7 @@ export function ClinicalDashboard({
   const pendingNotes = agendaItems.filter((item) => item.noteStatus.status === "pending");
   const pendingTasks = agendaItems.filter((item) => item.task?.description);
   const riskItems = agendaItems.filter((item) => item.risk.status === "open");
+  const resumableSessions = agendaItems.filter(isResumableSession);
   const nextItem =
     agendaItems.find((item) => item.nextSessionNumber && (item.completedSessions > 0 || item.agendaEntry)) ||
     agendaItems.find((item) => item.caseItem.id === "claudio") ||
@@ -56,17 +57,41 @@ export function ClinicalDashboard({
       </header>
 
       <section className="dashboard-metrics" aria-label="Resumen del dia">
-        <DashboardMetric icon={UsersRound} label="Pacientes activos" value={activeItems.length} />
-        <DashboardMetric icon={CalendarClock} label="Sesiones por retomar" value={countNextSessions(agendaItems)} />
-        <DashboardMetric icon={ClipboardCheck} label="Notas pendientes" value={pendingNotes.length} />
-        <DashboardMetric icon={ShieldAlert} label="Riesgos por revisar" value={riskItems.length} />
+        <DashboardMetric
+          icon={UsersRound}
+          label="Pacientes activos"
+          value={activeItems.length}
+          actionLabel="Ver agenda"
+          onClick={activeItems.length ? () => onOpenAgenda?.() : null}
+        />
+        <DashboardMetric
+          icon={CalendarClock}
+          label="Sesiones por retomar"
+          value={resumableSessions.length}
+          actionLabel="Ver sesiones"
+          onClick={resumableSessions.length ? () => onOpenAgenda?.(resumableSessions[0].caseItem.id) : null}
+        />
+        <DashboardMetric
+          icon={ClipboardCheck}
+          label="Notas pendientes"
+          value={pendingNotes.length}
+          actionLabel="Ver notas"
+          onClick={pendingNotes.length ? () => onOpenAgenda?.(pendingNotes[0].caseItem.id) : null}
+        />
+        <DashboardMetric
+          icon={ShieldAlert}
+          label="Riesgos por revisar"
+          value={riskItems.length}
+          actionLabel="Revisar"
+          onClick={riskItems.length ? () => onOpenAgenda?.(riskItems[0].caseItem.id) : null}
+        />
       </section>
 
       <div className="dashboard-grid">
         <article className="dashboard-panel next-session-panel">
           <div className="dashboard-panel-heading">
             <div>
-              <span className="eyebrow">Proxima accion</span>
+              <span className="eyebrow">Próxima acción</span>
               <h2>{nextItem ? nextItem.caseItem.name : "Selecciona un paciente"}</h2>
             </div>
             <CalendarClock aria-hidden="true" />
@@ -108,7 +133,7 @@ export function ClinicalDashboard({
                   <Play aria-hidden="true" />
                   {nextItem.completedSessions > 0 ? "Retomar sesion" : "Preparar caso"}
                 </button>
-                <button className="secondary-action" type="button" onClick={onOpenAgenda}>
+                <button className="secondary-action" type="button" onClick={() => onOpenAgenda?.(nextItem.caseItem.id)}>
                   Ver registro
                 </button>
               </div>
@@ -127,20 +152,73 @@ export function ClinicalDashboard({
             <Target aria-hidden="true" />
           </div>
           <div className="pending-list">
-            <PendingItem
-              label="Notas clinicas"
-              value={pendingNotes.length ? `${pendingNotes.length} por completar` : "Sin pendientes"}
-              tone={pendingNotes.length ? "warning" : "ok"}
+            <PendingGroup
+              title="Sesiones por retomar"
+              items={resumableSessions}
+              emptyText="Sin sesiones por retomar"
+              renderItem={(item) => (
+                <PendingActionItem
+                  key={`${item.caseItem.id}-session`}
+                  item={item}
+                  tone="session"
+                  typeLabel="Sesion por retomar"
+                  detail={item.nextFocus}
+                  actionLabel={item.completedSessions > 0 ? "Retomar sesion" : "Preparar caso"}
+                  onAction={() => openItemSession({ item, onPrepareCase, onStartSession })}
+                  onOpenRecord={() => onOpenAgenda?.(item.caseItem.id)}
+                />
+              )}
             />
-            <PendingItem
-              label="Tareas asignadas"
-              value={pendingTasks.length ? `${pendingTasks.length} por revisar` : "Sin tareas abiertas"}
-              tone={pendingTasks.length ? "warning" : "ok"}
+            <PendingGroup
+              title="Notas clinicas"
+              items={pendingNotes}
+              emptyText="Sin notas pendientes"
+              renderItem={(item) => (
+                <PendingActionItem
+                  key={`${item.caseItem.id}-note`}
+                  item={item}
+                  tone="warning"
+                  typeLabel="Nota clinica pendiente"
+                  detail={item.noteStatus.label}
+                  actionLabel="Ver registro"
+                  onAction={() => onOpenAgenda?.(item.caseItem.id)}
+                  onOpenRecord={() => onOpenAgenda?.(item.caseItem.id)}
+                />
+              )}
             />
-            <PendingItem
-              label="Riesgo"
-              value={riskItems.length ? `${riskItems.length} caso(s) a revisar` : "Sin alertas abiertas"}
-              tone={riskItems.length ? "risk" : "ok"}
+            <PendingGroup
+              title="Tareas asignadas"
+              items={pendingTasks}
+              emptyText="Sin tareas abiertas"
+              renderItem={(item) => (
+                <PendingActionItem
+                  key={`${item.caseItem.id}-task`}
+                  item={item}
+                  tone="warning"
+                  typeLabel="Tarea por revisar"
+                  detail={item.task?.description}
+                  actionLabel="Retomar sesion"
+                  onAction={() => openItemSession({ item, onPrepareCase, onStartSession })}
+                  onOpenRecord={() => onOpenAgenda?.(item.caseItem.id)}
+                />
+              )}
+            />
+            <PendingGroup
+              title="Riesgo"
+              items={riskItems}
+              emptyText="Sin alertas abiertas"
+              renderItem={(item) => (
+                <PendingActionItem
+                  key={`${item.caseItem.id}-risk`}
+                  item={item}
+                  tone="risk"
+                  typeLabel="Riesgo por revisar"
+                  detail={item.risk?.details || item.risk?.label}
+                  actionLabel="Revisar riesgo"
+                  onAction={() => openItemSession({ item, onPrepareCase, onStartSession })}
+                  onOpenRecord={() => onOpenAgenda?.(item.caseItem.id)}
+                />
+              )}
             />
           </div>
         </article>
@@ -192,22 +270,62 @@ export function ClinicalDashboard({
   );
 }
 
-function DashboardMetric({ icon: Icon, label, value }) {
-  return (
-    <article>
+function DashboardMetric({ icon: Icon, label, value, actionLabel, onClick }) {
+  const content = (
+    <>
       <Icon aria-hidden="true" />
       <strong>{value}</strong>
       <span>{label}</span>
+      {onClick && <small>{actionLabel}</small>}
+    </>
+  );
+
+  return onClick ? (
+    <button className="dashboard-metric-card" type="button" onClick={onClick}>
+      {content}
+    </button>
+  ) : (
+    <article className="dashboard-metric-card">
+      {content}
     </article>
   );
 }
 
-function PendingItem({ label, value, tone }) {
+function PendingGroup({ title, items, emptyText, renderItem }) {
   return (
-    <div className={`pending-item ${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
+    <section className="pending-group" aria-label={title}>
+      <div className="pending-group-heading">
+        <span>{title}</span>
+        <strong>{items.length}</strong>
+      </div>
+      {items.length ? (
+        <div className="pending-action-list">
+          {items.map(renderItem)}
+        </div>
+      ) : (
+        <p className="pending-empty">{emptyText}</p>
+      )}
+    </section>
+  );
+}
+
+function PendingActionItem({ item, tone, typeLabel, detail, actionLabel, onAction, onOpenRecord }) {
+  return (
+    <article className={`pending-action-item ${tone}`}>
+      <div>
+        <strong>{item.caseItem.name} - {getRelevantSessionLabel(item)}</strong>
+        <span>{typeLabel}</span>
+        {detail && <p>{detail}</p>}
+      </div>
+      <div className="pending-action-buttons">
+        <button type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+        <button type="button" onClick={onOpenRecord}>
+          Registro
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -216,8 +334,22 @@ function getFriendlyUserName(email = "") {
   return name ? name.replace(/[._-]+/g, " ").split(" ")[0] : "";
 }
 
-function countNextSessions(items) {
-  return items.filter((item) => item.nextSessionNumber && (item.completedSessions > 0 || item.agendaEntry)).length;
+function isResumableSession(item) {
+  return Boolean(item.nextSessionNumber && (item.completedSessions > 0 || item.agendaEntry));
+}
+
+function openItemSession({ item, onPrepareCase, onStartSession }) {
+  const targetSession = item.nextSessionNumber || item.latestSummary?.sessionNumber || 1;
+  if (item.completedSessions > 0 && item.nextSessionNumber) {
+    onStartSession?.(item.caseItem.id, targetSession);
+    return;
+  }
+  onPrepareCase?.(item.caseItem.id, targetSession);
+}
+
+function getRelevantSessionLabel(item) {
+  const session = item.latestSummary?.sessionNumber || item.nextSessionNumber || item.completedSessions || 1;
+  return `Sesion ${session}`;
 }
 
 function orderFeaturedCases(cases) {

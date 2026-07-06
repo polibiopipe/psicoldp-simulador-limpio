@@ -104,14 +104,22 @@ export function SimulationChat({
     const studentMessage = question.trim();
     setAvatarState("thinking");
     window.clearTimeout(responseTimerRef.current);
-    responseTimerRef.current = window.setTimeout(() => {
-      const patientResponse = onAsk(studentMessage, selectedInterventionType);
-      logSimulationDebug("MESSAGE_SENT", {
-        studentMessage,
-        patientResponse
-      });
-      setQuestion("");
-      setValidationFeedback("");
+    responseTimerRef.current = window.setTimeout(async () => {
+      try {
+        const patientResponse = await onAsk(studentMessage, selectedInterventionType, {
+          conversationStage: currentStage
+        });
+        logSimulationDebug("MESSAGE_SENT", {
+          studentMessage,
+          patientResponse
+        });
+        setQuestion("");
+        setValidationFeedback("");
+      } catch (error) {
+        console.error("PATIENT_RESPONSE_ERROR", error);
+        setAvatarState("idle");
+        setValidationFeedback("No se pudo generar la respuesta. Intenta enviar nuevamente.");
+      }
     }, 520);
   }
 

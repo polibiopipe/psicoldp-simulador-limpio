@@ -4259,7 +4259,7 @@ textarea:focus,
 
 .dashboard-hero,
 .dashboard-panel,
-.dashboard-metrics article {
+.dashboard-metric-card {
   border: 1px solid rgba(217, 226, 225, 0.88);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.92);
@@ -4304,11 +4304,29 @@ textarea:focus,
   gap: 12px;
 }
 
-.dashboard-metrics article {
+.dashboard-metric-card {
   display: grid;
   gap: 7px;
   min-height: 116px;
+  width: 100%;
+  border: 1px solid rgba(217, 226, 225, 0.88);
   padding: 16px;
+  color: inherit;
+  text-align: left;
+}
+
+button.dashboard-metric-card {
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+button.dashboard-metric-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(23, 109, 117, 0.32);
+  box-shadow: 0 18px 40px rgba(19, 34, 43, 0.09);
 }
 
 .dashboard-metrics svg,
@@ -4326,6 +4344,14 @@ textarea:focus,
   color: #52606d;
   font-size: 0.82rem;
   font-weight: 850;
+}
+
+.dashboard-metrics small {
+  color: #176d75;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .dashboard-grid {
@@ -4426,6 +4452,9 @@ textarea:focus,
 .pending-list {
   display: grid;
   gap: 10px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .pending-item.ok {
@@ -4438,6 +4467,128 @@ textarea:focus,
 
 .pending-item.risk {
   background: #fff2f4;
+}
+
+.pending-group {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(217, 226, 225, 0.88);
+  border-radius: 15px;
+  padding: 10px;
+  background: rgba(251, 252, 250, 0.78);
+}
+
+.pending-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pending-group-heading span {
+  color: #176d75;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pending-group-heading strong {
+  display: inline-grid;
+  min-width: 24px;
+  min-height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  color: #10212b;
+  background: #eef3f1;
+  font-size: 0.78rem;
+}
+
+.pending-action-list {
+  display: grid;
+  gap: 8px;
+}
+
+.pending-action-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(217, 226, 225, 0.88);
+  border-radius: 13px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.pending-action-item.warning {
+  background: #fffaf0;
+}
+
+.pending-action-item.risk {
+  background: #fff5f6;
+}
+
+.pending-action-item.session {
+  background: #f2fbfa;
+}
+
+.pending-action-item strong,
+.pending-action-item span,
+.pending-action-item p {
+  display: block;
+}
+
+.pending-action-item strong {
+  color: #10212b;
+  font-size: 0.92rem;
+  line-height: 1.25;
+}
+
+.pending-action-item span {
+  margin-top: 2px;
+  color: #176d75;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.pending-action-item p {
+  margin: 4px 0 0;
+  color: #52606d;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.pending-action-buttons {
+  display: grid;
+  gap: 6px;
+  min-width: 106px;
+}
+
+.pending-action-buttons button {
+  min-height: 30px;
+  border: 1px solid rgba(23, 109, 117, 0.18);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #176d75;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.pending-action-buttons button:first-child {
+  color: #ffffff;
+  background: #176d75;
+}
+
+.pending-action-buttons button:hover {
+  border-color: rgba(23, 109, 117, 0.34);
+  filter: saturate(1.05);
+}
+
+.pending-empty {
+  margin: 0;
+  color: #52606d;
+  font-size: 0.82rem;
 }
 
 .dashboard-patient-list {
@@ -4683,6 +4834,15 @@ textarea:focus,
   .dashboard-patient-strip img {
     width: 68px;
     height: 78px;
+  }
+
+  .pending-action-item,
+  .pending-action-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .pending-action-buttons {
+    min-width: 0;
   }
 }
 

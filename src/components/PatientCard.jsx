@@ -10,7 +10,7 @@ export function PatientCard({
   preSessionPlan = null
 }) {
   const caseImage = caseItem.image || "/avatar/placeholder.png";
-  const processLabel = sessionSummary ? "Continuidad del proceso" : "Preparacion inicial";
+  const processLabel = sessionSummary ? "Continuidad del proceso" : "Preparación inicial";
   const proposedSessions = preSessionPlan?.proposedSessionCount || totalSessions;
 
   return (
@@ -26,7 +26,7 @@ export function PatientCard({
       </div>
       <div className="patient-stat">
         <CalendarClock aria-hidden="true" />
-        <span>Sesion {sessionNumber} de {proposedSessions} - {processLabel}</span>
+        <span>Sesión {sessionNumber} de {proposedSessions} - {processLabel}</span>
       </div>
       <div className="patient-stat">
         <MessageCircle aria-hidden="true" />

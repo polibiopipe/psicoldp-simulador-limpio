@@ -68,6 +68,7 @@ export default function App() {
     error: null
   });
   const [saveStatus, setSaveStatus] = useState(null);
+  const [agendaFocusCaseId, setAgendaFocusCaseId] = useState("");
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
   const report = useMemo(() => buildEducationalReport(history, selectedCase), [history, selectedCase]);
@@ -280,15 +281,16 @@ export default function App() {
     setScreen(screens.home);
   }
 
-  function handleAsk(question, selectedInterventionType = "") {
-    const response = createPatientResponse({
+  async function handleAsk(question, selectedInterventionType = "", conversationContext = {}) {
+    const response = await createPatientResponse({
       caseItem: selectedCase,
       difficulty,
       question,
       history,
       sessionNumber,
       selectedInterventionType,
-      previousSessionSummary: sessionSummary
+      previousSessionSummary: sessionSummary,
+      conversationStage: conversationContext.conversationStage || null
     });
 
     setHistory((current) => [
@@ -394,6 +396,11 @@ export default function App() {
     setScreen(screens.home);
   }
 
+  function openClinicalAgenda(caseId = "") {
+    setAgendaFocusCaseId(typeof caseId === "string" ? caseId : "");
+    setScreen(screens.clinicalAgenda);
+  }
+
   function navigateWorkspace(targetScreen) {
     if (targetScreen === "progress") {
       setScreen(screens.savedSessions);
@@ -406,6 +413,10 @@ export default function App() {
     if (screens[targetScreen]) {
       if (targetScreen === screens.home) {
         goHome();
+        return;
+      }
+      if (targetScreen === screens.clinicalAgenda) {
+        openClinicalAgenda();
         return;
       }
       setScreen(targetScreen);
@@ -483,7 +494,7 @@ export default function App() {
           cases={cases}
           userEmail={userEmail}
           onOpenCases={() => setScreen(screens.select)}
-          onOpenAgenda={() => setScreen(screens.clinicalAgenda)}
+          onOpenAgenda={openClinicalAgenda}
           onViewHistory={() => setScreen(screens.savedSessions)}
           onPrepareCase={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.brief)}
           onStartSession={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.simulation)}
@@ -501,6 +512,7 @@ export default function App() {
       {screen === screens.clinicalAgenda && (
         <ClinicalAgenda
           cases={cases}
+          initialCaseId={agendaFocusCaseId}
           onBackHome={goHome}
           onPrepareCase={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.brief)}
           onStartSession={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.simulation)}
