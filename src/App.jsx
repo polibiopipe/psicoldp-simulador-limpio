@@ -49,6 +49,8 @@ const screens = {
   trustCenter: "trustCenter"
 };
 
+const accessGateEnabled = isSupabaseConfigured || import.meta.env.PROD;
+
 export default function App() {
   const [screen, setScreen] = useState(screens.home);
   const [selectedCaseId, setSelectedCaseId] = useState(cases[0].id);
@@ -63,7 +65,7 @@ export default function App() {
   const [authSession, setAuthSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [approvalState, setApprovalState] = useState({
-    status: isSupabaseConfigured ? "checking" : "approved",
+    status: isSupabaseConfigured ? "checking" : accessGateEnabled ? "configuration_error" : "approved",
     profile: null,
     error: null
   });
@@ -438,7 +440,7 @@ export default function App() {
     );
   }
 
-  if (isSupabaseConfigured && !authSession) {
+  if (accessGateEnabled && !authSession) {
     if (screen === screens.trustCenter) {
       return (
         <main className="app-shell">
@@ -460,7 +462,7 @@ export default function App() {
     );
   }
 
-  if (isSupabaseConfigured && authSession && approvalState.status !== "approved") {
+  if (accessGateEnabled && authSession && approvalState.status !== "approved") {
     return (
       <main className="app-shell">
         <EthicalNotice compact />
