@@ -9,6 +9,7 @@ const hasSupabaseAnonKey = Boolean(supabaseAnonKey);
 export const supabaseConfigStatus = {
   hasUrl: hasSupabaseUrl,
   hasAnonKey: hasSupabaseAnonKey,
+  urlHost: getSupabaseUrlHost(supabaseUrl),
   keyPrefix: getPublicKeyPrefix(supabaseAnonKey)
 };
 
@@ -41,9 +42,18 @@ function getPublicKeyPrefix(key) {
   return "unknown";
 }
 
+function getSupabaseUrlHost(url) {
+  try {
+    return new URL(String(url || "")).host || "missing";
+  } catch {
+    return url ? "invalid-url" : "missing";
+  }
+}
+
 function logSupabaseConfigStatus() {
   if (typeof console === "undefined") return;
   console.info(`[supabase] url present: ${hasSupabaseUrl}`);
+  console.info(`[supabase] url value host: ${getSupabaseUrlHost(supabaseUrl)}`);
   console.info(`[supabase] key present: ${hasSupabaseAnonKey}`);
   console.info(`[supabase] key prefix: ${getPublicKeyPrefix(supabaseAnonKey)}`);
 }

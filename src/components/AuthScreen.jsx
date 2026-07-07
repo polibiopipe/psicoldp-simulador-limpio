@@ -47,19 +47,20 @@ export function AuthScreen({ onOpenTrust }) {
         });
         if (signUpError) throw withAuthAction(signUpError, "signUp");
         setMessage(
-          "Registro creado. Revisa tu correo para confirmarlo. Despues, tu acceso quedara pendiente de aprobacion por el equipo de Escucha Viva."
+          "Registro creado. Revisa tu correo para confirmarlo. Después, tu acceso quedará pendiente de aprobación por el equipo de Escucha Viva."
         );
       } else if (mode === "reset") {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: globalThis.location?.origin
         });
         if (resetError) throw withAuthAction(resetError, "resetPassword");
-        setMessage("Si el correo esta registrado, recibiras instrucciones para recuperar tu contrasena.");
+        setMessage("Si el correo está registrado, recibirás instrucciones para recuperar tu contraseña.");
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password
         });
+        if (signInError) logSignInError(signInError);
         if (signInError) throw withAuthAction(signInError, "signIn");
       }
     } catch (authError) {
@@ -78,13 +79,13 @@ export function AuthScreen({ onOpenTrust }) {
           <img src="/logo-escucha-viva-horizontal.png" alt="Escucha Viva" />
           <div>
             <strong>Escucha Viva</strong>
-            <span>Plataforma formativa de simulacion clinica</span>
+            <span>Plataforma formativa de simulación clínica</span>
           </div>
         </div>
-        <span className="auth-kicker">Entrevista Psicologica Formativa</span>
-        <h1>Entrena entrevistas psicologicas con criterio clinico.</h1>
+        <span className="auth-kicker">Entrevista Psicológica Formativa</span>
+        <h1>Entrena entrevistas psicológicas con criterio clínico.</h1>
         <p>
-          Practica formativa con casos ficticios y retroalimentacion pedagogica.
+          Práctica formativa con casos ficticios y retroalimentación pedagógica.
         </p>
 
         <a
@@ -93,14 +94,14 @@ export function AuthScreen({ onOpenTrust }) {
           target="_blank"
           rel="noopener noreferrer"
         >
-          Escucha Viva, una iniciativa de Nucleo Vivo.
+          Escucha Viva, una iniciativa de Núcleo Vivo.
         </a>
 
         {!isSupabaseConfigured && (
           <div className="auth-warning">
             {isHostedAccessBlocked
               ? "Falta configuración Supabase en Vercel. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY."
-              : "Modo local: Supabase no esta configurado. El historial no se guardara en la nube."}
+              : "Modo local: Supabase no está configurado. El historial no se guardará en la nube."}
           </div>
         )}
       </div>
@@ -108,7 +109,7 @@ export function AuthScreen({ onOpenTrust }) {
       <div className="auth-card refined-auth-card">
         <header className="auth-card-heading">
           <span className="eyebrow">Acceso</span>
-          <h2>{mode === "register" ? "Crear cuenta" : mode === "reset" ? "Recuperar acceso" : "Iniciar sesion"}</h2>
+          <h2>{mode === "register" ? "Crear cuenta" : mode === "reset" ? "Recuperar acceso" : "Iniciar sesión"}</h2>
         </header>
 
         <div className="auth-tabs" aria-label="Opciones de acceso">
@@ -117,7 +118,7 @@ export function AuthScreen({ onOpenTrust }) {
             type="button"
             onClick={() => setMode("login")}
           >
-            Iniciar sesion
+            Iniciar sesión
           </button>
           <button
             className={mode === "register" ? "selected" : ""}
@@ -153,7 +154,7 @@ export function AuthScreen({ onOpenTrust }) {
           </label>
           {mode !== "reset" && (
             <label>
-              Contrasena
+              Contraseña
               <input
                 autoComplete={mode === "register" ? "new-password" : "current-password"}
                 minLength={6}
@@ -173,14 +174,14 @@ export function AuthScreen({ onOpenTrust }) {
             {mode === "register"
               ? "Crear cuenta"
               : mode === "reset"
-                ? "Enviar recuperacion"
-                : "Iniciar sesion"}
+                ? "Enviar recuperación"
+                : "Iniciar sesión"}
           </button>
         </form>
 
         <button className="text-action auth-reset-action" type="button" onClick={() => setMode(mode === "reset" ? "login" : "reset")}>
           <Mail aria-hidden="true" />
-          {mode === "reset" ? "Volver a iniciar sesion" : "Recuperar contrasena"}
+          {mode === "reset" ? "Volver a iniciar sesión" : "Recuperar contraseña"}
         </button>
 
         <button className="text-action auth-trust-action" type="button" onClick={onOpenTrust}>
@@ -194,7 +195,7 @@ export function AuthScreen({ onOpenTrust }) {
 
 function getMissingSupabaseMessage(isHostedAccessBlocked) {
   if (isHostedAccessBlocked) return "Falta configuración Supabase en Vercel";
-  return "Supabase no esta configurado. Revisa las variables de entorno.";
+  return "Supabase no está configurado. Revisa las variables de entorno.";
 }
 
 function withAuthAction(error, authAction) {
@@ -218,15 +219,20 @@ function getAuthErrorMessage(error) {
   if (!supabaseConfigStatus.hasUrl || !supabaseConfigStatus.hasAnonKey) {
     return "Falta configuración Supabase en Vercel";
   }
-  if (isNetworkAuthError(error)) {
-    return "No se pudo conectar con Supabase. Revisa VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.";
+  if (isInvalidCredentialsError(error)) {
+    return "Correo o contraseña incorrectos.";
   }
-  return error?.message || error?.originalError?.message || "No se pudo completar la accion. Intenta nuevamente.";
+  if (isEmailNotConfirmedError(error)) {
+    return "Debes confirmar tu correo antes de ingresar.";
+  }
+  if (isNetworkAuthError(error)) {
+    return "No se pudo conectar con Supabase. Revisa URL, key o conectividad.";
+  }
+  return error?.message || error?.originalError?.message || "No se pudo completar la acción. Intenta nuevamente.";
 }
 
 function isNetworkAuthError(error) {
-  const originalError = error?.originalError || error;
-  const message = String(originalError?.message || originalError?.name || originalError || "").toLowerCase();
+  const message = getAuthErrorText(error);
   return (
     message.includes("failed to fetch") ||
     message.includes("networkerror") ||
@@ -234,4 +240,46 @@ function isNetworkAuthError(error) {
     message.includes("load failed") ||
     message.includes("fetch")
   );
+}
+
+function isInvalidCredentialsError(error) {
+  const message = getAuthErrorText(error);
+  return message.includes("invalid login credentials") || message.includes("invalid credentials");
+}
+
+function isEmailNotConfirmedError(error) {
+  const message = getAuthErrorText(error);
+  return (
+    message.includes("email not confirmed") ||
+    message.includes("email not_confirmed") ||
+    message.includes("email_not_confirmed")
+  );
+}
+
+function getAuthErrorText(error) {
+  const originalError = error?.originalError || error;
+  return String(originalError?.message || originalError?.name || originalError || "").toLowerCase();
+}
+
+function logSignInError(error) {
+  const rawError = getSafeRawAuthError(error);
+  console.warn("[auth] signIn error name:", rawError.name || "");
+  console.warn("[auth] signIn error message:", rawError.message || "");
+  console.warn("[auth] signIn error status:", rawError.status || "");
+  console.warn("[auth] signIn raw error:", rawError);
+}
+
+function getSafeRawAuthError(error) {
+  return {
+    name: safeLogValue(error?.name),
+    message: safeLogValue(error?.message),
+    status: safeLogValue(error?.status),
+    code: safeLogValue(error?.code),
+    causeName: safeLogValue(error?.cause?.name),
+    causeMessage: safeLogValue(error?.cause?.message)
+  };
+}
+
+function safeLogValue(value) {
+  return String(value ?? "").slice(0, 240);
 }
