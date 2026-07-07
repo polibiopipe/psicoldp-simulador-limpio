@@ -7,6 +7,35 @@ import { generateLocalPatientResponse } from "../src/engine/localMiniAI.js";
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const MAX_HISTORY_TURNS = 8;
+const INVALID_FINAL_WORDS = new Set([
+  "a",
+  "al",
+  "de",
+  "del",
+  "en",
+  "con",
+  "por",
+  "para",
+  "un",
+  "una",
+  "el",
+  "la",
+  "los",
+  "las",
+  "lo",
+  "que",
+  "como",
+  "cuando",
+  "porque",
+  "pero",
+  "aunque",
+  "desde",
+  "hacia",
+  "sobre",
+  "entre",
+  "unos",
+  "unas"
+]);
 
 export default async function handler(req, res) {
   applyHeaders(res, corsHeaders());
@@ -104,14 +133,7 @@ export default async function handler(req, res) {
 
   let providerResponse;
   try {
-    providerResponse = await fetch(
-      `${GEMINI_API_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody)
-      }
-    );
+    providerResponse = await fetchGeminiCompletion({ apiKey, model, requestBody });
   } catch (error) {
     console.error("GEMINI_PATIENT_RESPONSE_NETWORK_ERROR", {
       provider: "vercel",
@@ -149,6 +171,57 @@ export default async function handler(req, res) {
       finishReason: finishReason || "unknown",
       textLength: responseText.length
     });
+
+    const retryRequestBody = buildRetryRequestBody(requestBody);
+    let retryProviderResponse;
+    try {
+      retryProviderResponse = await fetchGeminiCompletion({ apiKey, model, requestBody: retryRequestBody });
+    } catch (retryError) {
+      console.error("GEMINI_PATIENT_RESPONSE_RETRY_NETWORK_ERROR", {
+        provider: "vercel",
+        caseId,
+        message: safeErrorMessage(retryError)
+      });
+      sendJson(res, 200, localFallback("incomplete gemini response"));
+      return;
+    }
+
+    const retryProviderBody = await readJson(retryProviderResponse);
+    if (!retryProviderResponse.ok) {
+      const retryReason =
+        retryProviderBody?.error?.message || retryProviderBody?.message || `Gemini retry HTTP ${retryProviderResponse.status}`;
+      console.error("GEMINI_PATIENT_RESPONSE_RETRY_PROVIDER_ERROR", {
+        provider: "vercel",
+        caseId,
+        status: retryProviderResponse.status,
+        message: retryReason
+      });
+      sendJson(res, 200, localFallback("incomplete gemini response"));
+      return;
+    }
+
+    const retryFinishReason = extractGeminiFinishReason(retryProviderBody);
+    const retryResponseText = sanitizePatientResponse(extractGeminiText(retryProviderBody));
+    if (retryResponseText && !isIncompleteGeminiResponse(retryResponseText, retryFinishReason)) {
+      sendJson(res, 200, {
+        text: retryResponseText,
+        responseText: retryResponseText,
+        source: "gemini",
+        provider: "gemini",
+        model,
+        finishReason: retryFinishReason,
+        textLength: retryResponseText.length,
+        retry: true
+      });
+      return;
+    }
+
+    console.warn("GEMINI_PATIENT_RESPONSE_RETRY_INCOMPLETE", {
+      provider: "vercel",
+      caseId,
+      finishReason: retryFinishReason || "unknown",
+      textLength: retryResponseText.length
+    });
     sendJson(res, 200, localFallback("incomplete gemini response"));
     return;
   }
@@ -162,6 +235,35 @@ export default async function handler(req, res) {
     finishReason,
     textLength: responseText.length
   });
+}
+
+function fetchGeminiCompletion({ apiKey, model, requestBody }) {
+  return fetch(
+    `${GEMINI_API_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody)
+    }
+  );
+}
+
+function buildRetryRequestBody(requestBody) {
+  const retryBody = JSON.parse(JSON.stringify(requestBody));
+  retryBody.generationConfig = {
+    ...retryBody.generationConfig,
+    temperature: 0.62,
+    maxOutputTokens: Math.max(Number(retryBody.generationConfig?.maxOutputTokens) || 0, 700)
+  };
+
+  const retryInstruction =
+    "REINTENTO POR RESPUESTA INCOMPLETA: Completa una respuesta breve y natural como paciente, máximo 2 frases, sin dejar la idea inconclusa. Cierra la respuesta con puntuación.";
+  const firstContent = retryBody.contents?.[0];
+  const firstPart = firstContent?.parts?.[0];
+  if (firstPart && typeof firstPart.text === "string") {
+    firstPart.text = `${firstPart.text}\n\n${retryInstruction}`;
+  }
+  return retryBody;
 }
 
 function localFallbackResponse({ payload, caseId, studentMessage, fallbackReason }) {
@@ -357,20 +459,37 @@ function isIncompleteGeminiResponse(text, finishReason) {
   const normalizedReason = String(finishReason || "").toUpperCase();
   if (normalizedReason === "MAX_TOKENS") return true;
 
-  const trimmed = text.trim();
+  const trimmed = normalizeTerminalText(text);
   if (!trimmed || trimmed.length < 16) return true;
 
   const words = trimmed.split(/\s+/).filter(Boolean);
   if (words.length < 5) return true;
 
-  if (
-    trimmed.length < 60 &&
-    /(?:\bunos|\bunas|\bque|\bde|\bdel|\bla|\bel|\blos|\blas|\by|\bo|\bpero|\bporque|\bcuando|\bdesde|\bcon)$/i.test(trimmed)
-  ) {
-    return true;
-  }
+  const hasCompletePunctuation = /(?:[.!?]|\.{3}|…)$/.test(trimmed);
+  const finalWord = getFinalWord(trimmed);
+  const endsWithInvalidWord = INVALID_FINAL_WORDS.has(finalWord);
+
+  if (!hasCompletePunctuation && endsWithInvalidWord) return true;
+  if (!hasCompletePunctuation && words.length < 12) return true;
+  if (!hasCompletePunctuation && trimmed.length < 80) return true;
 
   return false;
+}
+
+function normalizeTerminalText(text) {
+  return String(text || "")
+    .trim()
+    .replace(/[)"'”’»\]]+$/g, "")
+    .trim();
+}
+
+function getFinalWord(text) {
+  const match = normalizeTerminalText(text)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .match(/[a-zñáéíóúü]+$/i);
+  return match ? match[0] : "";
 }
 
 function sanitizePatientResponse(text) {
