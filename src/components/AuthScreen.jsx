@@ -5,7 +5,7 @@ import {
   ShieldCheck,
   UserPlus
 } from "lucide-react";
-import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
+import { isAccessGateRequired, isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 
 export function AuthScreen({ onOpenTrust }) {
   const [mode, setMode] = useState("login");
@@ -15,7 +15,7 @@ export function AuthScreen({ onOpenTrust }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isProductionAccessBlocked = import.meta.env.PROD && !isSupabaseConfigured;
+  const isHostedAccessBlocked = isAccessGateRequired && !isSupabaseConfigured;
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -24,7 +24,7 @@ export function AuthScreen({ onOpenTrust }) {
 
     if (!isSupabaseConfigured || !supabase) {
       setError(
-        isProductionAccessBlocked
+        isHostedAccessBlocked
           ? "El acceso seguro no esta disponible porque faltan variables de Supabase en Vercel."
           : "Supabase no esta configurado. Revisa las variables de entorno."
       );
@@ -94,7 +94,7 @@ export function AuthScreen({ onOpenTrust }) {
 
         {!isSupabaseConfigured && (
           <div className="auth-warning">
-            {isProductionAccessBlocked
+            {isHostedAccessBlocked
               ? "Acceso seguro pendiente de configuracion: agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en Vercel."
               : "Modo local: Supabase no esta configurado. El historial no se guardara en la nube."}
           </div>

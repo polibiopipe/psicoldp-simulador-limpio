@@ -35,7 +35,7 @@ import { AppFooter } from "./components/AppFooter.jsx";
 import { ClinicalAgenda } from "./components/ClinicalAgenda.jsx";
 import { AuthenticatedLayout } from "./components/AuthenticatedLayout.jsx";
 import { ClinicalDashboard } from "./components/ClinicalDashboard.jsx";
-import { isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
+import { isAccessGateRequired, isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
 import { getOrCreateUserApproval } from "./lib/userApproval.js";
 
 const screens = {
@@ -48,8 +48,6 @@ const screens = {
   clinicalAgenda: "clinicalAgenda",
   trustCenter: "trustCenter"
 };
-
-const accessGateEnabled = isSupabaseConfigured || import.meta.env.PROD;
 
 export default function App() {
   const [screen, setScreen] = useState(screens.home);
@@ -65,7 +63,7 @@ export default function App() {
   const [authSession, setAuthSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [approvalState, setApprovalState] = useState({
-    status: isSupabaseConfigured ? "checking" : accessGateEnabled ? "configuration_error" : "approved",
+    status: isSupabaseConfigured ? "checking" : isAccessGateRequired ? "configuration_error" : "approved",
     profile: null,
     error: null
   });
@@ -440,7 +438,7 @@ export default function App() {
     );
   }
 
-  if (accessGateEnabled && !authSession) {
+  if (isAccessGateRequired && !authSession) {
     if (screen === screens.trustCenter) {
       return (
         <main className="app-shell">
@@ -462,7 +460,7 @@ export default function App() {
     );
   }
 
-  if (accessGateEnabled && authSession && approvalState.status !== "approved") {
+  if (isAccessGateRequired && authSession && approvalState.status !== "approved") {
     return (
       <main className="app-shell">
         <EthicalNotice compact />
