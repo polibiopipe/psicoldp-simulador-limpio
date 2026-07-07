@@ -5,7 +5,12 @@ import {
   ShieldCheck,
   UserPlus
 } from "lucide-react";
-import { isAccessGateRequired, isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
+import {
+  isAccessGateRequired,
+  isSupabaseConfigured,
+  supabase,
+  supabaseConfigStatus
+} from "../lib/supabaseClient.js";
 
 export function AuthScreen({ onOpenTrust }) {
   const [mode, setMode] = useState("login");
@@ -23,11 +28,8 @@ export function AuthScreen({ onOpenTrust }) {
     setError("");
 
     if (!isSupabaseConfigured || !supabase) {
-      setError(
-        isHostedAccessBlocked
-          ? "El acceso seguro no esta disponible porque faltan variables de Supabase en Vercel."
-          : "Supabase no esta configurado. Revisa las variables de entorno."
-      );
+      console.warn("[auth] signIn error:", "missing Supabase configuration");
+      setError(getMissingSupabaseMessage(isHostedAccessBlocked));
       return;
     }
 
@@ -43,7 +45,7 @@ export function AuthScreen({ onOpenTrust }) {
             }
           }
         });
-        if (signUpError) throw signUpError;
+        if (signUpError) throw withAuthAction(signUpError, "signUp");
         setMessage(
           "Registro creado. Revisa tu correo para confirmarlo. Despues, tu acceso quedara pendiente de aprobacion por el equipo de Escucha Viva."
         );
@@ -51,17 +53,19 @@ export function AuthScreen({ onOpenTrust }) {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: globalThis.location?.origin
         });
-        if (resetError) throw resetError;
+        if (resetError) throw withAuthAction(resetError, "resetPassword");
         setMessage("Si el correo esta registrado, recibiras instrucciones para recuperar tu contrasena.");
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password
         });
-        if (signInError) throw signInError;
+        if (signInError) throw withAuthAction(signInError, "signIn");
       }
     } catch (authError) {
-      setError(authError.message || "No se pudo completar la accion. Intenta nuevamente.");
+      const action = authError.authAction || (mode === "register" ? "signUp" : mode === "reset" ? "resetPassword" : "signIn");
+      console.warn(`[auth] ${action} error: ${summarizeAuthError(authError)}`);
+      setError(getAuthErrorMessage(authError));
     } finally {
       setIsSubmitting(false);
     }
@@ -95,7 +99,7 @@ export function AuthScreen({ onOpenTrust }) {
         {!isSupabaseConfigured && (
           <div className="auth-warning">
             {isHostedAccessBlocked
-              ? "Acceso seguro pendiente de configuracion: agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en Vercel."
+              ? "Falta configuración Supabase en Vercel. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY."
               : "Modo local: Supabase no esta configurado. El historial no se guardara en la nube."}
           </div>
         )}
@@ -185,5 +189,49 @@ export function AuthScreen({ onOpenTrust }) {
         </button>
       </div>
     </section>
+  );
+}
+
+function getMissingSupabaseMessage(isHostedAccessBlocked) {
+  if (isHostedAccessBlocked) return "Falta configuración Supabase en Vercel";
+  return "Supabase no esta configurado. Revisa las variables de entorno.";
+}
+
+function withAuthAction(error, authAction) {
+  return {
+    authAction,
+    originalError: error,
+    message: error?.message || String(error || "Unknown auth error")
+  };
+}
+
+function summarizeAuthError(error) {
+  const originalError = error?.originalError || error;
+  const message = String(originalError?.message || originalError?.name || originalError || "Unknown auth error").trim();
+  if (isNetworkAuthError(error)) {
+    return "network error; check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY";
+  }
+  return message.slice(0, 180);
+}
+
+function getAuthErrorMessage(error) {
+  if (!supabaseConfigStatus.hasUrl || !supabaseConfigStatus.hasAnonKey) {
+    return "Falta configuración Supabase en Vercel";
+  }
+  if (isNetworkAuthError(error)) {
+    return "No se pudo conectar con Supabase. Revisa VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.";
+  }
+  return error?.message || error?.originalError?.message || "No se pudo completar la accion. Intenta nuevamente.";
+}
+
+function isNetworkAuthError(error) {
+  const originalError = error?.originalError || error;
+  const message = String(originalError?.message || originalError?.name || originalError || "").toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed") ||
+    message.includes("load failed") ||
+    message.includes("fetch")
   );
 }
