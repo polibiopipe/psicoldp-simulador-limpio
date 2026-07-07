@@ -36,7 +36,7 @@ export function AuthScreen({ onOpenTrust }) {
     setIsSubmitting(true);
     try {
       if (mode === "register") {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -46,8 +46,13 @@ export function AuthScreen({ onOpenTrust }) {
           }
         });
         if (signUpError) throw withAuthAction(signUpError, "signUp");
+        await notifyAccessRequest({
+          email,
+          fullName: name,
+          userId: signUpData?.user?.id
+        });
         setMessage(
-          "Registro creado. Revisa tu correo para confirmarlo. Después, tu acceso quedará pendiente de aprobación por el equipo de Escucha Viva."
+          "Tu solicitud quedó pendiente de aprobación. Revisa tu correo para confirmar tu cuenta; cuando el equipo habilite tu acceso, podrás ingresar."
         );
       } else if (mode === "reset") {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
@@ -282,4 +287,38 @@ function getSafeRawAuthError(error) {
 
 function safeLogValue(value) {
   return String(value ?? "").slice(0, 240);
+}
+
+async function notifyAccessRequest({ email, fullName, userId }) {
+  try {
+    const response = await fetch("/api/access-request", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email,
+        fullName,
+        userId,
+        createdAt: new Date().toISOString()
+      })
+    });
+    const payload = await readAccessRequestPayload(response);
+    if (!response.ok || payload?.emailSent === false) {
+      console.warn("[auth] access request email warning:", {
+        status: response.status,
+        reason: safeLogValue(payload?.reason || payload?.error || "unknown")
+      });
+    }
+  } catch (error) {
+    console.warn("[auth] access request email warning:", safeLogValue(error?.message || error));
+  }
+}
+
+async function readAccessRequestPayload(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
 }
