@@ -33,8 +33,9 @@ export async function createPatientResponse({
     });
 
     if (geminiResponse.source === "gemini") {
-      console.info("[responseEngine] source: gemini", {
-        model: geminiResponse.model || "gemini"
+      console.info(`[responseEngine] source: gemini length: ${geminiResponse.text.length}`, {
+        model: geminiResponse.model || "gemini",
+        length: geminiResponse.text.length
       });
     } else {
       console.warn("[responseEngine] source: local fallback:", geminiResponse.fallbackReason || "Gemini unavailable");
@@ -199,6 +200,14 @@ async function requestGeminiPatientResponse({
       };
     }
 
+    if (data?.source === "gemini" && isIncompleteGeminiText(text, data?.finishReason)) {
+      return {
+        source: "local",
+        text: "",
+        fallbackReason: "incomplete gemini response"
+      };
+    }
+
     return {
       ...data,
       text,
@@ -218,6 +227,26 @@ async function requestGeminiPatientResponse({
   } finally {
     globalThis.clearTimeout(timeout);
   }
+}
+
+function isIncompleteGeminiText(text, finishReason) {
+  const normalizedReason = String(finishReason || "").toUpperCase();
+  if (normalizedReason === "MAX_TOKENS") return true;
+
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length < 16) return true;
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length < 5) return true;
+
+  if (
+    trimmed.length < 60 &&
+    /(?:\bunos|\bunas|\bque|\bde|\bdel|\bla|\bel|\blos|\blas|\by|\bo|\bpero|\bporque|\bcuando|\bdesde|\bcon)$/i.test(trimmed)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 async function readResponseJson(response) {

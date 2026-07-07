@@ -97,7 +97,8 @@ export default async function handler(req, res) {
     generationConfig: {
       temperature: 0.72,
       topP: 0.9,
-      maxOutputTokens: 260
+      candidateCount: 1,
+      maxOutputTokens: 900
     }
   };
 
@@ -134,9 +135,21 @@ export default async function handler(req, res) {
     return;
   }
 
+  const finishReason = extractGeminiFinishReason(providerBody);
   const responseText = sanitizePatientResponse(extractGeminiText(providerBody));
   if (!responseText) {
     sendJson(res, 200, localFallback("Gemini returned empty text"));
+    return;
+  }
+
+  if (isIncompleteGeminiResponse(responseText, finishReason)) {
+    console.warn("GEMINI_PATIENT_RESPONSE_INCOMPLETE", {
+      provider: "vercel",
+      caseId,
+      finishReason: finishReason || "unknown",
+      textLength: responseText.length
+    });
+    sendJson(res, 200, localFallback("incomplete gemini response"));
     return;
   }
 
@@ -145,7 +158,9 @@ export default async function handler(req, res) {
     responseText,
     source: "gemini",
     provider: "gemini",
-    model
+    model,
+    finishReason,
+    textLength: responseText.length
   });
 }
 
@@ -312,13 +327,54 @@ function formatHistory(history) {
 }
 
 function extractGeminiText(body) {
-  const parts = body?.candidates?.[0]?.content?.parts;
+  const candidates = Array.isArray(body?.candidates) ? body.candidates : [];
+  const primaryParts = candidates[0]?.content?.parts;
+  if (Array.isArray(primaryParts)) {
+    return joinTextParts(primaryParts);
+  }
+
+  return candidates
+    .map((candidate) => joinTextParts(candidate?.content?.parts))
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
+function joinTextParts(parts) {
   if (!Array.isArray(parts)) return "";
-  return parts.map((part) => part?.text || "").join("").trim();
+  return parts
+    .map((part) => typeof part?.text === "string" ? part.text : "")
+    .filter(Boolean)
+    .join("")
+    .trim();
+}
+
+function extractGeminiFinishReason(body) {
+  return cleanText(body?.candidates?.[0]?.finishReason || "", 80);
+}
+
+function isIncompleteGeminiResponse(text, finishReason) {
+  const normalizedReason = String(finishReason || "").toUpperCase();
+  if (normalizedReason === "MAX_TOKENS") return true;
+
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length < 16) return true;
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length < 5) return true;
+
+  if (
+    trimmed.length < 60 &&
+    /(?:\bunos|\bunas|\bque|\bde|\bdel|\bla|\bel|\blos|\blas|\by|\bo|\bpero|\bporque|\bcuando|\bdesde|\bcon)$/i.test(trimmed)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function sanitizePatientResponse(text) {
-  return cleanText(text, 1400)
+  return cleanText(text, 3200)
     .replace(/^\s*(Paciente|Respuesta|Claudio|Tomas|Tomás|Marcos)\s*:\s*/i, "")
     .replace(/\bcomo (modelo de lenguaje|ia|inteligencia artificial)\b/gi, "")
     .trim();
