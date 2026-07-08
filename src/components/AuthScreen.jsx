@@ -36,16 +36,33 @@ export function AuthScreen({ onOpenTrust }) {
     setIsSubmitting(true);
     try {
       if (mode === "register") {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: name
+        console.info("[auth] signUp started");
+        let signUpResult;
+        try {
+          signUpResult = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                name,
+                full_name: name
+              }
             }
-          }
-        });
+          });
+        } catch (signUpException) {
+          logSignUpError(signUpException);
+          throw withAuthAction(signUpException, "signUp");
+        }
+
+        const { data: signUpData, error: signUpError } = signUpResult;
+        if (signUpError) logSignUpError(signUpError);
         if (signUpError) throw withAuthAction(signUpError, "signUp");
+        console.info("[auth] signUp success user:", Boolean(signUpData?.user));
+        await ensurePendingProfileAfterSignUp({
+          user: signUpData?.user,
+          email,
+          fullName: name
+        });
         await notifyAccessRequest({
           email,
           fullName: name,
@@ -71,7 +88,7 @@ export function AuthScreen({ onOpenTrust }) {
     } catch (authError) {
       const action = authError.authAction || (mode === "register" ? "signUp" : mode === "reset" ? "resetPassword" : "signIn");
       console.warn(`[auth] ${action} error: ${summarizeAuthError(authError)}`);
-      setError(getAuthErrorMessage(authError));
+      setError(getAuthErrorMessage(authError, action));
     } finally {
       setIsSubmitting(false);
     }
@@ -220,15 +237,24 @@ function summarizeAuthError(error) {
   return message.slice(0, 180);
 }
 
-function getAuthErrorMessage(error) {
+function getAuthErrorMessage(error, action = "") {
   if (!supabaseConfigStatus.hasUrl || !supabaseConfigStatus.hasAnonKey) {
     return "Falta configuración Supabase en Vercel";
+  }
+  if (isInvalidApiKeyError(error)) {
+    return "La clave pública de Supabase no es válida o está incompleta.";
+  }
+  if (action === "signUp" && isUserAlreadyRegisteredError(error)) {
+    return "Este correo ya está registrado. Intenta iniciar sesión o recuperar contraseña.";
+  }
+  if (action === "signUp" && isSignupDisabledError(error)) {
+    return "El registro está deshabilitado en Supabase.";
   }
   if (isInvalidCredentialsError(error)) {
     return "Correo o contraseña incorrectos.";
   }
   if (isEmailNotConfirmedError(error)) {
-    return "Debes confirmar tu correo antes de ingresar.";
+    return action === "signUp" ? "Debes confirmar tu correo." : "Debes confirmar tu correo antes de ingresar.";
   }
   if (isNetworkAuthError(error)) {
     return "No se pudo conectar con Supabase. Revisa URL, key o conectividad.";
@@ -250,6 +276,40 @@ function isNetworkAuthError(error) {
 function isInvalidCredentialsError(error) {
   const message = getAuthErrorText(error);
   return message.includes("invalid login credentials") || message.includes("invalid credentials");
+}
+
+function isInvalidApiKeyError(error) {
+  const message = getAuthErrorText(error);
+  return (
+    message.includes("invalid api key") ||
+    message.includes("api key invalid") ||
+    message.includes("invalid anon key") ||
+    message.includes("invalid publishable key") ||
+    message.includes("invalid jwt") ||
+    message.includes("invalid compact jwt")
+  );
+}
+
+function isUserAlreadyRegisteredError(error) {
+  const message = getAuthErrorText(error);
+  return (
+    message.includes("user already registered") ||
+    message.includes("already registered") ||
+    message.includes("already exists") ||
+    message.includes("user already exists") ||
+    message.includes("email address already registered")
+  );
+}
+
+function isSignupDisabledError(error) {
+  const message = getAuthErrorText(error);
+  return (
+    message.includes("signups not allowed") ||
+    message.includes("signup disabled") ||
+    message.includes("signups are disabled") ||
+    message.includes("user signups are disabled") ||
+    message.includes("signup is disabled")
+  );
 }
 
 function isEmailNotConfirmedError(error) {
@@ -274,6 +334,14 @@ function logSignInError(error) {
   console.warn("[auth] signIn raw error:", rawError);
 }
 
+function logSignUpError(error) {
+  const rawError = getSafeRawAuthError(error);
+  console.warn("[auth] signUp error name:", rawError.name || "");
+  console.warn("[auth] signUp error message:", rawError.message || "");
+  console.warn("[auth] signUp error status:", rawError.status || "");
+  console.warn("[auth] signUp raw error:", rawError);
+}
+
 function getSafeRawAuthError(error) {
   return {
     name: safeLogValue(error?.name),
@@ -289,7 +357,55 @@ function safeLogValue(value) {
   return String(value ?? "").slice(0, 240);
 }
 
+async function ensurePendingProfileAfterSignUp({ user, email, fullName }) {
+  console.info("[profile] pending profile upsert started");
+  if (!user?.id) {
+    console.warn("[profile] pending profile upsert warning:", "missing signup user");
+    return;
+  }
+
+  let session = null;
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.warn("[profile] pending profile session warning:", safeLogValue(error.message || error));
+    }
+    session = data?.session || null;
+  } catch (error) {
+    console.warn("[profile] pending profile session warning:", safeLogValue(error?.message || error));
+  }
+
+  if (!session) {
+    console.info("[profile] pending profile upsert success:", "database trigger");
+    return;
+  }
+
+  const { error } = await supabase.from("user_profiles").insert({
+    id: user.id,
+    email,
+    full_name: fullName || null,
+    approved: false,
+    role: "student"
+  });
+
+  if (!error || error.code === "23505") {
+    console.info("[profile] pending profile upsert success");
+    return;
+  }
+
+  console.warn("[profile] pending profile upsert warning:", sanitizeProfileError(error));
+}
+
+function sanitizeProfileError(error) {
+  return {
+    code: safeLogValue(error?.code),
+    message: safeLogValue(error?.message),
+    details: safeLogValue(error?.details)
+  };
+}
+
 async function notifyAccessRequest({ email, fullName, userId }) {
+  console.info("[access-request] started");
   try {
     const response = await fetch("/api/access-request", {
       method: "POST",
@@ -305,13 +421,15 @@ async function notifyAccessRequest({ email, fullName, userId }) {
     });
     const payload = await readAccessRequestPayload(response);
     if (!response.ok || payload?.emailSent === false) {
-      console.warn("[auth] access request email warning:", {
+      console.warn("[access-request] email warning:", {
         status: response.status,
         reason: safeLogValue(payload?.reason || payload?.error || "unknown")
       });
+      return;
     }
+    console.info("[access-request] success");
   } catch (error) {
-    console.warn("[auth] access request email warning:", safeLogValue(error?.message || error));
+    console.warn("[access-request] email warning:", safeLogValue(error?.message || error));
   }
 }
 
