@@ -12,6 +12,8 @@ import {
   supabaseConfigStatus
 } from "../lib/supabaseClient.js";
 
+const AUTH_REDIRECT_FALLBACK = "https://psicoldp-simulador-limpio.vercel.app";
+
 export function AuthScreen({ onOpenTrust }) {
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
@@ -43,6 +45,7 @@ export function AuthScreen({ onOpenTrust }) {
             email,
             password,
             options: {
+              emailRedirectTo: getAuthRedirectUrl(),
               data: {
                 name,
                 full_name: name
@@ -73,7 +76,7 @@ export function AuthScreen({ onOpenTrust }) {
         );
       } else if (mode === "reset") {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: globalThis.location?.origin
+          redirectTo: getAuthRedirectUrl()
         });
         if (resetError) throw withAuthAction(resetError, "resetPassword");
         setMessage("Si el correo está registrado, recibirás instrucciones para recuperar tu contraseña.");
@@ -218,6 +221,10 @@ export function AuthScreen({ onOpenTrust }) {
 function getMissingSupabaseMessage(isHostedAccessBlocked) {
   if (isHostedAccessBlocked) return "Falta configuración Supabase en Vercel";
   return "Supabase no está configurado. Revisa las variables de entorno.";
+}
+
+function getAuthRedirectUrl() {
+  return globalThis.location?.origin || AUTH_REDIRECT_FALLBACK;
 }
 
 function withAuthAction(error, authAction) {

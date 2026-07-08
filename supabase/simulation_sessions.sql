@@ -124,7 +124,10 @@ create policy "Users can read their own approval profile"
 on public.user_profiles
 for select
 to authenticated
-using ((select auth.uid()) = id);
+using (
+  (select auth.uid()) = id
+  or lower(email) = lower((select auth.jwt() ->> 'email'))
+);
 
 create policy "Users can create only their own pending profile"
 on public.user_profiles
