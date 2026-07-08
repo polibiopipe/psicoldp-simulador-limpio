@@ -2,6 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req, res) {
+  console.info("[approve-access] started");
+
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     sendHtml(res, 405, renderStatusPage({
@@ -26,6 +28,7 @@ export default async function handler(req, res) {
   const email = normalizeEmail(getQueryValue(req.query?.email));
   const expires = cleanText(getQueryValue(req.query?.expires), 40);
   const token = cleanText(getQueryValue(req.query?.token), 256);
+  console.info("[approve-access] email", safeLogValue(email));
 
   if (!email || !expires || !token) {
     sendHtml(res, 400, renderStatusPage({
@@ -52,23 +55,32 @@ export default async function handler(req, res) {
   }
 
   const supabase = createServerSupabase(config.supabaseUrl, config.serviceRoleKey);
-  const approvedAt = new Date().toISOString();
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .update({
-      approved: true,
-      approved_at: approvedAt
-    })
-    .ilike("email", email)
-    .select("id,email,approved")
-    .limit(1)
-    .maybeSingle();
+  const authUserResult = await findAuthUserByEmail(supabase, email);
 
-  if (error) {
-    console.error("ACCESS_APPROVAL_UPDATE_ERROR", {
-      code: error.code,
-      message: cleanText(error.message, 180)
-    });
+  if (authUserResult.error) {
+    logApprovalError(authUserResult.error);
+    sendHtml(res, 500, renderStatusPage({
+      title: "No pudimos aprobar el acceso",
+      message: "Ocurrió un error al buscar el usuario en Supabase."
+    }));
+    return;
+  }
+
+  console.info("[approve-access] user found", Boolean(authUserResult.user));
+  if (!authUserResult.user) {
+    sendHtml(res, 404, renderStatusPage({
+      title: "Usuario no encontrado",
+      message: "No se encontró usuario registrado con este correo."
+    }));
+    return;
+  }
+
+  console.info("[approve-access] profile upsert started");
+  const profileResult = await upsertApprovedProfile(supabase, authUserResult.user);
+  console.info("[approve-access] profile upsert success", Boolean(profileResult.data?.approved));
+
+  if (profileResult.error || profileResult.data?.approved !== true) {
+    logApprovalError(profileResult.error || { message: "Profile was not approved after upsert" });
     sendHtml(res, 500, renderStatusPage({
       title: "No pudimos aprobar el acceso",
       message: "Ocurrió un error al actualizar el perfil en Supabase."
@@ -76,30 +88,22 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (!data) {
-    sendHtml(res, 404, renderStatusPage({
-      title: "Usuario no encontrado",
-      message: "No se encontró usuario pendiente para este correo."
-    }));
-    return;
-  }
-
   console.info("ACCESS_APPROVAL_SUCCESS", {
-    userId: data.id,
-    email: data.email
+    userId: profileResult.data.id,
+    email: profileResult.data.email
   });
 
   sendHtml(res, 200, renderStatusPage({
     title: "Acceso aprobado",
     message: "El usuario ya puede ingresar al simulador.",
-    detail: data.email
+    detail: profileResult.data.email
   }));
 }
 
 function getServerConfig() {
   const values = {
     approvalSecret: process.env.ACCESS_APPROVAL_SECRET?.trim(),
-    supabaseUrl: (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL)?.trim(),
+    supabaseUrl: process.env.SUPABASE_URL?.trim(),
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   };
   const missing = Object.entries(values)
@@ -116,6 +120,81 @@ function createServerSupabase(url, serviceRoleKey) {
       persistSession: false
     }
   });
+}
+
+async function findAuthUserByEmail(supabase, normalizedEmail) {
+  const perPage = 1000;
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage
+    });
+
+    if (error) return { user: null, error };
+
+    const users = data?.users || [];
+    const user = users.find((candidate) => normalizeEmail(candidate.email) === normalizedEmail);
+    if (user) return { user, error: null };
+    if (users.length < perPage) break;
+  }
+
+  return { user: null, error: null };
+}
+
+async function upsertApprovedProfile(supabase, user) {
+  const approvedAt = new Date().toISOString();
+  const fullName = cleanText(user.user_metadata?.full_name || user.user_metadata?.name, 180) || null;
+  const attempts = [
+    {
+      id: user.id,
+      email: normalizeEmail(user.email),
+      full_name: fullName,
+      approved: true,
+      approved_at: approvedAt,
+      updated_at: approvedAt
+    },
+    {
+      id: user.id,
+      email: normalizeEmail(user.email),
+      full_name: fullName,
+      approved: true,
+      approved_at: approvedAt
+    },
+    {
+      id: user.id,
+      email: normalizeEmail(user.email),
+      approved: true
+    }
+  ];
+
+  let lastError = null;
+  for (const profile of attempts) {
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .upsert(profile, { onConflict: "id" })
+      .select("id,email,approved")
+      .single();
+
+    if (!error) return { data, error: null };
+    lastError = error;
+    if (!isMissingColumnError(error)) break;
+  }
+
+  return { data: null, error: lastError };
+}
+
+function isMissingColumnError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.code === "PGRST204" ||
+    message.includes("column") ||
+    message.includes("schema cache")
+  );
+}
+
+function logApprovalError(error) {
+  console.error("[approve-access] error message", safeLogValue(error?.message || error));
+  console.error("[approve-access] error code", safeLogValue(error?.code));
 }
 
 function getQueryValue(value) {
@@ -152,6 +231,10 @@ function normalizeEmail(value) {
 
 function cleanText(value, maxLength = 240) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function safeLogValue(value) {
+  return String(value ?? "").slice(0, 240);
 }
 
 function sendHtml(res, status, html) {
