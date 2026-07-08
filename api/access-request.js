@@ -1,5 +1,8 @@
+import { createHmac } from "node:crypto";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 const DEFAULT_SUBJECT = "Nueva solicitud de acceso a Escucha Viva";
+const APPROVAL_LINK_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default async function handler(req, res) {
   setJsonHeaders(res);
@@ -16,7 +19,9 @@ export default async function handler(req, res) {
       function: "access-request",
       hasResendKey: Boolean(process.env.RESEND_API_KEY),
       hasFromEmail: Boolean(process.env.ACCESS_REQUEST_FROM_EMAIL),
-      hasToEmail: Boolean(process.env.ACCESS_REQUEST_TO_EMAIL)
+      hasToEmail: Boolean(process.env.ACCESS_REQUEST_TO_EMAIL),
+      hasApprovalSecret: Boolean(process.env.ACCESS_APPROVAL_SECRET),
+      hasAppBaseUrl: Boolean(process.env.APP_BASE_URL)
     });
     return;
   }
@@ -54,10 +59,16 @@ export default async function handler(req, res) {
 
   const fullName = cleanText(payload.fullName || payload.name, 160) || "No informado";
   const registeredAt = formatRegistrationDate(payload.createdAt || new Date().toISOString());
+  const approvalUrl = buildApprovalUrl({
+    email: userEmail,
+    baseUrl: getAppBaseUrl(req),
+    secret: process.env.ACCESS_APPROVAL_SECRET?.trim()
+  });
   const message = buildEmail({
     userEmail,
     fullName,
-    registeredAt
+    registeredAt,
+    approvalUrl
   });
 
   let providerResponse;
@@ -143,10 +154,11 @@ function getResendConfig() {
   return { ...values, missing, ok: missing.length === 0 };
 }
 
-function buildEmail({ userEmail, fullName, registeredAt }) {
+function buildEmail({ userEmail, fullName, registeredAt, approvalUrl }) {
   const safeName = escapeHtml(fullName);
   const safeEmail = escapeHtml(userEmail);
   const safeDate = escapeHtml(registeredAt);
+  const safeApprovalUrl = approvalUrl ? escapeHtml(approvalUrl) : "";
 
   return {
     text: [
@@ -157,6 +169,7 @@ function buildEmail({ userEmail, fullName, registeredAt }) {
       `Fecha de registro: ${registeredAt}`,
       "Estado: pendiente de aprobacion.",
       "",
+      ...(approvalUrl ? [`Aprobar acceso: ${approvalUrl}`, ""] : []),
       "Para aprobar manualmente:",
       "1. Abre Supabase.",
       "2. Ve a Table Editor -> public.user_profiles.",
@@ -187,6 +200,12 @@ function buildEmail({ userEmail, fullName, registeredAt }) {
               <td style="padding:9px 10px;color:#9a6714;font-weight:700;">Pendiente de aprobacion</td>
             </tr>
           </table>
+          ${
+            safeApprovalUrl
+              ? `<a href="${safeApprovalUrl}" style="display:inline-block;margin-top:22px;padding:13px 20px;border-radius:10px;background:#176d75;color:#ffffff;text-decoration:none;font-weight:700;">Aprobar acceso</a>
+          <p style="margin:12px 0 0;color:#5f6f73;font-size:13px;line-height:1.45;">El enlace es seguro, personal y temporal. Si expira, aprueba manualmente desde Supabase.</p>`
+              : ""
+          }
           <div style="margin-top:22px;padding:16px;border-radius:12px;background:#fff9f0;border:1px solid #eadcc5;">
             <p style="margin:0 0 8px;font-weight:700;">Aprobacion manual</p>
             <p style="margin:0;line-height:1.55;color:#40515a;">En Supabase, abre <strong>public.user_profiles</strong>, busca este correo y cambia <strong>approved</strong> a <strong>true</strong>.</p>
@@ -195,6 +214,52 @@ function buildEmail({ userEmail, fullName, registeredAt }) {
       </div>
     `
   };
+}
+
+function buildApprovalUrl({ email, baseUrl, secret }) {
+  if (!email || !baseUrl || !secret) {
+    console.warn("ACCESS_APPROVAL_LINK_CONFIG_MISSING", {
+      hasEmail: Boolean(email),
+      hasBaseUrl: Boolean(baseUrl),
+      hasSecret: Boolean(secret)
+    });
+    return "";
+  }
+
+  const expires = String(Date.now() + APPROVAL_LINK_DURATION_MS);
+  const token = signApprovalToken({ email, expires, secret });
+  const url = new URL("/api/approve-access", baseUrl);
+  url.searchParams.set("email", email);
+  url.searchParams.set("expires", expires);
+  url.searchParams.set("token", token);
+  return url.toString();
+}
+
+function signApprovalToken({ email, expires, secret }) {
+  return createHmac("sha256", secret)
+    .update(`${email}:${expires}`)
+    .digest("hex");
+}
+
+function getAppBaseUrl(req) {
+  const configured = cleanBaseUrl(process.env.APP_BASE_URL);
+  if (configured) return configured;
+
+  const host = req.headers?.host;
+  if (!host) return "";
+  const proto = req.headers?.["x-forwarded-proto"] || "https";
+  return cleanBaseUrl(`${proto}://${host}`);
+}
+
+function cleanBaseUrl(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim().replace(/\/+$/, "");
+  if (!trimmed) return "";
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return "";
+  }
 }
 
 function normalizeEmail(value) {
