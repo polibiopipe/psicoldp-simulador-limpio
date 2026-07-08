@@ -172,8 +172,67 @@ create table if not exists public.simulation_sessions (
   conversation jsonb not null default '[]'::jsonb,
   feedback jsonb not null default '{}'::jsonb,
   score integer,
-  created_at timestamptz not null default now()
+  status text not null default 'completed',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
+
+alter table public.simulation_sessions
+add column if not exists status text not null default 'completed';
+
+alter table public.simulation_sessions
+add column if not exists updated_at timestamptz not null default now();
+
+alter table public.simulation_sessions
+alter column status set default 'completed';
+
+alter table public.simulation_sessions
+alter column updated_at set default now();
+
+update public.simulation_sessions
+set status = coalesce(nullif(status, ''), 'completed')
+where status is null or status = '';
+
+update public.simulation_sessions
+set updated_at = coalesce(updated_at, created_at, now())
+where updated_at is null;
+
+alter table public.simulation_sessions
+alter column status set not null;
+
+alter table public.simulation_sessions
+alter column updated_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'simulation_sessions_status_check'
+      and conrelid = 'public.simulation_sessions'::regclass
+  ) then
+    alter table public.simulation_sessions
+    add constraint simulation_sessions_status_check
+    check (status in ('in_progress', 'completed'));
+  end if;
+end;
+$$;
+
+create or replace function public.set_simulation_session_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists on_simulation_sessions_updated_at on public.simulation_sessions;
+create trigger on_simulation_sessions_updated_at
+before update on public.simulation_sessions
+for each row
+execute function public.set_simulation_session_updated_at();
 
 alter table public.simulation_sessions enable row level security;
 
@@ -209,6 +268,19 @@ using (
   and public.current_user_is_approved()
 );
 
+create policy "Approved users can update their own simulation sessions"
+on public.simulation_sessions
+for update
+to authenticated
+using (
+  (select auth.uid()) = user_id
+  and public.current_user_is_approved()
+)
+with check (
+  (select auth.uid()) = user_id
+  and public.current_user_is_approved()
+);
+
 create policy "Approved users can delete their own simulation sessions"
 on public.simulation_sessions
 for delete
@@ -219,12 +291,18 @@ using (
 );
 
 revoke all on table public.simulation_sessions from anon, authenticated;
-grant select, insert, delete on table public.simulation_sessions to authenticated;
+grant select, insert, update, delete on table public.simulation_sessions to authenticated;
 
 create index if not exists user_profiles_approved_idx
 on public.user_profiles (approved, created_at desc);
 
 create index if not exists simulation_sessions_user_created_at_idx
 on public.simulation_sessions (user_id, created_at desc);
+
+create index if not exists simulation_sessions_user_status_updated_at_idx
+on public.simulation_sessions (user_id, status, updated_at desc);
+
+create index if not exists simulation_sessions_user_case_session_idx
+on public.simulation_sessions (user_id, case_id, session_number, status);
 
 commit;
