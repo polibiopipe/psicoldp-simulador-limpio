@@ -82,7 +82,11 @@ export function ClinicalDashboard({
           label="Sesiones por retomar"
           value={resumableSessions.length}
           actionLabel="Ver sesiones"
-          onClick={resumableSessions.length ? () => onOpenAgenda?.(resumableSessions[0].caseItem.id) : null}
+          onClick={
+            resumableSessions.length
+              ? () => openItemSession({ item: resumableSessions[0], onPrepareCase, onStartSession })
+              : null
+          }
         />
         <DashboardMetric
           icon={ClipboardCheck}
@@ -172,7 +176,7 @@ export function ClinicalDashboard({
                   tone="session"
                   typeLabel="Sesion por retomar"
                   detail={item.nextFocus}
-                  actionLabel={item.completedSessions > 0 ? "Retomar sesion" : "Preparar caso"}
+                  actionLabel={item.draftRecord || item.completedSessions > 0 ? "Retomar sesion" : "Preparar caso"}
                   onAction={() => openItemSession({ item, onPrepareCase, onStartSession })}
                   onOpenRecord={() => onOpenAgenda?.(item.caseItem.id)}
                 />

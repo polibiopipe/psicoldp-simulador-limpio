@@ -176,6 +176,41 @@ export default function App() {
   function selectCase(caseId) {
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
+    const resumeRecord = findLatestResumableSessionRecord(sessionRecords, caseId);
+    if (resumeRecord) {
+      const resumeSession = Number(resumeRecord.sessionNumber) || 1;
+      const previousSummary = getPreviousSessionSummary({
+        caseId,
+        sessionNumber: resumeSession,
+        sessionSummaries: summaries
+      });
+      const latestSummary = summaries.at(-1);
+      const basePlan = buildBasePlanFromSummary(previousSummary || latestSummary);
+      const nextPlan = buildInitialPreSessionPlan({
+        caseItem: nextCase,
+        sessionNumber: resumeSession,
+        basePlan
+      });
+      console.log("[sessions] resume found", {
+        found: true,
+        recordId: resumeRecord.id,
+        caseId,
+        sessionNumber: resumeSession
+      });
+      console.log("[sessions] resume session id", resumeRecord.id);
+      console.log("[sessions] resume conversation length", resumeRecord.conversationHistory?.length || 0);
+      setSelectedCaseId(caseId);
+      setSessionNumber(resumeSession);
+      setSessionSummaries(summaries);
+      setSessionSummary(previousSummary);
+      setPreSessionPlan(nextPlan);
+      setHistory(resumeRecord.conversationHistory || []);
+      updateActiveSessionRecordId(resumeRecord.id);
+      setSaveStatus(null);
+      setScreen(screens.simulation);
+      return;
+    }
+
     const latestSummary = summaries.at(-1);
     const basePlan = latestSummary
       ? {
@@ -218,6 +253,10 @@ export default function App() {
       caseId,
       sessionNumber: safeSession
     });
+    if (resumeRecord) {
+      console.log("[sessions] resume session id", resumeRecord.id);
+      console.log("[sessions] resume conversation length", resumeRecord.conversationHistory?.length || 0);
+    }
 
     setSelectedCaseId(caseId);
     setSessionNumber(safeSession);
@@ -254,6 +293,10 @@ export default function App() {
       caseId: selectedCase.id,
       sessionNumber: session
     });
+    if (resumeRecord) {
+      console.log("[sessions] resume session id", resumeRecord.id);
+      console.log("[sessions] resume conversation length", resumeRecord.conversationHistory?.length || 0);
+    }
     setSessionNumber(session);
     setSessionSummary(summary);
     setPreSessionPlan(normalizedPlan);
@@ -748,6 +791,17 @@ function findResumableSessionRecord(records = [], caseId, sessionNumber) {
       record?.status === "in_progress" &&
       record.caseId === caseId &&
       Number(record.sessionNumber) === Number(sessionNumber) &&
+      Array.isArray(record.conversationHistory) &&
+      record.conversationHistory.length > 0
+    )
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())[0] || null;
+}
+
+function findLatestResumableSessionRecord(records = [], caseId) {
+  return records
+    .filter((record) =>
+      record?.status === "in_progress" &&
+      record.caseId === caseId &&
       Array.isArray(record.conversationHistory) &&
       record.conversationHistory.length > 0
     )
