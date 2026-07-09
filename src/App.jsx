@@ -9,6 +9,7 @@ import {
 } from "./engine/sessionMemory.js";
 import {
   buildSessionHistoryRecord,
+  getLatestInProgressSessionForCase,
   getSessionHistoryForUser,
   saveSessionHistory
 } from "./engine/sessionHistory.js";
@@ -173,41 +174,19 @@ export default function App() {
     setScreen(nextScreen);
   }
 
-  function selectCase(caseId) {
+  async function selectCase(caseId) {
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
-    const resumeRecord = findLatestResumableSessionRecord(sessionRecords, caseId);
+    const resumeRecord =
+      await getLatestInProgressSessionForCase(authSession, caseId) ||
+      findLatestResumableSessionRecord(sessionRecords, caseId);
     if (resumeRecord) {
-      const resumeSession = Number(resumeRecord.sessionNumber) || 1;
-      const previousSummary = getPreviousSessionSummary({
+      openResumeRecord({
         caseId,
-        sessionNumber: resumeSession,
-        sessionSummaries: summaries
+        nextCase,
+        summaries,
+        resumeRecord
       });
-      const latestSummary = summaries.at(-1);
-      const basePlan = buildBasePlanFromSummary(previousSummary || latestSummary);
-      const nextPlan = buildInitialPreSessionPlan({
-        caseItem: nextCase,
-        sessionNumber: resumeSession,
-        basePlan
-      });
-      console.log("[sessions] resume found", {
-        found: true,
-        recordId: resumeRecord.id,
-        caseId,
-        sessionNumber: resumeSession
-      });
-      console.log("[sessions] resume session id", resumeRecord.id);
-      console.log("[sessions] resume conversation length", resumeRecord.conversationHistory?.length || 0);
-      setSelectedCaseId(caseId);
-      setSessionNumber(resumeSession);
-      setSessionSummaries(summaries);
-      setSessionSummary(previousSummary);
-      setPreSessionPlan(nextPlan);
-      setHistory(resumeRecord.conversationHistory || []);
-      updateActiveSessionRecordId(resumeRecord.id);
-      setSaveStatus(null);
-      setScreen(screens.simulation);
       return;
     }
 
@@ -229,7 +208,7 @@ export default function App() {
     setScreen(screens.brief);
   }
 
-  function openCaseFromAgenda(caseId, targetSession = 1, nextScreen = screens.brief) {
+  async function openCaseFromAgenda(caseId, targetSession = 1, nextScreen = screens.brief) {
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
     const safeSession = Math.max(1, Number(targetSession) || 1);
@@ -246,16 +225,17 @@ export default function App() {
       basePlan
     });
     const processTotal = getProcessSessionTotal(nextPlan, summaries);
-    const resumeRecord = findResumableSessionRecord(sessionRecords, caseId, safeSession);
-    console.log("[sessions] resume found", {
-      found: Boolean(resumeRecord),
-      recordId: resumeRecord?.id || null,
-      caseId,
-      sessionNumber: safeSession
-    });
+    const resumeRecord =
+      await getLatestInProgressSessionForCase(authSession, caseId, safeSession) ||
+      findResumableSessionRecord(sessionRecords, caseId, safeSession);
     if (resumeRecord) {
-      console.log("[sessions] resume session id", resumeRecord.id);
-      console.log("[sessions] resume conversation length", resumeRecord.conversationHistory?.length || 0);
+      openResumeRecord({
+        caseId,
+        nextCase,
+        summaries,
+        resumeRecord
+      });
+      return;
     }
 
     setSelectedCaseId(caseId);
@@ -276,7 +256,7 @@ export default function App() {
     setScreen(nextScreen);
   }
 
-  function startSession(session, planOverride = null) {
+  async function startSession(session, planOverride = null) {
     const summary = getPreviousSessionSummary({
       caseId: selectedCase.id,
       sessionNumber: session,
@@ -286,16 +266,18 @@ export default function App() {
       caseItem: selectedCase,
       sessionNumber: session
     });
-    const resumeRecord = findResumableSessionRecord(sessionRecords, selectedCase.id, session);
-    console.log("[sessions] resume found", {
-      found: Boolean(resumeRecord),
-      recordId: resumeRecord?.id || null,
-      caseId: selectedCase.id,
-      sessionNumber: session
-    });
+    const resumeRecord =
+      await getLatestInProgressSessionForCase(authSession, selectedCase.id, session) ||
+      findResumableSessionRecord(sessionRecords, selectedCase.id, session);
     if (resumeRecord) {
-      console.log("[sessions] resume session id", resumeRecord.id);
-      console.log("[sessions] resume conversation length", resumeRecord.conversationHistory?.length || 0);
+      openResumeRecord({
+        caseId: selectedCase.id,
+        nextCase: selectedCase,
+        summaries: sessionSummaries,
+        resumeRecord,
+        preSessionPlanOverride: normalizedPlan
+      });
+      return;
     }
     setSessionNumber(session);
     setSessionSummary(summary);
@@ -310,6 +292,46 @@ export default function App() {
     );
     setSaveStatus(null);
     setScreen(screens.simulation);
+  }
+
+  function openResumeRecord({
+    caseId,
+    nextCase,
+    summaries,
+    resumeRecord,
+    preSessionPlanOverride = null
+  }) {
+    const resumeSession = Number(resumeRecord.sessionNumber) || 1;
+    const previousSummary = getPreviousSessionSummary({
+      caseId,
+      sessionNumber: resumeSession,
+      sessionSummaries: summaries
+    });
+    const latestSummary = summaries.at(-1);
+    const basePlan = buildBasePlanFromSummary(previousSummary || latestSummary);
+    const nextPlan =
+      preSessionPlanOverride ||
+      buildInitialPreSessionPlan({
+        caseItem: nextCase,
+        sessionNumber: resumeSession,
+        basePlan
+      });
+
+    console.log("[sessions] resume open chat", {
+      caseId,
+      sessionNumber: resumeSession,
+      recordId: resumeRecord.id
+    });
+    setSelectedCaseId(caseId);
+    setSessionNumber(resumeSession);
+    setSessionSummaries(summaries);
+    setSessionSummary(previousSummary);
+    setPreSessionPlan(nextPlan);
+    setHistory(resumeRecord.conversationHistory || []);
+    updateActiveSessionRecordId(resumeRecord.id);
+    setSaveStatus(null);
+    setScreen(screens.simulation);
+    setSessionRecords((current) => mergeSessionRecordList(current, resumeRecord));
   }
 
   function beginSessionFromPreparation(session, preparationState = {}) {

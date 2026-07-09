@@ -205,6 +205,64 @@ export async function getSessionHistoryForUser(authSession = null) {
   return (data || []).map(mapSupabaseRowToRecord);
 }
 
+export async function getLatestInProgressSessionForCase(authSession = null, caseId = "", sessionNumber = null) {
+  console.log("[sessions] resume query started", {
+    caseId,
+    sessionNumber: sessionNumber || null
+  });
+
+  if (!caseId) {
+    console.log("[sessions] resume found", false);
+    return null;
+  }
+
+  if (!isSupabaseConfigured || !supabase || !authSession?.user) {
+    const localRecord = getSessionHistory()
+      .filter((record) =>
+        record?.status === "in_progress" &&
+        record.caseId === caseId &&
+        (!sessionNumber || Number(record.sessionNumber) === Number(sessionNumber))
+      )
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())[0] || null;
+    console.log("[sessions] resume found", Boolean(localRecord));
+    if (localRecord) {
+      console.log("[sessions] resume session id", localRecord.id);
+      console.log("[sessions] resume conversation length", localRecord.conversationHistory?.length || 0);
+    }
+    return localRecord;
+  }
+
+  let query = supabase
+    .from("simulation_sessions")
+    .select("*")
+    .eq("user_id", authSession.user.id)
+    .eq("case_id", caseId)
+    .eq("status", "in_progress")
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  if (sessionNumber) {
+    query = query.eq("session_number", Number(sessionNumber));
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[sessions] resume error message", error.message);
+    console.error("[sessions] resume error code", error.code || null);
+    console.log("[sessions] resume found", false);
+    return null;
+  }
+
+  const record = data?.[0] ? mapSupabaseRowToRecord(data[0]) : null;
+  console.log("[sessions] resume found", Boolean(record));
+  if (record) {
+    console.log("[sessions] resume session id", record.id);
+    console.log("[sessions] resume conversation length", record.conversationHistory?.length || 0);
+  }
+  return record;
+}
+
 export async function deleteSessionHistory(sessionId, authSession = null) {
   if (isSupabaseConfigured && supabase && authSession?.user) {
     const { error } = await supabase
