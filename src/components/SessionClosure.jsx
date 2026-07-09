@@ -116,8 +116,15 @@ export function SessionClosure({
     normalizedClinicalDecision.action === "continue_session" &&
     Boolean(nextSessionNumber) &&
     normalizedClinicalDecision.proposedSessions > sessionNumber;
-  const isFinalSession = !canContinueInSimulator;
   const reachedSessionLimit = !nextSessionNumber;
+  const closureAction = getClosureActionConfig({
+    canContinueInSimulator,
+    normalizedClinicalDecision,
+    nextSessionNumber,
+    nextSessionStage,
+    plannedSessionTotal,
+    reachedSessionLimit
+  });
   const summary = useMemo(
     () =>
       buildSessionSummary({
@@ -164,6 +171,19 @@ export function SessionClosure({
       ...current,
       ...patch
     }));
+  }
+
+  function selectClinicalAction(action) {
+    const nextPatch = { action };
+    if (action === "continue_session") {
+      nextPatch.proposedSessions = Math.max(
+        Number(clinicalDecision.proposedSessions) || sessionNumber + 1,
+        sessionNumber + 1
+      );
+    } else {
+      nextPatch.proposedSessions = sessionNumber;
+    }
+    updateDecision(nextPatch);
   }
 
   function updateArtifacts(patch) {
@@ -527,7 +547,7 @@ export function SessionClosure({
                 name="clinical-decision-action"
                 value={option.value}
                 checked={normalizedClinicalDecision.action === option.value}
-                onChange={() => updateDecision({ action: option.value })}
+                onChange={() => selectClinicalAction(option.value)}
               />
               <span>
                 <strong>{option.label}</strong>
@@ -625,18 +645,8 @@ export function SessionClosure({
 
       <div className="continuity-callout">
         <div>
-          <h2>{canContinueInSimulator ? "Continuar segun tu decision" : "Guardar decision y cerrar"}</h2>
-          {canContinueInSimulator ? (
-            <p>
-              Puedes avanzar a {nextSessionStage.title.toLowerCase()} porque propusiste continuidad
-              dentro de las {plannedSessionTotal} sesiones propuestas.
-            </p>
-          ) : (
-            <p>
-              La sesion quedara guardada con tu decision de {formatClinicalDecision(normalizedClinicalDecision).toLowerCase()}.
-              {reachedSessionLimit ? " Ya llegaste a la ultima sesion del proceso que propusiste." : ""}
-            </p>
-          )} 
+          <h2>{closureAction.title}</h2>
+          <p>{closureAction.description}</p>
         </div>
         <PedagogicalGuide
           guideId="cierre_seguimiento"
@@ -647,63 +657,19 @@ export function SessionClosure({
         <div className="closure-actions">
           {canContinueInSimulator ? (
             <button className="primary-action" type="button" onClick={() => setModalOpen(true)}>
-              Continuar a sesion {nextSessionNumber}
+              {closureAction.primaryLabel}
               <ArrowRight aria-hidden="true" />
             </button>
           ) : (
             <button className="primary-action" type="button" onClick={backHomeAfterSave}>
               <Home aria-hidden="true" />
-              Guardar y volver al inicio
+              {closureAction.primaryLabel}
             </button>
           )}
           <button className="secondary-action" type="button" onClick={copyProcessSummary}>
             <Clipboard aria-hidden="true" />
             {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
           </button>
-          <button className="secondary-action" type="button" onClick={copyCurrentSummary}>
-            <Clipboard aria-hidden="true" />
-            {copied ? "Resumen copiado" : "Copiar resumen"}
-          </button>
-          <button className="secondary-action" type="button" onClick={backHomeAfterSave}>
-            <Home aria-hidden="true" />
-            Volver al inicio
-          </button>
-        </div>
-      </div>
-
-      <div className="continuity-callout" hidden>
-        <div>
-          <h2>{canContinueInSimulator ? "Continuar segun tu decision" : "Guardar decision y cerrar"}</h2>
-          {isFinalSession ? (
-            <p>
-              Has completado las sesiones simuladas de tu plan. Puedes copiar una sintesis del
-              proceso formativo o volver al inicio para trabajar otro caso.
-            </p>
-          ) : (
-            <p>
-              Puedes continuar con {nextSessionStage.title.toLowerCase()} para retomar
-              los temas abiertos y trabajar el foco: {nextSessionStage.focus}
-            </p>
-          )}
-        </div>
-        <div className="closure-actions">
-          {isFinalSession ? (
-            <>
-              <button className="primary-action" type="button" onClick={backHomeAfterSave}>
-                <Home aria-hidden="true" />
-                Finalizar proceso formativo
-              </button>
-              <button className="secondary-action" type="button" onClick={copyProcessSummary}>
-                <Clipboard aria-hidden="true" />
-                {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
-              </button>
-            </>
-          ) : (
-            <button className="primary-action" type="button" onClick={() => setModalOpen(true)}>
-              Continuar a sesión {nextSessionNumber}
-              <ArrowRight aria-hidden="true" />
-            </button>
-          )}
           <button className="secondary-action" type="button" onClick={copyCurrentSummary}>
             <Clipboard aria-hidden="true" />
             {copied ? "Resumen copiado" : "Copiar resumen"}
@@ -772,4 +738,71 @@ export function SessionClosure({
       />
     </section>
   );
+}
+
+function getClosureActionConfig({
+  canContinueInSimulator,
+  normalizedClinicalDecision,
+  nextSessionNumber,
+  nextSessionStage,
+  plannedSessionTotal,
+  reachedSessionLimit
+}) {
+  if (canContinueInSimulator) {
+    return {
+      title: "Continuar segun tu decision",
+      description: `Puedes avanzar a ${nextSessionStage?.title?.toLowerCase() || "la siguiente sesion"} porque propusiste continuidad dentro de las ${plannedSessionTotal} sesiones propuestas.`,
+      primaryLabel: `Continuar a sesion ${nextSessionNumber}`
+    };
+  }
+
+  const suffix = reachedSessionLimit ? " Ya llegaste a la ultima sesion del proceso que propusiste." : "";
+  const configs = {
+    close_process: {
+      title: "Cerrar proceso simulado",
+      description: `La sesion quedara guardada como cierre del proceso simulado.${suffix}`,
+      primaryLabel: "Cerrar proceso y volver al inicio"
+    },
+    refer: {
+      title: "Registrar derivacion",
+      description: "La sesion quedara guardada con una decision de derivacion. Revisa que la justificacion indique el motivo y el dispositivo sugerido.",
+      primaryLabel: "Registrar derivacion y finalizar sesion"
+    },
+    risk_protocol: {
+      title: "Registrar protocolo de riesgo",
+      description: "La prioridad formativa es dejar registrada la decision de seguridad, supervisar el caso y no avanzar automaticamente a otra sesion.",
+      primaryLabel: "Registrar protocolo de riesgo"
+    },
+    request_supervision: {
+      title: "Registrar solicitud de supervision",
+      description: "La sesion quedara guardada para revision docente o supervision antes de tomar una nueva decision clinica.",
+      primaryLabel: "Registrar solicitud de supervision"
+    },
+    apply_instruments: {
+      title: "Registrar evaluacion complementaria",
+      description: "La sesion quedara guardada indicando que se requieren instrumentos o evaluacion complementaria antes de continuar.",
+      primaryLabel: "Registrar evaluacion complementaria"
+    },
+    initial_feedback: {
+      title: "Guardar devolucion inicial",
+      description: "La sesion quedara guardada con una decision de devolucion inicial, sin forzar avance automatico a una nueva sesion.",
+      primaryLabel: "Guardar devolucion inicial"
+    },
+    follow_up: {
+      title: "Guardar recomendacion de seguimiento",
+      description: "La sesion quedara guardada con recomendacion de seguimiento y monitoreo segun lo observado.",
+      primaryLabel: "Guardar recomendacion de seguimiento"
+    },
+    beyond_simulator: {
+      title: "Registrar continuidad extendida",
+      description: "La sesion quedara guardada indicando que el caso requiere continuidad mas alla del ciclo disponible en el simulador.",
+      primaryLabel: "Registrar continuidad extendida"
+    }
+  };
+
+  return configs[normalizedClinicalDecision.action] || {
+    title: "Guardar decision y cerrar",
+    description: `La sesion quedara guardada con tu decision de ${formatClinicalDecision(normalizedClinicalDecision).toLowerCase()}.${suffix}`,
+    primaryLabel: "Guardar decision y volver al inicio"
+  };
 }
