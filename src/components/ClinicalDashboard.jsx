@@ -13,6 +13,7 @@ import { buildClinicalAgendaItems, formatAgendaDate } from "../engine/clinicalAg
 
 export function ClinicalDashboard({
   cases,
+  sessionRecords = [],
   userEmail,
   onOpenCases,
   onOpenAgenda,
@@ -21,12 +22,24 @@ export function ClinicalDashboard({
   onStartSession
 }) {
   const agendaItems = useMemo(() => buildClinicalAgendaItems(cases), [cases]);
-  const activeItems = agendaItems.filter((item) => item.completedSessions > 0 || item.agendaEntry);
+  const draftSessionItems = useMemo(
+    () => buildDraftSessionItems({ sessionRecords, cases, agendaItems }),
+    [sessionRecords, cases, agendaItems]
+  );
+  const agendaActiveItems = agendaItems.filter((item) => item.completedSessions > 0 || item.agendaEntry);
+  const activeItems = [
+    ...draftSessionItems,
+    ...agendaActiveItems.filter((item) => !draftSessionItems.some((draft) => draft.caseItem.id === item.caseItem.id))
+  ];
   const pendingNotes = agendaItems.filter((item) => item.noteStatus.status === "pending");
   const pendingTasks = agendaItems.filter((item) => item.task?.description);
   const riskItems = agendaItems.filter((item) => item.risk.status === "open");
-  const resumableSessions = agendaItems.filter(isResumableSession);
+  const resumableSessions = [
+    ...draftSessionItems,
+    ...agendaItems.filter((item) => !draftSessionItems.some((draft) => draft.caseItem.id === item.caseItem.id) && isResumableSession(item))
+  ];
   const nextItem =
+    draftSessionItems[0] ||
     agendaItems.find((item) => item.nextSessionNumber && (item.completedSessions > 0 || item.agendaEntry)) ||
     agendaItems.find((item) => item.caseItem.id === "claudio") ||
     agendaItems[0];
@@ -69,7 +82,11 @@ export function ClinicalDashboard({
           label="Sesiones por retomar"
           value={resumableSessions.length}
           actionLabel="Ver sesiones"
-          onClick={resumableSessions.length ? () => onOpenAgenda?.(resumableSessions[0].caseItem.id) : null}
+          onClick={
+            resumableSessions.length
+              ? () => openItemSession({ item: resumableSessions[0], onPrepareCase, onStartSession })
+              : null
+          }
         />
         <DashboardMetric
           icon={ClipboardCheck}
@@ -124,14 +141,10 @@ export function ClinicalDashboard({
                 <button
                   className="primary-action"
                   type="button"
-                  onClick={() =>
-                    nextItem.completedSessions > 0
-                      ? onStartSession(nextItem.caseItem.id, nextItem.nextSessionNumber || 1)
-                      : onPrepareCase(nextItem.caseItem.id, nextItem.nextSessionNumber || 1)
-                  }
+                  onClick={() => openItemSession({ item: nextItem, onPrepareCase, onStartSession })}
                 >
                   <Play aria-hidden="true" />
-                  {nextItem.completedSessions > 0 ? "Retomar sesion" : "Preparar caso"}
+                  {nextItem.draftRecord || nextItem.completedSessions > 0 ? "Retomar sesion" : "Preparar caso"}
                 </button>
                 <button className="secondary-action" type="button" onClick={() => onOpenAgenda?.(nextItem.caseItem.id)}>
                   Ver registro
@@ -163,7 +176,7 @@ export function ClinicalDashboard({
                   tone="session"
                   typeLabel="Sesion por retomar"
                   detail={item.nextFocus}
-                  actionLabel={item.completedSessions > 0 ? "Retomar sesion" : "Preparar caso"}
+                  actionLabel={item.draftRecord || item.completedSessions > 0 ? "Retomar sesion" : "Preparar caso"}
                   onAction={() => openItemSession({ item, onPrepareCase, onStartSession })}
                   onOpenRecord={() => onOpenAgenda?.(item.caseItem.id)}
                 />
@@ -339,6 +352,10 @@ function isResumableSession(item) {
 }
 
 function openItemSession({ item, onPrepareCase, onStartSession }) {
+  if (item.draftRecord) {
+    onStartSession?.(item.caseItem.id, item.nextSessionNumber || item.draftRecord.sessionNumber || 1);
+    return;
+  }
   const targetSession = item.nextSessionNumber || item.latestSummary?.sessionNumber || 1;
   if (item.completedSessions > 0 && item.nextSessionNumber) {
     onStartSession?.(item.caseItem.id, targetSession);
@@ -362,4 +379,52 @@ function orderFeaturedCases(cases) {
     if (bIndex === -1) return -1;
     return aIndex - bIndex;
   });
+}
+
+function buildDraftSessionItems({ sessionRecords = [], cases = [], agendaItems = [] }) {
+  const latestDrafts = new Map();
+  for (const record of sessionRecords) {
+    if (!isDraftSessionRecord(record)) continue;
+    const key = `${record.caseId}:${record.sessionNumber || 1}`;
+    const current = latestDrafts.get(key);
+    const currentTime = current ? new Date(current.updatedAt || current.createdAt).getTime() : 0;
+    const nextTime = new Date(record.updatedAt || record.createdAt).getTime();
+    if (!current || nextTime >= currentTime) latestDrafts.set(key, record);
+  }
+
+  return Array.from(latestDrafts.values())
+    .map((record) => {
+      const caseItem = cases.find((candidate) => candidate.id === record.caseId);
+      if (!caseItem) return null;
+      const agendaItem = agendaItems.find((item) => item.caseItem.id === record.caseId);
+      const sessionNumber = Number(record.sessionNumber) || 1;
+
+      return {
+        ...(agendaItem || {}),
+        caseItem,
+        draftRecord: record,
+        latestSummary: record.sessionSummary || agendaItem?.latestSummary || null,
+        completedSessions: agendaItem?.completedSessions || 0,
+        plannedSessions: agendaItem?.plannedSessions || 4,
+        nextSessionNumber: sessionNumber,
+        nextSessionLabel: `Sesion ${sessionNumber} en curso`,
+        processState: "Sesion por retomar",
+        noteStatus: agendaItem?.noteStatus || { status: "ok", label: "Sin nota pendiente" },
+        task: agendaItem?.task || null,
+        risk: agendaItem?.risk || { status: "closed", label: "Sin alertas abiertas" },
+        nextFocus: record.summary?.brief || "Continuar conversacion guardada",
+        agendaEntry: agendaItem?.agendaEntry || null
+      };
+    })
+    .filter(Boolean);
+}
+
+function isDraftSessionRecord(record) {
+  return (
+    record?.status === "in_progress" &&
+    record.caseId &&
+    Number(record.sessionNumber) >= 1 &&
+    Array.isArray(record.conversationHistory) &&
+    record.conversationHistory.length > 0
+  );
 }

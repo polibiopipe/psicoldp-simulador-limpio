@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { cases, difficultyOptions } from "./data/cases.js";
 import { createPatientResponse } from "./utils/responseEngine.js";
 import { buildEducationalReport } from "./utils/scoring.js";
@@ -7,7 +7,12 @@ import {
   getSessionSummariesForCase,
   mergeSessionSummaryList
 } from "./engine/sessionMemory.js";
-import { buildSessionHistoryRecord, saveSessionHistory } from "./engine/sessionHistory.js";
+import {
+  buildSessionHistoryRecord,
+  getLatestInProgressSessionForCase,
+  getSessionHistoryForUser,
+  saveSessionHistory
+} from "./engine/sessionHistory.js";
 import {
   SESSION_COUNT_LIMITS,
   buildInitialPreSessionPlan,
@@ -69,6 +74,9 @@ export default function App() {
   });
   const [saveStatus, setSaveStatus] = useState(null);
   const [agendaFocusCaseId, setAgendaFocusCaseId] = useState("");
+  const [sessionRecords, setSessionRecords] = useState([]);
+  const [activeSessionRecordId, setActiveSessionRecordId] = useState("");
+  const activeSessionRecordIdRef = useRef("");
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
   const report = useMemo(() => buildEducationalReport(history, selectedCase), [history, selectedCase]);
@@ -80,6 +88,18 @@ export default function App() {
     () => getAvailableSessionNumbers(sessionSummaries, sessionTotal),
     [sessionSummaries, sessionTotal]
   );
+
+  function updateActiveSessionRecordId(nextId = "") {
+    activeSessionRecordIdRef.current = nextId;
+    setActiveSessionRecordId(nextId);
+  }
+
+  function getOrCreateActiveSessionRecordId() {
+    if (activeSessionRecordIdRef.current) return activeSessionRecordIdRef.current;
+    const nextId = crypto.randomUUID();
+    updateActiveSessionRecordId(nextId);
+    return nextId;
+  }
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -131,14 +151,45 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (approvalState.status !== "approved" || !authSession?.user) {
+      setSessionRecords([]);
+      return;
+    }
+
+    let cancelled = false;
+    getSessionHistoryForUser(authSession).then((records) => {
+      if (cancelled) return;
+      setSessionRecords(records);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [approvalState.status, authSession?.user?.id]);
+
   function resetConversation(nextScreen = screens.brief) {
     setHistory(sessionNumber > 1 ? [createSessionPrelude(selectedCase, sessionNumber, sessionSummary, sessionTotal)] : []);
+    updateActiveSessionRecordId("");
     setScreen(nextScreen);
   }
 
-  function selectCase(caseId) {
+  async function selectCase(caseId) {
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
+    const resumeRecord =
+      await getLatestInProgressSessionForCase(authSession, caseId) ||
+      findLatestResumableSessionRecord(sessionRecords, caseId);
+    if (resumeRecord) {
+      openResumeRecord({
+        caseId,
+        nextCase,
+        summaries,
+        resumeRecord
+      });
+      return;
+    }
+
     const latestSummary = summaries.at(-1);
     const basePlan = latestSummary
       ? {
@@ -153,10 +204,11 @@ export default function App() {
     setSessionSummary(null);
     setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: nextCase, sessionNumber: 1, basePlan }));
     setHistory([]);
+    updateActiveSessionRecordId("");
     setScreen(screens.brief);
   }
 
-  function openCaseFromAgenda(caseId, targetSession = 1, nextScreen = screens.brief) {
+  async function openCaseFromAgenda(caseId, targetSession = 1, nextScreen = screens.brief) {
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
     const safeSession = Math.max(1, Number(targetSession) || 1);
@@ -173,6 +225,18 @@ export default function App() {
       basePlan
     });
     const processTotal = getProcessSessionTotal(nextPlan, summaries);
+    const resumeRecord =
+      await getLatestInProgressSessionForCase(authSession, caseId, safeSession) ||
+      findResumableSessionRecord(sessionRecords, caseId, safeSession);
+    if (resumeRecord) {
+      openResumeRecord({
+        caseId,
+        nextCase,
+        summaries,
+        resumeRecord
+      });
+      return;
+    }
 
     setSelectedCaseId(caseId);
     setSessionNumber(safeSession);
@@ -180,15 +244,19 @@ export default function App() {
     setSessionSummary(previousSummary);
     setPreSessionPlan(nextPlan);
     setSaveStatus(null);
-    setHistory(
-      nextScreen === screens.simulation && safeSession > 1
-        ? [createSessionPrelude(nextCase, safeSession, previousSummary, processTotal)]
-        : []
-    );
+    updateActiveSessionRecordId(nextScreen === screens.simulation && resumeRecord ? resumeRecord.id : "");
+    setHistory(resolveInitialHistoryForSession({
+      nextScreen,
+      safeSession,
+      nextCase,
+      previousSummary,
+      processTotal,
+      resumeRecord
+    }));
     setScreen(nextScreen);
   }
 
-  function startSession(session, planOverride = null) {
+  async function startSession(session, planOverride = null) {
     const summary = getPreviousSessionSummary({
       caseId: selectedCase.id,
       sessionNumber: session,
@@ -198,12 +266,72 @@ export default function App() {
       caseItem: selectedCase,
       sessionNumber: session
     });
+    const resumeRecord =
+      await getLatestInProgressSessionForCase(authSession, selectedCase.id, session) ||
+      findResumableSessionRecord(sessionRecords, selectedCase.id, session);
+    if (resumeRecord) {
+      openResumeRecord({
+        caseId: selectedCase.id,
+        nextCase: selectedCase,
+        summaries: sessionSummaries,
+        resumeRecord,
+        preSessionPlanOverride: normalizedPlan
+      });
+      return;
+    }
     setSessionNumber(session);
     setSessionSummary(summary);
     setPreSessionPlan(normalizedPlan);
-    setHistory(session > 1 ? [createSessionPrelude(selectedCase, session, summary, sessionTotal)] : []);
+    updateActiveSessionRecordId(resumeRecord?.id || "");
+    setHistory(
+      resumeRecord?.conversationHistory?.length
+        ? resumeRecord.conversationHistory
+        : session > 1
+          ? [createSessionPrelude(selectedCase, session, summary, sessionTotal)]
+          : []
+    );
     setSaveStatus(null);
     setScreen(screens.simulation);
+  }
+
+  function openResumeRecord({
+    caseId,
+    nextCase,
+    summaries,
+    resumeRecord,
+    preSessionPlanOverride = null
+  }) {
+    const resumeSession = Number(resumeRecord.sessionNumber) || 1;
+    const previousSummary = getPreviousSessionSummary({
+      caseId,
+      sessionNumber: resumeSession,
+      sessionSummaries: summaries
+    });
+    const latestSummary = summaries.at(-1);
+    const basePlan = buildBasePlanFromSummary(previousSummary || latestSummary);
+    const nextPlan =
+      preSessionPlanOverride ||
+      buildInitialPreSessionPlan({
+        caseItem: nextCase,
+        sessionNumber: resumeSession,
+        basePlan
+      });
+
+    console.log("[sessions] resume open chat", {
+      caseId,
+      sessionNumber: resumeSession,
+      recordId: resumeRecord.id
+    });
+    setSelectedCaseId(caseId);
+    setSessionNumber(resumeSession);
+    setSessionSummaries(summaries);
+    setSessionSummary(previousSummary);
+    setPreSessionPlan(nextPlan);
+    setHistory(resumeRecord.conversationHistory || []);
+    updateActiveSessionRecordId(resumeRecord.id);
+    setSaveStatus(null);
+    setScreen(screens.simulation);
+    setSessionRecords((current) => mergeSessionRecordList(current, resumeRecord));
   }
 
   function beginSessionFromPreparation(session, preparationState = {}) {
@@ -259,6 +387,7 @@ export default function App() {
       })
     );
     setHistory([createSessionPrelude(selectedCase, nextSession, summary, processTotal)]);
+    updateActiveSessionRecordId("");
     setScreen(screens.simulation);
   }
 
@@ -273,6 +402,7 @@ export default function App() {
         }
       : null;
     setHistory([]);
+    updateActiveSessionRecordId("");
     setSessionNumber(1);
     setSessionSummary(null);
     setSessionSummaries(summaries);
@@ -282,6 +412,32 @@ export default function App() {
   }
 
   async function handleAsk(question, selectedInterventionType = "", conversationContext = {}) {
+    const turnId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const sessionRecordId = getOrCreateActiveSessionRecordId();
+    const pendingEntry = {
+      id: turnId,
+      question,
+      answer: "",
+      responseId: "pending-patient-response",
+      analysis: null,
+      patientState: null,
+      responseCategory: "pending",
+      interventionType: selectedInterventionType,
+      guidedIntervention: null,
+      conversationStage: conversationContext.conversationStage
+        ? {
+            sessionNumber,
+            stageName: conversationContext.conversationStage.stageName,
+            stageLabel: conversationContext.conversationStage.stageLabel
+          }
+        : null,
+      createdAt,
+      isPendingResponse: true
+    };
+    const pendingHistory = [...history, pendingEntry];
+    await persistSessionProgress(pendingHistory, { recordId: sessionRecordId });
+
     const response = await createPatientResponse({
       caseItem: selectedCase,
       difficulty,
@@ -293,10 +449,8 @@ export default function App() {
       conversationStage: conversationContext.conversationStage || null
     });
 
-    setHistory((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
+    const nextEntry = {
+        id: turnId,
         question,
         answer: response.text,
         responseId: response.responseId,
@@ -312,11 +466,34 @@ export default function App() {
               stageLabel: response.guidedIntervention.stageLabel
             }
           : null,
-        createdAt: new Date().toISOString()
-      }
-    ]);
+        createdAt
+      };
+    const nextHistory = [...history, nextEntry];
+    setHistory(nextHistory);
+    void persistSessionProgress(nextHistory, { recordId: sessionRecordId });
 
     return response.text;
+  }
+
+  async function persistSessionProgress(nextHistory, { recordId = "" } = {}) {
+    const nextRecordId = recordId || getOrCreateActiveSessionRecordId();
+    const liveReport = buildEducationalReport(nextHistory, selectedCase);
+    const sessionRecord = buildSessionHistoryRecord({
+      id: nextRecordId,
+      caseItem: selectedCase,
+      history: nextHistory,
+      report: liveReport,
+      sessionNumber,
+      preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
+      status: "in_progress"
+    });
+
+    const saveResult = await saveSessionHistory(sessionRecord);
+    setSessionRecords((current) => mergeSessionRecordList(current, sessionRecord));
+    if (!saveResult.cloudSaved && saveResult.error) {
+      console.warn("[sessions] save error message", saveResult.error?.message || saveResult.error);
+      console.warn("[sessions] save error code", saveResult.error?.code || null);
+    }
   }
 
   async function finishSession() {
@@ -334,6 +511,7 @@ export default function App() {
       message: "Guardando sesion..."
     });
     const sessionRecord = buildSessionHistoryRecord({
+      id: activeSessionRecordIdRef.current || "",
       caseItem: selectedCase,
       history,
       report,
@@ -341,9 +519,12 @@ export default function App() {
       preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
       clinicalArtifacts,
       clinicalDecision,
-      clinicalPlanEvaluation
+      clinicalPlanEvaluation,
+      status: "completed"
     });
     const saveResult = await saveSessionHistory(sessionRecord);
+    setSessionRecords((current) => mergeSessionRecordList(current, sessionRecord));
+    updateActiveSessionRecordId("");
     if (saveResult.cloudSaved) {
       setSaveStatus({
         type: "success",
@@ -371,6 +552,7 @@ export default function App() {
       await supabase.auth.signOut();
     }
     setHistory([]);
+    updateActiveSessionRecordId("");
     setSessionNumber(1);
     setSessionSummary(null);
     setAuthSession(null);
@@ -492,6 +674,7 @@ export default function App() {
       {screen === screens.home && (
         <ClinicalDashboard
           cases={cases}
+          sessionRecords={sessionRecords}
           userEmail={userEmail}
           onOpenCases={() => setScreen(screens.select)}
           onOpenAgenda={openClinicalAgenda}
@@ -622,6 +805,60 @@ function buildBasePlanFromSummary(summary) {
     proposedSessionCount:
       summary.clinicalDecision?.proposedSessions || summary.preSessionPlan?.proposedSessionCount
   };
+}
+
+function findResumableSessionRecord(records = [], caseId, sessionNumber) {
+  return records
+    .filter((record) =>
+      record?.status === "in_progress" &&
+      record.caseId === caseId &&
+      Number(record.sessionNumber) === Number(sessionNumber) &&
+      Array.isArray(record.conversationHistory) &&
+      record.conversationHistory.length > 0
+    )
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())[0] || null;
+}
+
+function findLatestResumableSessionRecord(records = [], caseId) {
+  return records
+    .filter((record) =>
+      record?.status === "in_progress" &&
+      record.caseId === caseId &&
+      Array.isArray(record.conversationHistory) &&
+      record.conversationHistory.length > 0
+    )
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())[0] || null;
+}
+
+function resolveInitialHistoryForSession({
+  nextScreen,
+  safeSession,
+  nextCase,
+  previousSummary,
+  processTotal,
+  resumeRecord
+}) {
+  if (nextScreen === screens.simulation && resumeRecord?.conversationHistory?.length) {
+    return resumeRecord.conversationHistory;
+  }
+  if (nextScreen === screens.simulation && safeSession > 1) {
+    return [createSessionPrelude(nextCase, safeSession, previousSummary, processTotal)];
+  }
+  return [];
+}
+
+function mergeSessionRecordList(records = [], nextRecord = null) {
+  if (!nextRecord?.id) return records;
+  const merged = new Map();
+  for (const record of [...records, nextRecord].filter(Boolean)) {
+    const current = merged.get(record.id);
+    const currentTime = current ? new Date(current.updatedAt || current.createdAt).getTime() : 0;
+    const nextTime = new Date(record.updatedAt || record.createdAt).getTime();
+    if (!current || nextTime >= currentTime) merged.set(record.id, record);
+  }
+  return Array.from(merged.values()).sort(
+    (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+  );
 }
 
 function createSessionPrelude(caseItem, sessionNumber, summary, totalSessions = SESSION_COUNT_LIMITS.defaultValue) {
