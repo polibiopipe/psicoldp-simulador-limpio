@@ -562,6 +562,13 @@ export function SessionClosure({
           ))}
         </div>
 
+        {normalizedClinicalDecision.action === "continue_session" && (
+          <div className="session-note" role="status">
+            Primero se guardar&aacute; el acuerdo de continuidad. La sesi&oacute;n {nextSessionNumber || 2} podr&aacute;
+            iniciarse despu&eacute;s como acci&oacute;n opcional.
+          </div>
+        )}
+
         <div className="clinical-plan-form">
           <label>
             <span>Cantidad de sesiones que propones para este caso</span>
