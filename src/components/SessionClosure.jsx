@@ -48,6 +48,7 @@ export function SessionClosure({
   preSessionPlan = null,
   onContinueSession,
   onBackHome,
+  onRequestExit,
   onSaveSessionRecord
 }) {
   const [copied, setCopied] = useState(false);
@@ -235,6 +236,14 @@ export function SessionClosure({
 
   async function backHomeAfterSave() {
     await saveCurrentSummary({ includeHistory: true });
+    onBackHome();
+  }
+
+  function requestBackHomeWithoutDecision() {
+    if (onRequestExit) {
+      onRequestExit("home");
+      return;
+    }
     onBackHome();
   }
 
@@ -716,7 +725,7 @@ export function SessionClosure({
             {copied ? "Resumen copiado" : "Copiar resumen"}
           </button>
           {!(canContinueInSimulator && hasSavedContinuityAgreement) && (
-          <button className="secondary-action" type="button" onClick={backHomeAfterSave}>
+          <button className="secondary-action" type="button" onClick={requestBackHomeWithoutDecision}>
             <Home aria-hidden="true" />
             Volver al inicio
           </button>

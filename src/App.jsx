@@ -623,11 +623,20 @@ export default function App() {
   }
 
   function navigateWorkspace(targetScreen) {
+    requestExitFromResults(targetScreen);
+  }
+
+  function requestExitFromResults(destination = screens.home, exitAction = null) {
     if (shouldWarnBeforeLeavingResults()) {
-      setPendingResultsExit({ targetScreen });
-      return;
+      setPendingResultsExit({ targetScreen: destination, exitAction });
+      return false;
     }
-    performWorkspaceNavigation(targetScreen);
+    if (typeof exitAction === "function") {
+      exitAction();
+      return true;
+    }
+    performWorkspaceNavigation(destination);
+    return true;
   }
 
   function performWorkspaceNavigation(targetScreen) {
@@ -657,9 +666,14 @@ export default function App() {
   }
 
   async function leaveResultsWithPendingClosure() {
-    const targetScreen = pendingResultsExit?.targetScreen || screens.home;
+    const exitRequest = pendingResultsExit;
+    const targetScreen = exitRequest?.targetScreen || screens.home;
     await saveClosurePendingSession();
     setPendingResultsExit(null);
+    if (typeof exitRequest?.exitAction === "function") {
+      exitRequest.exitAction();
+      return;
+    }
     performWorkspaceNavigation(targetScreen);
   }
 
@@ -821,7 +835,7 @@ export default function App() {
             <div className={`save-status ${saveStatus.type}`}>
               {saveStatus.message}
               {saveStatus.type === "success" && (
-                <button className="secondary-action" type="button" onClick={() => setScreen(screens.savedSessions)}>
+                <button className="secondary-action" type="button" onClick={() => requestExitFromResults(screens.savedSessions)}>
                   Ver Mis sesiones
                 </button>
               )}
@@ -833,12 +847,10 @@ export default function App() {
             caseItem={selectedCase}
             history={history}
             sessionNumber={sessionNumber}
-            onRestart={() => resetConversation(screens.simulation)}
-            onSelectCase={() =>
-              shouldWarnBeforeLeavingResults()
-                ? setPendingResultsExit({ targetScreen: screens.select })
-                : setScreen(screens.select)
+            onRestart={() =>
+              requestExitFromResults(screens.simulation, () => resetConversation(screens.simulation))
             }
+            onSelectCase={() => requestExitFromResults(screens.select)}
           />
           <SessionClosure
             caseItem={selectedCase}
@@ -850,6 +862,7 @@ export default function App() {
             preSessionPlan={normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber })}
             onContinueSession={advanceToNextSession}
             onBackHome={goHome}
+            onRequestExit={requestExitFromResults}
             onSaveSessionRecord={saveCompletedSession}
           />
         </section>
@@ -865,15 +878,14 @@ export default function App() {
             aria-labelledby="closure-pending-title"
           >
             <span className="eyebrow">Cierre pendiente</span>
-            <h2 id="closure-pending-title">Aun falta registrar tu decision clinica</h2>
+            <h2 id="closure-pending-title">Falta registrar la decisión clínica</h2>
             <p>
-              La entrevista ya llego a resultados, pero todavia no has registrado si
-              corresponde cerrar, continuar, derivar o dejar seguimiento. Puedes volver
-              al cierre o salir dejando esta sesion marcada como cierre pendiente.
+              Puedes volver y completar la decisión, o dejar el cierre pendiente para
+              retomarlo después.
             </p>
             <div className="modal-actions">
               <button className="primary-action" type="button" onClick={cancelResultsExit}>
-                Volver y registrar decision
+                Volver y registrar decisión
               </button>
               <button className="secondary-action" type="button" onClick={leaveResultsWithPendingClosure}>
                 Salir y dejar pendiente
@@ -907,7 +919,7 @@ function buildBasePlanFromSummary(summary) {
 function findResumableSessionRecord(records = [], caseId, sessionNumber) {
   return records
     .filter((record) =>
-      record?.status === "in_progress" &&
+      ["in_progress", "closure_pending"].includes(record?.status) &&
       record.caseId === caseId &&
       Number(record.sessionNumber) === Number(sessionNumber) &&
       Array.isArray(record.conversationHistory) &&
@@ -919,7 +931,7 @@ function findResumableSessionRecord(records = [], caseId, sessionNumber) {
 function findLatestResumableSessionRecord(records = [], caseId) {
   return records
     .filter((record) =>
-      record?.status === "in_progress" &&
+      ["in_progress", "closure_pending"].includes(record?.status) &&
       record.caseId === caseId &&
       Array.isArray(record.conversationHistory) &&
       record.conversationHistory.length > 0
