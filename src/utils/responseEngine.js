@@ -51,6 +51,17 @@ export async function createPatientResponse({
     conversationStage
   });
 
+  if (geminiResponse?.recoverableError) {
+    const error = new Error(
+      geminiResponse.fallbackReason ||
+        "No pudimos obtener la respuesta del paciente. Tu intervención está guardada."
+    );
+    error.code = "PATIENT_RESPONSE_RETRYABLE";
+    error.errorType = geminiResponse.errorType || "unknown";
+    error.retryAvailable = true;
+    throw error;
+  }
+
   if (geminiResponse?.text) {
     const localMetadata = createLocalPatientResponse({
       caseItem,
@@ -250,9 +261,11 @@ async function requestGeminiPatientResponse({
       ? "Function request timed out"
       : error?.message || "Function request failed";
     return {
-      source: "local",
+      source: "error",
       text: "",
-      fallbackReason
+      fallbackReason,
+      errorType: error?.name === "AbortError" ? "timeout" : "network",
+      recoverableError: true
     };
   } finally {
     globalThis.clearTimeout(timeout);

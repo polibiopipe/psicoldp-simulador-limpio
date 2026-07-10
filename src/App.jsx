@@ -72,6 +72,7 @@ export default function App() {
     profile: null,
     error: null
   });
+  const [connectionNotice, setConnectionNotice] = useState("");
   const [saveStatus, setSaveStatus] = useState(null);
   const [closureSaveState, setClosureSaveState] = useState("idle");
   const [pendingResultsExit, setPendingResultsExit] = useState(null);
@@ -79,6 +80,7 @@ export default function App() {
   const [sessionRecords, setSessionRecords] = useState([]);
   const [activeSessionRecordId, setActiveSessionRecordId] = useState("");
   const activeSessionRecordIdRef = useRef("");
+  const approvalStateRef = useRef(approvalState);
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
   const report = useMemo(() => buildEducationalReport(history, selectedCase), [history, selectedCase]);
@@ -104,6 +106,40 @@ export default function App() {
   }
 
   useEffect(() => {
+    approvalStateRef.current = approvalState;
+  }, [approvalState]);
+
+  async function verifyApprovalForUser(user, { preserveActiveAccess = true } = {}) {
+    if (!user) return;
+    const hadApprovedAccess = preserveActiveAccess && approvalStateRef.current.status === "approved";
+    if (!hadApprovedAccess) {
+      setAuthLoading(true);
+      setApprovalState({ status: "checking", profile: null, error: null });
+    }
+
+    const nextApprovalState = await getOrCreateUserApproval(user);
+    const shouldPreserveActiveAccess =
+      hadApprovedAccess &&
+      (
+        nextApprovalState.status === "transient_error" ||
+        (nextApprovalState.status === "error" && !["not_found", "configuration"].includes(nextApprovalState.errorType))
+      );
+
+    if (shouldPreserveActiveAccess) {
+      setConnectionNotice(
+        nextApprovalState.error ||
+          "Sin conexión. Conservaremos tu sesión mientras recuperamos el acceso."
+      );
+      setAuthLoading(false);
+      return;
+    }
+
+    setConnectionNotice("");
+    setApprovalState(nextApprovalState);
+    setAuthLoading(false);
+  }
+
+  useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
       setAuthLoading(false);
       return undefined;
@@ -123,12 +159,8 @@ export default function App() {
         return;
       }
 
-      setAuthLoading(true);
-      setApprovalState({ status: "checking", profile: null, error: null });
-      const nextApprovalState = await getOrCreateUserApproval(nextSession.user);
+      await verifyApprovalForUser(nextSession.user, { preserveActiveAccess: true });
       if (!isMounted || requestId !== approvalRequestId) return;
-      setApprovalState(nextApprovalState);
-      setAuthLoading(false);
     }
 
     supabase.auth.getSession().then(({ data, error }) => {
@@ -152,6 +184,17 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !authSession?.user) return undefined;
+    function handleOnline() {
+      void verifyApprovalForUser(authSession.user, { preserveActiveAccess: true });
+    }
+    globalThis.addEventListener?.("online", handleOnline);
+    return () => {
+      globalThis.removeEventListener?.("online", handleOnline);
+    };
+  }, [authSession?.user?.id]);
 
   useEffect(() => {
     if (approvalState.status !== "approved" || !authSession?.user) {
@@ -556,17 +599,14 @@ export default function App() {
     setSessionSummary(null);
     setAuthSession(null);
     setApprovalState({ status: "signed_out", profile: null, error: null });
+    setConnectionNotice("");
     setAuthLoading(false);
     setScreen(screens.home);
   }
 
   async function refreshApproval() {
     if (!authSession?.user) return;
-    setAuthLoading(true);
-    setApprovalState({ status: "checking", profile: null, error: null });
-    const nextApprovalState = await getOrCreateUserApproval(authSession.user);
-    setApprovalState(nextApprovalState);
-    setAuthLoading(false);
+    await verifyApprovalForUser(authSession.user, { preserveActiveAccess: true });
   }
 
   function openTrustCenter() {
@@ -684,6 +724,11 @@ export default function App() {
   return (
     <main className={`app-shell authenticated-shell ${screen === screens.simulation ? "simulation-mode" : ""}`}>
       <EthicalNotice compact={screen !== screens.home} />
+      {connectionNotice && (
+        <div className="connection-status-banner" role="status">
+          {connectionNotice}
+        </div>
+      )}
       <AuthenticatedLayout
         currentScreen={screen}
         userEmail={userEmail}

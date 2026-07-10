@@ -2253,6 +2253,34 @@ textarea:hover {
   margin-top: -4px;
 }
 
+.connection-status-banner {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  margin: 0 auto;
+  padding: 9px 18px;
+  border-bottom: 1px solid #d8c28d;
+  background: #fff7df;
+  color: #72510d;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.failed-exchange .retryable-message {
+  border-color: #d8c28d;
+  background: #fff8e7;
+  color: #614713;
+}
+
+.failed-exchange .retryable-message.sending {
+  opacity: 0.9;
+}
+
+.failed-exchange .retry-response-action {
+  margin-top: 8px;
+}
+
 @media (min-width: 1024px) {
   .landing-page > .feature-grid {
     margin-top: 18px;

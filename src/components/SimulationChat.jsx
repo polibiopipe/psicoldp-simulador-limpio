@@ -37,6 +37,7 @@ export function SimulationChat({
   const [avatarState, setAvatarState] = useState("idle");
   const [validationFeedback, setValidationFeedback] = useState("");
   const [canRetryLastMessage, setCanRetryLastMessage] = useState(false);
+  const [failedTurn, setFailedTurn] = useState(null);
   const conversationRef = useRef(null);
   const previousHistoryLengthRef = useRef(history.length);
   const avatarIdleTimerRef = useRef(null);
@@ -107,7 +108,15 @@ export function SimulationChat({
     if (avatarState === "thinking" || avatarState === "closed") return;
 
     const studentMessage = rawQuestion.trim();
+    const failedTurnId = failedTurn?.question === studentMessage ? failedTurn.id : crypto.randomUUID();
     setCanRetryLastMessage(false);
+    setFailedTurn({
+      id: failedTurnId,
+      question: studentMessage,
+      status: "sending",
+      errorType: "",
+      retryAvailable: false
+    });
     setAvatarState("thinking");
     window.clearTimeout(responseTimerRef.current);
     responseTimerRef.current = window.setTimeout(async () => {
@@ -121,11 +130,19 @@ export function SimulationChat({
         });
         setQuestion("");
         setValidationFeedback("");
+        setFailedTurn(null);
       } catch (error) {
         console.error("PATIENT_RESPONSE_ERROR", error);
         setAvatarState("idle");
         setCanRetryLastMessage(true);
-        setValidationFeedback("No se pudo generar la respuesta del paciente. Puedes reintentar sin duplicar tu intervencion.");
+        setFailedTurn({
+          id: failedTurnId,
+          question: studentMessage,
+          status: "failed",
+          errorType: error?.errorType || "unknown",
+          retryAvailable: true
+        });
+        setValidationFeedback("");
       }
     }, 520);
   }
@@ -133,7 +150,6 @@ export function SimulationChat({
   function updateQuestion(value) {
     setQuestion(value);
     if (validationFeedback) setValidationFeedback("");
-    if (canRetryLastMessage) setCanRetryLastMessage(false);
     if (avatarState !== "thinking" && avatarState !== "closed") {
       setAvatarState(value.trim() ? "listening" : "idle");
     }
@@ -141,7 +157,7 @@ export function SimulationChat({
 
   function retryLastMessage() {
     if (!canRetryLastMessage || avatarState === "thinking" || avatarState === "closed") return;
-    attemptSendQuestion(question);
+    attemptSendQuestion(failedTurn?.question || question);
   }
 
   function appendDictatedText(text) {
@@ -265,7 +281,7 @@ export function SimulationChat({
           )}
 
           <div className="conversation" aria-live="polite" ref={conversationRef}>
-            {visibleHistory.length === 0 ? (
+            {visibleHistory.length === 0 && !failedTurn ? (
               <div className="empty-state">
                 <p>{caseItem.openingLine}</p>
                 <span>
@@ -274,20 +290,47 @@ export function SimulationChat({
                 </span>
               </div>
             ) : (
-              visibleHistory.map((entry) => (
-                <div className="exchange" key={entry.id}>
-                  {!entry.isSessionPrelude && (
+              <>
+                {visibleHistory.map((entry) => (
+                  <div className="exchange" key={entry.id}>
+                    {!entry.isSessionPrelude && (
+                      <div className="message student-message">
+                        <span>Estudiante</span>
+                        <p>{entry.question}</p>
+                      </div>
+                    )}
+                    <div className="message patient-message">
+                      <span>{entry.isSessionPrelude ? `Inicio Sesión ${sessionNumber}` : caseItem.name}</span>
+                      <p>{entry.answer}</p>
+                    </div>
+                  </div>
+                ))}
+                {failedTurn && (
+                  <div className="exchange failed-exchange" key={failedTurn.id}>
                     <div className="message student-message">
                       <span>Estudiante</span>
-                      <p>{entry.question}</p>
+                      <p>{failedTurn.question}</p>
                     </div>
-                  )}
-                  <div className="message patient-message">
-                    <span>{entry.isSessionPrelude ? `Inicio Sesión ${sessionNumber}` : caseItem.name}</span>
-                    <p>{entry.answer}</p>
+                    <div className={`message patient-message retryable-message ${failedTurn.status}`}>
+                      <span>{caseItem.name}</span>
+                      {failedTurn.status === "sending" ? (
+                        <p>Esperando respuesta del paciente...</p>
+                      ) : (
+                        <>
+                          <p>No pudimos obtener la respuesta del paciente. Tu intervención está guardada.</p>
+                          <button
+                            className="secondary-action retry-response-action"
+                            type="button"
+                            onClick={retryLastMessage}
+                          >
+                            Reintentar
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                )}
+              </>
             )}
           </div>
         </div>
@@ -367,11 +410,6 @@ export function SimulationChat({
             <p className="writing-suggestion" aria-live="polite">
               {writingSuggestion}
             </p>
-          )}
-          {canRetryLastMessage && (
-            <button className="secondary-action retry-response-action" type="button" onClick={retryLastMessage}>
-              Reintentar
-            </button>
           )}
         </form>
       </section>
