@@ -36,6 +36,7 @@ export function SimulationChat({
   );
   const [avatarState, setAvatarState] = useState("idle");
   const [validationFeedback, setValidationFeedback] = useState("");
+  const [canRetryLastMessage, setCanRetryLastMessage] = useState(false);
   const conversationRef = useRef(null);
   const previousHistoryLengthRef = useRef(history.length);
   const avatarIdleTimerRef = useRef(null);
@@ -88,9 +89,13 @@ export function SimulationChat({
 
   function submitQuestion(event) {
     event.preventDefault();
-    const validation = validateStudentMessage(question);
+    attemptSendQuestion(question);
+  }
+
+  function attemptSendQuestion(rawQuestion) {
+    const validation = validateStudentMessage(rawQuestion);
     logSimulationDebug("SEND_ATTEMPT", {
-      inputValue: question,
+      inputValue: rawQuestion,
       selectedInterventionType,
       canSend: validation.isValid,
       reasonIfBlocked: validation.isValid ? "" : validation.reason
@@ -101,7 +106,8 @@ export function SimulationChat({
     }
     if (avatarState === "thinking" || avatarState === "closed") return;
 
-    const studentMessage = question.trim();
+    const studentMessage = rawQuestion.trim();
+    setCanRetryLastMessage(false);
     setAvatarState("thinking");
     window.clearTimeout(responseTimerRef.current);
     responseTimerRef.current = window.setTimeout(async () => {
@@ -118,7 +124,8 @@ export function SimulationChat({
       } catch (error) {
         console.error("PATIENT_RESPONSE_ERROR", error);
         setAvatarState("idle");
-        setValidationFeedback("No se pudo generar la respuesta. Intenta enviar nuevamente.");
+        setCanRetryLastMessage(true);
+        setValidationFeedback("No se pudo generar la respuesta del paciente. Puedes reintentar sin duplicar tu intervencion.");
       }
     }, 520);
   }
@@ -126,9 +133,15 @@ export function SimulationChat({
   function updateQuestion(value) {
     setQuestion(value);
     if (validationFeedback) setValidationFeedback("");
+    if (canRetryLastMessage) setCanRetryLastMessage(false);
     if (avatarState !== "thinking" && avatarState !== "closed") {
       setAvatarState(value.trim() ? "listening" : "idle");
     }
+  }
+
+  function retryLastMessage() {
+    if (!canRetryLastMessage || avatarState === "thinking" || avatarState === "closed") return;
+    attemptSendQuestion(question);
   }
 
   function appendDictatedText(text) {
@@ -354,6 +367,11 @@ export function SimulationChat({
             <p className="writing-suggestion" aria-live="polite">
               {writingSuggestion}
             </p>
+          )}
+          {canRetryLastMessage && (
+            <button className="secondary-action retry-response-action" type="button" onClick={retryLastMessage}>
+              Reintentar
+            </button>
           )}
         </form>
       </section>

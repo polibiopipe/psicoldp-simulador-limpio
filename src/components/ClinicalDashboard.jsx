@@ -144,7 +144,11 @@ export function ClinicalDashboard({
                   onClick={() => openItemSession({ item: nextItem, onPrepareCase, onStartSession })}
                 >
                   <Play aria-hidden="true" />
-                  {nextItem.draftRecord || nextItem.completedSessions > 0 ? "Retomar sesion" : "Preparar caso"}
+                  {nextItem.draftRecord?.status === "closure_pending"
+                    ? "Registrar cierre"
+                    : nextItem.draftRecord || nextItem.completedSessions > 0
+                      ? "Retomar sesion"
+                      : "Preparar caso"}
                 </button>
                 <button className="secondary-action" type="button" onClick={() => onOpenAgenda?.(nextItem.caseItem.id)}>
                   Ver registro
@@ -176,7 +180,11 @@ export function ClinicalDashboard({
                   tone="session"
                   typeLabel="Sesion por retomar"
                   detail={item.nextFocus}
-                  actionLabel={item.draftRecord || item.completedSessions > 0 ? "Retomar sesion" : "Preparar caso"}
+                  actionLabel={item.draftRecord?.status === "closure_pending"
+                    ? "Registrar cierre"
+                    : item.draftRecord || item.completedSessions > 0
+                      ? "Retomar sesion"
+                      : "Preparar caso"}
                   onAction={() => openItemSession({ item, onPrepareCase, onStartSession })}
                   onOpenRecord={() => onOpenAgenda?.(item.caseItem.id)}
                 />
@@ -407,12 +415,14 @@ function buildDraftSessionItems({ sessionRecords = [], cases = [], agendaItems =
         completedSessions: agendaItem?.completedSessions || 0,
         plannedSessions: agendaItem?.plannedSessions || 4,
         nextSessionNumber: sessionNumber,
-        nextSessionLabel: `Sesion ${sessionNumber} en curso`,
-        processState: "Sesion por retomar",
+        nextSessionLabel: record.status === "closure_pending" ? `Sesion ${sessionNumber} con cierre pendiente` : `Sesion ${sessionNumber} en curso`,
+        processState: record.status === "closure_pending" ? "Cierre pendiente" : "Sesion por retomar",
         noteStatus: agendaItem?.noteStatus || { status: "ok", label: "Sin nota pendiente" },
         task: agendaItem?.task || null,
         risk: agendaItem?.risk || { status: "closed", label: "Sin alertas abiertas" },
-        nextFocus: record.summary?.brief || "Continuar conversacion guardada",
+        nextFocus: record.status === "closure_pending"
+          ? "Registrar decision clinica de cierre"
+          : record.summary?.brief || "Continuar conversacion guardada",
         agendaEntry: agendaItem?.agendaEntry || null
       };
     })
@@ -421,7 +431,7 @@ function buildDraftSessionItems({ sessionRecords = [], cases = [], agendaItems =
 
 function isDraftSessionRecord(record) {
   return (
-    record?.status === "in_progress" &&
+    ["in_progress", "closure_pending"].includes(record?.status) &&
     record.caseId &&
     Number(record.sessionNumber) >= 1 &&
     Array.isArray(record.conversationHistory) &&

@@ -73,6 +73,8 @@ export default function App() {
     error: null
   });
   const [saveStatus, setSaveStatus] = useState(null);
+  const [closureSaveState, setClosureSaveState] = useState("idle");
+  const [pendingResultsExit, setPendingResultsExit] = useState(null);
   const [agendaFocusCaseId, setAgendaFocusCaseId] = useState("");
   const [sessionRecords, setSessionRecords] = useState([]);
   const [activeSessionRecordId, setActiveSessionRecordId] = useState("");
@@ -171,6 +173,7 @@ export default function App() {
   function resetConversation(nextScreen = screens.brief) {
     setHistory(sessionNumber > 1 ? [createSessionPrelude(selectedCase, sessionNumber, sessionSummary, sessionTotal)] : []);
     updateActiveSessionRecordId("");
+    setClosureSaveState("idle");
     setScreen(nextScreen);
   }
 
@@ -205,6 +208,7 @@ export default function App() {
     setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: nextCase, sessionNumber: 1, basePlan }));
     setHistory([]);
     updateActiveSessionRecordId("");
+    setClosureSaveState("idle");
     setScreen(screens.brief);
   }
 
@@ -291,6 +295,7 @@ export default function App() {
           : []
     );
     setSaveStatus(null);
+    setClosureSaveState("idle");
     setScreen(screens.simulation);
   }
 
@@ -330,8 +335,13 @@ export default function App() {
     setHistory(resumeRecord.conversationHistory || []);
     updateActiveSessionRecordId(resumeRecord.id);
     setSaveStatus(null);
-    setScreen(screens.simulation);
     setSessionRecords((current) => mergeSessionRecordList(current, resumeRecord));
+    setClosureSaveState(resumeRecord.status === "closure_pending" ? "pending" : "idle");
+    if (resumeRecord.status === "closure_pending") {
+      setScreen(screens.results);
+      return;
+    }
+    setScreen(screens.simulation);
   }
 
   function beginSessionFromPreparation(session, preparationState = {}) {
@@ -408,6 +418,7 @@ export default function App() {
     setSessionSummaries(summaries);
     setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: selectedCase, sessionNumber: 1, basePlan }));
     setSaveStatus(null);
+    setClosureSaveState("idle");
     setScreen(screens.home);
   }
 
@@ -415,29 +426,6 @@ export default function App() {
     const turnId = crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const sessionRecordId = getOrCreateActiveSessionRecordId();
-    const pendingEntry = {
-      id: turnId,
-      question,
-      answer: "",
-      responseId: "pending-patient-response",
-      analysis: null,
-      patientState: null,
-      responseCategory: "pending",
-      interventionType: selectedInterventionType,
-      guidedIntervention: null,
-      conversationStage: conversationContext.conversationStage
-        ? {
-            sessionNumber,
-            stageName: conversationContext.conversationStage.stageName,
-            stageLabel: conversationContext.conversationStage.stageLabel
-          }
-        : null,
-      createdAt,
-      isPendingResponse: true
-    };
-    const pendingHistory = [...history, pendingEntry];
-    await persistSessionProgress(pendingHistory, { recordId: sessionRecordId });
-
     const response = await createPatientResponse({
       caseItem: selectedCase,
       difficulty,
@@ -448,11 +436,15 @@ export default function App() {
       previousSessionSummary: sessionSummary,
       conversationStage: conversationContext.conversationStage || null
     });
+    const responseText = String(response?.text || "").trim();
+    if (!responseText) {
+      throw new Error("La respuesta del paciente llegó vacía. Intenta reenviar la intervención.");
+    }
 
     const nextEntry = {
         id: turnId,
         question,
-        answer: response.text,
+        answer: responseText,
         responseId: response.responseId,
         analysis: response.analysis,
         patientState: response.patientState,
@@ -472,7 +464,7 @@ export default function App() {
     setHistory(nextHistory);
     void persistSessionProgress(nextHistory, { recordId: sessionRecordId });
 
-    return response.text;
+    return responseText;
   }
 
   async function persistSessionProgress(nextHistory, { recordId = "" } = {}) {
@@ -498,13 +490,15 @@ export default function App() {
 
   async function finishSession() {
     setSaveStatus(null);
+    setClosureSaveState("open");
     setScreen(screens.results);
   }
 
   async function saveCompletedSession({
     clinicalDecision = null,
     clinicalPlanEvaluation = null,
-    clinicalArtifacts = null
+    clinicalArtifacts = null,
+    status = "completed"
   } = {}) {
     setSaveStatus({
       type: "saving",
@@ -520,15 +514,16 @@ export default function App() {
       clinicalArtifacts,
       clinicalDecision,
       clinicalPlanEvaluation,
-      status: "completed"
+      status
     });
     const saveResult = await saveSessionHistory(sessionRecord);
     setSessionRecords((current) => mergeSessionRecordList(current, sessionRecord));
     updateActiveSessionRecordId("");
+    setClosureSaveState(status === "closure_pending" ? "pending" : "saved");
     if (saveResult.cloudSaved) {
       setSaveStatus({
         type: "success",
-        message: "Sesion guardada correctamente."
+        message: status === "closure_pending" ? "Cierre pendiente guardado." : "Sesion guardada correctamente."
       });
     } else if (saveResult.error) {
       setSaveStatus({
@@ -545,6 +540,10 @@ export default function App() {
       });
     }
     return saveResult;
+  }
+
+  async function saveClosurePendingSession() {
+    return saveCompletedSession({ status: "closure_pending" });
   }
 
   async function handleSignOut() {
@@ -584,6 +583,14 @@ export default function App() {
   }
 
   function navigateWorkspace(targetScreen) {
+    if (shouldWarnBeforeLeavingResults()) {
+      setPendingResultsExit({ targetScreen });
+      return;
+    }
+    performWorkspaceNavigation(targetScreen);
+  }
+
+  function performWorkspaceNavigation(targetScreen) {
     if (targetScreen === "progress") {
       setScreen(screens.savedSessions);
       return;
@@ -603,6 +610,21 @@ export default function App() {
       }
       setScreen(targetScreen);
     }
+  }
+
+  function shouldWarnBeforeLeavingResults() {
+    return screen === screens.results && history.length > 0 && closureSaveState !== "saved";
+  }
+
+  async function leaveResultsWithPendingClosure() {
+    const targetScreen = pendingResultsExit?.targetScreen || screens.home;
+    await saveClosurePendingSession();
+    setPendingResultsExit(null);
+    performWorkspaceNavigation(targetScreen);
+  }
+
+  function cancelResultsExit() {
+    setPendingResultsExit(null);
   }
 
   if (authLoading) {
@@ -767,7 +789,11 @@ export default function App() {
             history={history}
             sessionNumber={sessionNumber}
             onRestart={() => resetConversation(screens.simulation)}
-            onSelectCase={() => setScreen(screens.select)}
+            onSelectCase={() =>
+              shouldWarnBeforeLeavingResults()
+                ? setPendingResultsExit({ targetScreen: screens.select })
+                : setScreen(screens.select)
+            }
           />
           <SessionClosure
             caseItem={selectedCase}
@@ -785,6 +811,32 @@ export default function App() {
       )}
 
       </AuthenticatedLayout>
+      {pendingResultsExit && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="confirmation-modal closure-pending-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="closure-pending-title"
+          >
+            <span className="eyebrow">Cierre pendiente</span>
+            <h2 id="closure-pending-title">Aun falta registrar tu decision clinica</h2>
+            <p>
+              La entrevista ya llego a resultados, pero todavia no has registrado si
+              corresponde cerrar, continuar, derivar o dejar seguimiento. Puedes volver
+              al cierre o salir dejando esta sesion marcada como cierre pendiente.
+            </p>
+            <div className="modal-actions">
+              <button className="primary-action" type="button" onClick={cancelResultsExit}>
+                Volver y registrar decision
+              </button>
+              <button className="secondary-action" type="button" onClick={leaveResultsWithPendingClosure}>
+                Salir y dejar pendiente
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

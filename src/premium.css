@@ -2203,6 +2203,56 @@ textarea:hover {
   border-color: var(--nv-border);
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(16, 33, 43, 0.34);
+  backdrop-filter: blur(8px);
+}
+
+.confirmation-modal {
+  width: min(520px, 100%);
+  padding: 28px;
+  border: 1px solid var(--nv-border);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 24px 70px rgba(15, 43, 70, 0.18);
+}
+
+.confirmation-modal h2 {
+  margin: 8px 0 10px;
+  color: var(--nv-ink);
+  font-size: 1.35rem;
+}
+
+.confirmation-modal p {
+  margin: 0;
+  color: var(--nv-muted);
+  line-height: 1.6;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
+.delete-notice {
+  color: var(--nv-teal);
+  font-size: 0.86rem;
+}
+
+.retry-response-action {
+  align-self: flex-start;
+  margin-top: -4px;
+}
+
 @media (min-width: 1024px) {
   .landing-page > .feature-grid {
     margin-top: 18px;

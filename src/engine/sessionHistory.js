@@ -39,7 +39,12 @@ export function buildSessionHistoryRecord({
     report
   });
   const visibleHistory = history
-    .filter((entry) => !entry.isSessionPrelude)
+    .filter((entry) =>
+      !entry.isSessionPrelude &&
+      !entry.isPendingResponse &&
+      String(entry.question || "").trim() &&
+      String(entry.answer || "").trim()
+    )
     .map((entry) => ({
       id: entry.id,
       question: entry.question,
@@ -230,7 +235,7 @@ export async function getLatestInProgressSessionForCase(authSession = null, case
   if (!isSupabaseConfigured || !supabase || !authSession?.user) {
     const localRecord = getSessionHistory()
       .filter((record) =>
-        record?.status === "in_progress" &&
+        ["in_progress", "closure_pending"].includes(record?.status) &&
         record.caseId === caseId &&
         (!sessionNumber || Number(record.sessionNumber) === Number(sessionNumber))
       )
@@ -248,7 +253,7 @@ export async function getLatestInProgressSessionForCase(authSession = null, case
     .select("*")
     .eq("user_id", authSession.user.id)
     .eq("case_id", caseId)
-    .eq("status", "in_progress")
+    .in("status", ["in_progress", "closure_pending"])
     .order("updated_at", { ascending: false })
     .limit(1);
 

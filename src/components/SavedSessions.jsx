@@ -11,6 +11,9 @@ export function SavedSessions({ authSession, onBackHome }) {
   const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteRequest, setDeleteRequest] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteNotice, setDeleteNotice] = useState("");
   const selectedSession = useMemo(
     () => sessions.find((session) => session.id === selectedId) || null,
     [sessions, selectedId]
@@ -37,6 +40,35 @@ export function SavedSessions({ authSession, onBackHome }) {
     await clearAllSessionHistory(authSession);
     setSessions([]);
     setSelectedId("");
+  }
+
+  function requestDeleteSession(session) {
+    setDeleteNotice("");
+    setDeleteRequest({ type: "single", session });
+  }
+
+  function requestDeleteAll() {
+    setDeleteNotice("");
+    setDeleteRequest({ type: "all", count: sessions.length });
+  }
+
+  function cancelDeleteRequest() {
+    if (isDeleting) return;
+    setDeleteRequest(null);
+  }
+
+  async function confirmDeleteRequest() {
+    if (!deleteRequest || isDeleting) return;
+    setIsDeleting(true);
+    if (deleteRequest.type === "single") {
+      await removeSession(deleteRequest.session.id);
+      setDeleteNotice("Sesion eliminada correctamente.");
+    } else {
+      await removeAllSessions();
+      setDeleteNotice("Todas las sesiones fueron eliminadas.");
+    }
+    setIsDeleting(false);
+    setDeleteRequest(null);
   }
 
   return (
@@ -75,7 +107,8 @@ export function SavedSessions({ authSession, onBackHome }) {
         <>
           <div className="saved-sessions-toolbar">
             <span>{sessions.length} sesion(es) guardada(s)</span>
-            <button className="danger-action" type="button" onClick={removeAllSessions}>
+            {deleteNotice && <strong className="delete-notice">{deleteNotice}</strong>}
+            <button className="danger-action" type="button" onClick={requestDeleteAll}>
               <Trash2 aria-hidden="true" />
               Eliminar todo
             </button>
@@ -95,6 +128,7 @@ export function SavedSessions({ authSession, onBackHome }) {
                   <div className="saved-session-meta">
                     <span>{formatDate(session.createdAt)}</span>
                     <span>{session.conversationHistory?.length || 0} turnos</span>
+                    <span>{getSessionStatusLabel(session.status)}</span>
                     <span>Nivel {getSessionFeedback(session).levelLabel}</span>
                     {getClinicalPlanEvaluation(session) && (
                       <span>{getClinicalPlanEvaluation(session).decisionLabel}</span>
@@ -113,7 +147,7 @@ export function SavedSessions({ authSession, onBackHome }) {
                     <button
                       className="danger-action"
                       type="button"
-                      onClick={() => removeSession(session.id)}
+                      onClick={() => requestDeleteSession(session)}
                     >
                       <Trash2 aria-hidden="true" />
                       Eliminar
@@ -267,6 +301,45 @@ export function SavedSessions({ authSession, onBackHome }) {
               )}
             </aside>
           </div>
+          {deleteRequest && (
+            <div className="modal-backdrop" role="presentation">
+              <section
+                className="confirmation-modal delete-session-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="delete-session-title"
+              >
+                <span className="eyebrow">Confirmar eliminacion</span>
+                <h2 id="delete-session-title">
+                  {deleteRequest.type === "single" ? "Eliminar sesion guardada" : "Eliminar todas las sesiones"}
+                </h2>
+                {deleteRequest.type === "single" ? (
+                  <p>
+                    Se eliminara el registro de {deleteRequest.session.caseName}, sesion {deleteRequest.session.sessionNumber},
+                    guardado el {formatDate(deleteRequest.session.createdAt)}.
+                  </p>
+                ) : (
+                  <p>
+                    Se eliminaran {deleteRequest.count} sesiones guardadas. Esta accion quitara los registros
+                    visibles del historial de este usuario.
+                  </p>
+                )}
+                <div className="modal-actions">
+                  <button className="secondary-action" type="button" onClick={cancelDeleteRequest} disabled={isDeleting}>
+                    Cancelar
+                  </button>
+                  <button className="danger-action" type="button" onClick={confirmDeleteRequest} disabled={isDeleting}>
+                    <Trash2 aria-hidden="true" />
+                    {isDeleting
+                      ? "Eliminando..."
+                      : deleteRequest.type === "single"
+                        ? "Eliminar sesion"
+                        : "Eliminar todas"}
+                  </button>
+                </div>
+              </section>
+            </div>
+          )}
         </>
       )}
     </section>
@@ -347,4 +420,10 @@ function resolveSavedLevel(score) {
   if (numericScore >= 65) return "Logrado";
   if (numericScore >= 40) return "En desarrollo";
   return "Inicial";
+}
+
+function getSessionStatusLabel(status) {
+  if (status === "closure_pending") return "Cierre pendiente";
+  if (status === "in_progress") return "Sesion por retomar";
+  return "Sesion completada";
 }
