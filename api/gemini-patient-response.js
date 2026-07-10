@@ -96,6 +96,16 @@ export default async function handler(req, res) {
     caseId,
     clientCaseData: payload.caseData
   });
+  console.info("[gemini] request context", {
+    caseId,
+    caseName: caseContext?.minimumClinicalProfile?.name || caseContext?.visibleCase?.name || "unknown",
+    profileLoaded: Boolean(
+      caseContext?.masterRecord?.identity ||
+      caseContext?.clinicalProfile?.identity ||
+      caseContext?.visibleCase?.name
+    ),
+    sessionNumber: toSafeNumber(payload.sessionNumber) || null
+  });
   const recentHistory = normalizeHistory(payload.conversationHistory);
   const sessionContext = {
     sessionNumber: toSafeNumber(payload.sessionNumber) || null,
@@ -213,6 +223,12 @@ export default async function handler(req, res) {
         textLength: retryResponseText.length,
         retry: true
       });
+      console.info("[gemini] response source", {
+        caseId,
+        source: "gemini",
+        retry: true,
+        textLength: retryResponseText.length
+      });
       return;
     }
 
@@ -233,6 +249,12 @@ export default async function handler(req, res) {
     provider: "gemini",
     model,
     finishReason,
+    textLength: responseText.length
+  });
+  console.info("[gemini] response source", {
+    caseId,
+    source: "gemini",
+    retry: false,
     textLength: responseText.length
   });
 }
@@ -345,9 +367,18 @@ function buildCaseContext({ caseId, clientCaseData }) {
   const facts = patientFacts[caseId] || {};
   const masterRecord = patientMasterRecords[caseId] || null;
   const simulationProfile = clinicalSimulationProfiles[caseId] || null;
+  const minimumClinicalProfile = buildMinimumClinicalProfile({
+    caseId,
+    catalogCase,
+    facts,
+    masterRecord,
+    simulationProfile,
+    clientCaseData
+  });
 
   return trimContext({
     caseId,
+    minimumClinicalProfile,
     visibleCase: pickDefined({
       name: catalogCase?.name || clientCaseData?.name,
       age: catalogCase?.age || clientCaseData?.age,
@@ -389,6 +420,55 @@ function buildCaseContext({ caseId, clientCaseData }) {
       disclosureRules: masterRecord?.disclosureRules || masterRecord?.disclosureMatrix,
       sensitiveInfo: masterRecord?.sensitiveInfo
     })
+  });
+}
+
+function buildMinimumClinicalProfile({
+  caseId,
+  catalogCase,
+  facts,
+  masterRecord,
+  simulationProfile,
+  clientCaseData
+}) {
+  const identity = masterRecord?.identity || {};
+  const consultation = masterRecord?.consultation || {};
+  const personality = masterRecord?.personality || {};
+  const emotionalState = masterRecord?.emotionalState || {};
+  const sensitiveInfo = masterRecord?.sensitiveInfo || {};
+
+  return pickDefined({
+    id: caseId,
+    name: identity.name || facts.name || catalogCase?.name || clientCaseData?.name,
+    age: identity.age || facts.age || catalogCase?.age || clientCaseData?.age,
+    briefReason: consultation.manifestMotive || facts.motive || catalogCase?.motive || clientCaseData?.motive,
+    presentingProblem: consultation.whyNow || facts.concern || catalogCase?.motive || clientCaseData?.motive,
+    background: catalogCase?.background || clientCaseData?.background,
+    emotionalTone: emotionalState.currentlyFeels || facts.currentEmotion || facts.concern,
+    communicationStyle:
+      personality.responseStyle ||
+      catalogCase?.communicationStyle ||
+      clientCaseData?.communicationStyle ||
+      simulationProfile?.clinicalFrame?.style,
+    relationalStyle:
+      personality.temperament ||
+      simulationProfile?.clinicalFrame?.relationalStyle ||
+      "apertura gradual segun confianza y pertinencia de la entrevista",
+    openingLineBySession: pickDefined({
+      session1: catalogCase?.openingLine || facts.motive || consultation.whyNow,
+      session2: "Puede retomar algo trabajado antes si el estudiante lo menciona o si existe resumen previo."
+    }),
+    therapeuticBoundaries:
+      catalogCase?.sensitiveTopics ||
+      clientCaseData?.sensitiveTopics ||
+      simulationProfile?.disclosureRules?.boundaries,
+    riskNotes: sensitiveInfo.riskResponse || masterRecord?.risk?.summary || "Explorar riesgo si corresponde, sin dramatizar ni inventar.",
+    whatThePatientKnows: consultation.beliefAboutProblem || facts.concreteConcern || facts.concern,
+    whatThePatientAvoids: personality.avoids || simulationProfile?.disclosureRules?.avoidAtStart,
+    progressionHints:
+      simulationProfile?.disclosureRules ||
+      masterRecord?.disclosureRules ||
+      "Revelar informacion de forma progresiva segun alianza, respeto y pertinencia."
   });
 }
 
