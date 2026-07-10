@@ -18,7 +18,6 @@ import {
 import {
   buildProcessSummary,
   buildSessionSummary,
-  formatProcessSummary,
   formatSessionAgreement,
   saveSessionSummary
 } from "../engine/sessionMemory.js";
@@ -52,7 +51,6 @@ export function SessionClosure({
   onSaveSessionRecord
 }) {
   const [copied, setCopied] = useState(false);
-  const [processCopied, setProcessCopied] = useState(false);
   const [hasSavedSessionRecord, setHasSavedSessionRecord] = useState(false);
   const [hasSavedContinuityAgreement, setHasSavedContinuityAgreement] = useState(false);
   const [clinicalArtifacts, setClinicalArtifacts] = useState(() => buildInitialClinicalArtifacts());
@@ -235,17 +233,6 @@ export function SessionClosure({
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setCopied(false);
-    }
-  }
-
-  async function copyProcessSummary() {
-    await saveCurrentSummary();
-    try {
-      await navigator.clipboard.writeText(formatProcessSummary(processSummary));
-      setProcessCopied(true);
-      window.setTimeout(() => setProcessCopied(false), 1800);
-    } catch {
-      setProcessCopied(false);
     }
   }
 
@@ -564,8 +551,7 @@ export function SessionClosure({
 
         {normalizedClinicalDecision.action === "continue_session" && (
           <div className="session-note" role="status">
-            Primero se guardar&aacute; el acuerdo de continuidad. La sesi&oacute;n {nextSessionNumber || 2} podr&aacute;
-            iniciarse despu&eacute;s como acci&oacute;n opcional.
+            Primero se registrara la continuidad. La sesion siguiente podra iniciarse despues como accion opcional.
           </div>
         )}
 
@@ -660,7 +646,7 @@ export function SessionClosure({
           <h2>{canContinueInSimulator && hasSavedContinuityAgreement ? "Continuidad registrada" : closureAction.title}</h2>
           <p>
             {canContinueInSimulator && hasSavedContinuityAgreement
-              ? `El acuerdo de nueva sesion quedo guardado. Puedes iniciar la sesion ${nextSessionNumber} ahora o volver al inicio para retomarla luego.`
+              ? `La continuidad dentro del simulador quedo registrada. Puedes iniciar la sesion ${nextSessionNumber} ahora o volver al inicio para retomarla luego.`
               : closureAction.description}
           </p>
         </div>
@@ -695,18 +681,16 @@ export function SessionClosure({
               {closureAction.primaryLabel}
             </button>
           ) : null}
-          <button className="secondary-action" type="button" onClick={copyProcessSummary}>
-            <Clipboard aria-hidden="true" />
-            {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
-          </button>
           <button className="secondary-action" type="button" onClick={copyCurrentSummary}>
             <Clipboard aria-hidden="true" />
             {copied ? "Resumen copiado" : "Copiar resumen"}
           </button>
+          {!(canContinueInSimulator && hasSavedContinuityAgreement) && (
           <button className="secondary-action" type="button" onClick={backHomeAfterSave}>
             <Home aria-hidden="true" />
             Volver al inicio
           </button>
+          )}
         </div>
       </div>
 
@@ -769,8 +753,8 @@ function getClosureActionConfig({
   if (canContinueInSimulator) {
     return {
       title: "Registrar continuidad",
-      description: `Guarda primero el acuerdo de nueva sesion. Luego podras iniciar ${nextSessionStage?.title?.toLowerCase() || "la siguiente sesion"} si quieres continuar ahora.`,
-      primaryLabel: "Guardar acuerdo de nueva sesion"
+      description: `Registra primero la continuidad dentro del simulador. Luego podras iniciar ${nextSessionStage?.title?.toLowerCase() || "la proxima sesion simulada"} si quieres continuar ahora.`,
+      primaryLabel: "Registrar continuidad"
     };
   }
 

@@ -24,20 +24,12 @@ import {
 } from "../engine/clinicalLanguage.js";
 
 const prepSteps = [
-  { id: "objective", label: "Objetivo inicial", hint: "Qué necesitas comprender primero." },
-  { id: "process", label: "Plan de sesiones", hint: "Cantidad, criterio y objetivos." },
-  { id: "interview", label: "Tipo de entrevista", hint: "Modalidad y justificación." },
-  { id: "areas", label: "Áreas prioritarias", hint: "Foco clínico inicial." },
-  { id: "ethics", label: "Cuidados éticos", hint: "Encuadre, límites y seguridad." },
-  { id: "priority", label: "Información clave", hint: "Lo que no debe faltar." }
+  { id: "objective", label: "Objetivo inicial", hint: "Que necesitas comprender primero." },
+  { id: "areas", label: "Areas prioritarias", hint: "Foco clinico inicial." },
+  { id: "interview", label: "Tipo de entrevista", hint: "Modalidad y justificacion." },
+  { id: "ethics", label: "Cuidados eticos", hint: "Encuadre, limites y seguridad." },
+  { id: "summary", label: "Revision final", hint: "Confirma tu plan antes de iniciar." }
 ];
-
-const prepReviewStep = {
-  id: "summary",
-  label: "Revisión final",
-  hint: "Confirma tu plan antes de iniciar."
-};
-
 const interviewJustificationExamples = [
   "Elijo entrevista abierta para favorecer vínculo y escuchar el relato inicial.",
   "Elijo entrevista semiestructurada para equilibrar escucha clínica con exploración de áreas relevantes.",
@@ -83,22 +75,34 @@ export function CaseBrief({
   const [languagePreference, setLanguagePreference] = useState(() => getClinicalTermPreference(caseItem.id));
   const termCopy = getClinicalTermCopy(languagePreference);
   const readiness = evaluatePreSessionReadiness(preSessionPlan, { languagePreference });
-  const completion = readiness.requiredCompletion;
-  const qualityCompletion = readiness.qualityCompletion;
+  const selectedAreas = preSessionPlan?.explorationAreas || [];
+  const selectedCareItems = preSessionPlan?.ethicalCareItems || [];
+  const completion = {
+    objective: String(preSessionPlan?.evaluationObjective || "").trim().length > 0,
+    areas: selectedAreas.length >= 2 && selectedAreas.length <= 3,
+    interview: Boolean(preSessionPlan?.interviewType) && String(preSessionPlan?.interviewJustification || "").trim().length > 0,
+    ethics: ethicalCareChecklist.every((item) => selectedCareItems.includes(item.id)),
+    summary: false
+  };
+  const qualityCompletion = {
+    objective: String(preSessionPlan?.evaluationObjective || "").trim().length >= 18,
+    areas: selectedAreas.length >= 2 && selectedAreas.length <= 3,
+    interview: Boolean(preSessionPlan?.interviewType) && String(preSessionPlan?.interviewJustification || "").trim().length >= 18,
+    ethics: ethicalCareChecklist.every((item) => selectedCareItems.includes(item.id)),
+    summary: Object.entries(completion).every(([stepId, ok]) => stepId === "summary" || ok)
+  };
   const activeStepId =
     prepSteps.find((step) => !completion[step.id])?.id ||
     prepSteps.find((step) => !qualityCompletion[step.id])?.id ||
     "summary";
   const displayedPrepStepId = selectedPrepStepId || activeStepId;
-  const requiredComplete = readiness.requiredComplete;
-  const qualityComplete = readiness.qualityComplete;
-  const preparationWeak = requiredComplete && !qualityComplete;
+  const requiredComplete = Object.entries(completion).every(([stepId, ok]) => stepId === "summary" || ok);
+  const qualityComplete = Object.entries(qualityCompletion).every(([stepId, ok]) => stepId === "summary" || ok);
+  const preparationWeak = false;
   const requiredStepCount = prepSteps.length;
-  const completedRequiredSteps = Object.values(completion).filter(Boolean).length;
+  const completedRequiredSteps = prepSteps.filter((step) => step.id === "summary" ? requiredComplete : completion[step.id]).length;
   const prepProgressPercent = Math.round((completedRequiredSteps / requiredStepCount) * 100);
   const nextPrepStep = prepSteps.find((step) => !completion[step.id]) || prepSteps.find((step) => !qualityCompletion[step.id]);
-  const selectedAreas = preSessionPlan?.explorationAreas || [];
-  const selectedCareItems = preSessionPlan?.ethicalCareItems || [];
   const selectedAreaLabels = selectedAreas
     .map((areaId) => clinicalExplorationAreas.find((area) => area.id === areaId)?.label)
     .filter(Boolean);
@@ -147,7 +151,7 @@ export function CaseBrief({
   function toggleArea(areaId) {
     const current = new Set(preSessionPlan?.explorationAreas || []);
     if (current.has(areaId)) current.delete(areaId);
-    else current.add(areaId);
+    else if (current.size < 3) current.add(areaId);
     updatePlan({ explorationAreas: Array.from(current) });
   }
 
@@ -170,7 +174,19 @@ export function CaseBrief({
 
   function beginWithPreparationState(overrideUsed = false) {
     if (!onBegin) return;
+    const selectedCareLabelsText = selectedCareLabels.join(", ");
+    const selectedAreaLabelsText = selectedAreaLabels.join(", ");
     onBegin({
+      sessionCountJustification:
+        preSessionPlan?.sessionCountJustification ||
+        "Se inicia con una primera entrevista formativa; la continuidad se decidira al cierre segun motivo de consulta, riesgo, red de apoyo y respuesta del paciente.",
+      processObjectives:
+        preSessionPlan?.processObjectives ||
+        "Comprender el motivo inicial, priorizar focos clinicos, sostener encuadre etico y definir proximos pasos al cierre de la entrevista.",
+      priorityInformation:
+        preSessionPlan?.priorityInformation ||
+        `Objetivo: ${preSessionPlan?.evaluationObjective || "Pendiente"}. Focos iniciales: ${selectedAreaLabelsText || "Pendiente"}.`,
+      ethicalCare: selectedCareLabelsText,
       preparationQuality: preparationWeak ? "debil" : "suficiente",
       preparationOverrideUsed: Boolean(overrideUsed),
       preparationWeakReasons: readiness.weakReasons,
@@ -190,6 +206,28 @@ export function CaseBrief({
     if (displayedPrepStepId === stepId && !completion[stepId]) return "in-progress";
     if (completion[stepId]) return qualityCompletion[stepId] ? "completed" : "weak";
     return "pending";
+  }
+
+  function getCurrentStepIndex() {
+    return Math.max(0, prepSteps.findIndex((step) => step.id === displayedPrepStepId));
+  }
+
+  function getCurrentStepMessage() {
+    if (displayedPrepStepId === "objective") return "Completa este campo para continuar.";
+    if (displayedPrepStepId === "areas") return "Selecciona 2 o 3 areas prioritarias para continuar.";
+    if (displayedPrepStepId === "interview") return "Elige una modalidad y justifica brevemente tu decision.";
+    if (displayedPrepStepId === "ethics") return "Marca todos los cuidados eticos para continuar.";
+    return "Completa los pasos pendientes antes de iniciar la entrevista.";
+  }
+
+  function canAdvanceCurrentStep() {
+    if (displayedPrepStepId === "summary") return requiredComplete;
+    return Boolean(completion[displayedPrepStepId]);
+  }
+
+  function goToPrepStep(offset) {
+    const nextIndex = Math.min(prepSteps.length - 1, Math.max(0, getCurrentStepIndex() + offset));
+    setSelectedPrepStepId(prepSteps[nextIndex].id);
   }
 
   function renderPreparationStepContent() {
@@ -361,7 +399,7 @@ export function CaseBrief({
           <div className="clinical-prep-field">
             <span>Áreas prioritarias</span>
             <small>
-              Selecciona entre 4 y 6 áreas prioritarias para esta primera entrevista.
+              Selecciona 2 o 3 areas prioritarias para esta primera entrevista.
               No necesitas explorarlo todo en una sola sesión.
             </small>
             <div className="clinical-area-grid">
@@ -370,19 +408,20 @@ export function CaseBrief({
                   <input
                     type="checkbox"
                     checked={selectedAreas.includes(area.id)}
+                    disabled={!selectedAreas.includes(area.id) && selectedAreas.length >= 3}
                     onChange={() => toggleArea(area.id)}
                   />
                   {area.label}
                 </label>
               ))}
             </div>
-            <div className={`prep-priority-status ${selectedAreas.length > 6 ? "warning" : ""}`}>
+            <div className={`prep-priority-status ${selectedAreas.length > 3 ? "warning" : ""}`}>
               <strong>{selectedAreas.length}</strong>
               <span>
-                {selectedAreas.length > 6
+                {selectedAreas.length > 3
                   ? "Intenta priorizar. Una primera entrevista necesita foco clínico, no solo acumulación de preguntas."
-                  : selectedAreas.length < 4
-                    ? "Elige al menos 4 áreas para sostener un plan inicial suficiente."
+                  : selectedAreas.length < 2
+                    ? "Elige al menos 2 areas para sostener un plan inicial suficiente."
                     : "Priorizar también es parte del criterio clínico."}
               </span>
             </div>
@@ -436,7 +475,7 @@ export function CaseBrief({
           <ClipboardCheck aria-hidden="true" />
           <div>
             <span className="eyebrow">Tu plan inicial</span>
-            <h3 id="prep-summary-title">Revisa antes de comenzar</h3>
+            <h3 id="prep-summary-title">Revisa antes de iniciar</h3>
           </div>
         </div>
         <p>
@@ -447,18 +486,6 @@ export function CaseBrief({
           <div>
             <dt>Objetivo</dt>
             <dd>{preSessionPlan.evaluationObjective || "Pendiente"}</dd>
-          </div>
-          <div>
-            <dt>Sesiones propuestas</dt>
-            <dd>{preSessionPlan.proposedSessionCount || "Pendiente"} sesión(es)</dd>
-          </div>
-          <div>
-            <dt>Justificación de sesiones</dt>
-            <dd>{preSessionPlan.sessionCountJustification || "Pendiente"}</dd>
-          </div>
-          <div>
-            <dt>Objetivos del proceso</dt>
-            <dd>{preSessionPlan.processObjectives || "Pendiente"}</dd>
           </div>
           <div>
             <dt>Modalidad</dt>
@@ -475,10 +502,6 @@ export function CaseBrief({
           <div>
             <dt>Cuidados</dt>
             <dd>{selectedCareLabels.length ? selectedCareLabels.join(", ") : "Pendiente"}</dd>
-          </div>
-          <div>
-            <dt>Información clave</dt>
-            <dd>{preSessionPlan.priorityInformation || "Pendiente"}</dd>
           </div>
         </dl>
         {requiredComplete && qualityComplete ? (
@@ -550,51 +573,6 @@ export function CaseBrief({
             sessionSummary={sessionSummary}
             preSessionPlan={preSessionPlan}
           />
-
-          {preSessionPlan && (
-            <aside className="prep-sidebar-card" aria-label="Progreso de preparación">
-              <div>
-                <span className="eyebrow">Preparación</span>
-                <h2>{prepProgressPercent}% listo</h2>
-                <p>
-                  {nextPrepStep
-                    ? `Próximo paso: ${nextPrepStep.label}.`
-                    : preparationWeak
-                      ? "Plan completo con aspectos por fortalecer."
-                      : "Plan listo para iniciar."}
-                </p>
-              </div>
-              <div className="prep-progress-meter" aria-hidden="true">
-                <span style={{ width: `${prepProgressPercent}%` }} />
-              </div>
-              <ul className="prep-sidebar-checklist">
-                {prepSteps.map((step) => {
-                  const status = getPrepStepStatus(step.id);
-                  return (
-                    <li key={step.id} className={status}>
-                      <span>{step.label}</span>
-                      <strong>
-                        {status === "completed"
-                          ? "Listo"
-                          : status === "weak"
-                            ? "Mejorar"
-                            : "Pendiente"}
-                      </strong>
-                    </li>
-                  );
-                })}
-              </ul>
-              <button
-                className="primary-action prep-start-action"
-                type="button"
-                onClick={handleBeginClick}
-                disabled={!requiredComplete}
-              >
-                <Play aria-hidden="true" />
-                {preparationWeak ? "Revisar antes de iniciar" : "Iniciar entrevista"}
-              </button>
-            </aside>
-          )}
         </div>
 
         <div className="brief-content">
@@ -629,41 +607,6 @@ export function CaseBrief({
             )}
           </section>
 
-          <section className="info-panel">
-            <div className="panel-heading">
-              <ClipboardList aria-hidden="true" />
-              <h2>Antecedentes relevantes</h2>
-            </div>
-            <ul>
-              {caseItem.background.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="info-panel">
-            <div className="panel-heading">
-              <Target aria-hidden="true" />
-              <h2>Objetivos formativos de esta simulación</h2>
-            </div>
-            <ul>
-              {(caseItem.learningObjectives || caseItem.objectives || []).slice(0, 6).map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="info-panel caution">
-            <div className="panel-heading">
-              <TriangleAlert aria-hidden="true" />
-              <h2>Recomendaciones antes de iniciar</h2>
-            </div>
-            <ul>
-              {caseItem.sensitiveTopics.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
 
           {preSessionPlan && (
             <section className="info-panel clinical-preparation-panel">
@@ -671,14 +614,16 @@ export function CaseBrief({
                 <div className="panel-heading">
                   <ClipboardList aria-hidden="true" />
                   <div>
-                    <span className="eyebrow">Antesala clínica</span>
-                    <h2>Antes de comenzar: prepara tu primera entrevista</h2>
+                    <span className="eyebrow">Preparacion de entrevista - Paso {getCurrentStepIndex() + 1} de {prepSteps.length}</span>
+                    <h2>{prepSteps[getCurrentStepIndex()]?.label || "Preparacion"}</h2>
                   </div>
                 </div>
                 <p>
-                  Completa estos pasos antes de hablar {termCopy.prep}. Esta
-                  preparación será considerada en tu retroalimentación final.
+                  Completa un paso a la vez antes de hablar {termCopy.prep}. Esta preparacion sera considerada en tu retroalimentacion final.
                 </p>
+                <div className="prep-progress-meter" aria-hidden="true">
+                  <span style={{ width: `${prepProgressPercent}%` }} />
+                </div>
                 <PedagogicalGuide
                   guideId="preparacion_sesion"
                   autoOpen={false}
@@ -688,7 +633,7 @@ export function CaseBrief({
               </div>
 
               <div className="prep-workflow-stepper" aria-label="Avance de preparacion">
-                {[...prepSteps, prepReviewStep].map((step, index) => {
+                {prepSteps.map((step, index) => {
                   const status = getPrepStepStatus(step.id);
                   const isActive = displayedPrepStepId === step.id;
                   const StatusIcon = status === "completed" ? CheckCircle2 : status === "weak" ? TriangleAlert : Circle;
@@ -745,6 +690,41 @@ export function CaseBrief({
               </div>
 
               {renderPreparationStepContent()}
+              {!canAdvanceCurrentStep() && (
+                <p className="prep-step-helper" role="alert">
+                  {getCurrentStepMessage()}
+                </p>
+              )}
+              <div className="prep-step-actions">
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={() => goToPrepStep(-1)}
+                  disabled={getCurrentStepIndex() === 0}
+                >
+                  Anterior
+                </button>
+                {displayedPrepStepId === "summary" ? (
+                  <button
+                    className="primary-action prep-start-action"
+                    type="button"
+                    onClick={handleBeginClick}
+                    disabled={!requiredComplete}
+                  >
+                    <Play aria-hidden="true" />
+                    Iniciar entrevista con {caseItem.name}
+                  </button>
+                ) : (
+                  <button
+                    className="primary-action"
+                    type="button"
+                    onClick={() => goToPrepStep(1)}
+                    disabled={!canAdvanceCurrentStep()}
+                  >
+                    Continuar
+                  </button>
+                )}
+              </div>
             </section>
           )}
 
