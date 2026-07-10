@@ -1,16 +1,24 @@
 import React from "react";
 import { CheckCircle2, Clock, GraduationCap, TrendingUp } from "lucide-react";
+import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 
 export function ResultsSummary({ report, caseItem, history, sessionNumber = 1 }) {
   const achieved = report.criteria.filter((criterion) => criterion.level === "achieved").length;
   const partial = report.criteria.filter((criterion) => criterion.level === "partial").length;
   const interviewTurns = history.filter((entry) => !entry.isSessionPrelude);
+  const sessionFeedback = buildSessionFeedback({
+    sessionNumber,
+    selectedCase: caseItem,
+    conversation: history,
+    report,
+    selectedApproach: report.therapeuticApproach
+  });
 
   return (
     <aside className="results-summary" style={{ "--accent": caseItem.accent }}>
-      <span className="eyebrow">Resumen visual · Sesión {sessionNumber}</span>
+      <span className="eyebrow">Resumen visual · Sesion {sessionNumber}</span>
       <h1>{caseItem.name}</h1>
-      <p>{report.summary}</p>
+      <p>{sessionFeedback.briefSummary}</p>
 
       <div className="summary-metrics">
         <div>
@@ -30,8 +38,8 @@ export function ResultsSummary({ report, caseItem, history, sessionNumber = 1 })
         </div>
         <div>
           <GraduationCap aria-hidden="true" />
-          <strong>{report.generalScore ?? 0}/100</strong>
-          <span>puntaje</span>
+          <strong>{sessionFeedback.levelLabel}</strong>
+          <span>nivel</span>
         </div>
       </div>
 
@@ -43,14 +51,14 @@ export function ResultsSummary({ report, caseItem, history, sessionNumber = 1 })
         <div className="progress-track">
           <div style={{ width: `${report.trust.final}%` }} />
         </div>
-        <p>Nivel final: {report.trust.label}. Cambio durante la sesión: {report.trust.delta >= 0 ? "+" : ""}{report.trust.delta}.</p>
+        <p>Nivel final: {report.trust.label}. Cambio durante la sesion: {report.trust.delta >= 0 ? "+" : ""}{report.trust.delta}.</p>
       </div>
 
       <div className="supervision-note">
         <GraduationCap aria-hidden="true" />
         <p>
-          Usa este informe como insumo de conversación con supervisión docente,
-          no como evaluación clínica del paciente ficticio.
+          Usa esta devolucion como insumo de supervision docente, no como evaluacion
+          clinica del paciente ficticio.
         </p>
       </div>
     </aside>

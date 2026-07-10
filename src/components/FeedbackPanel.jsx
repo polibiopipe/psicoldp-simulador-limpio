@@ -1,189 +1,139 @@
 import React from "react";
-import { ArrowRight, CheckCircle2, Circle, RotateCcw, XCircle } from "lucide-react";
+import { ArrowRight, RotateCcw } from "lucide-react";
+import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 import { EmailShare } from "./EmailShare.jsx";
-
-function CriterionIcon({ level }) {
-  if (level === "achieved") return <CheckCircle2 className="success-icon" aria-hidden="true" />;
-  if (level === "partial") return <Circle className="partial-icon" aria-hidden="true" />;
-  return <XCircle className="growth-icon" aria-hidden="true" />;
-}
 
 export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, onRestart, onSelectCase }) {
   const visibleHistory = history.filter((entry) => !entry.isSessionPrelude);
+  const sessionFeedback = buildSessionFeedback({
+    sessionNumber,
+    selectedCase: caseItem,
+    conversation: history,
+    report,
+    selectedApproach: report.therapeuticApproach
+  });
 
   return (
     <section className="feedback-panel">
       <header className="section-header">
         <span className="eyebrow">Informe formativo</span>
-        <h1>Retroalimentación educativa</h1>
+        <h1>Retroalimentacion educativa</h1>
         <p>{report.ethicalNotice}</p>
       </header>
 
       <section className="feedback-score-card">
         <div>
-          <span className="eyebrow">Puntaje general formativo</span>
-          <strong>{report.generalScore ?? 0}/100</strong>
+          <span className="eyebrow">Nivel formativo</span>
+          <strong>{sessionFeedback.levelLabel}</strong>
         </div>
-        <p>
-          Puntaje orientativo basado en habilidades de entrevista observadas. No equivale
-          a evaluación clínica ni reemplaza supervisión docente.
-        </p>
+        <p>{sessionFeedback.levelDescription}</p>
       </section>
 
-      <div className="feedback-sections">
+      <div className="feedback-sections feedback-brief-grid">
+        <section className="feedback-block">
+          <h2>Sintesis breve</h2>
+          <p>{sessionFeedback.briefSummary}</p>
+        </section>
+
         <section className="feedback-block">
           <h2>Fortalezas observadas</h2>
           <ul>
-            {report.strengths.map((item) => (
+            {sessionFeedback.strengths.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
         </section>
 
         <section className="feedback-block">
-          <h2>Aspectos por mejorar</h2>
+          <h2>Aspecto a mejorar</h2>
           <ul>
-            {report.improvements.map((item) => (
+            {sessionFeedback.improvements.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
+        </section>
+
+        <section className="feedback-block">
+          <h2>Proximo paso sugerido</h2>
+          <p>{sessionFeedback.nextStep}</p>
         </section>
       </div>
 
-      <div className="feedback-sections">
-        <section className="feedback-block">
-          <h2>Momentos que favorecieron el vínculo</h2>
-          <ul>
-            {report.bondMoments.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
+      <details className="history-details feedback-detail-toggle">
+        <summary>Ver detalle formativo</summary>
 
-        <section className="feedback-block">
-          <h2>Momentos que pudieron cerrar la comunicación</h2>
-          <ul>
-            {report.closingMoments.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-      </div>
-
-      {report.therapeuticApproach && (
-        <section className="feedback-block">
-          <h2>Enfoque terapéutico observado</h2>
-          <p>{report.therapeuticApproach.feedbackText}</p>
-          <ul>
-            <li>
-              Orientación predominante observada: {report.therapeuticApproach.primaryApproach.label}.
-            </li>
-            {report.therapeuticApproach.secondaryApproaches.length > 0 && (
-              <li>
-                Enfoques secundarios observados:{" "}
-                {report.therapeuticApproach.secondaryApproaches
-                  .map((approach) => approach.label)
-                  .join(", ")}.
-              </li>
-            )}
-            {report.therapeuticApproach.primaryApproach.examples?.slice(0, 2).map((example) => (
-              <li key={example}>Ejemplo del estudiante: “{example}”</li>
-            ))}
-            {report.therapeuticApproach.suggestions.slice(0, 2).map((suggestion) => (
-              <li key={suggestion}>{suggestion}</li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {report.guidedInterventionFeedback && (
-        <section className="feedback-block">
-          <h2>Uso del selector de intervención</h2>
-          <p>{report.guidedInterventionFeedback.summary}</p>
-          {report.guidedInterventionFeedback.counts.length > 0 && (
+        <div className="feedback-sections">
+          <section className="feedback-block">
+            <h2>Criterios formativos</h2>
             <ul>
-              {report.guidedInterventionFeedback.counts.map((item) => (
-                <li key={item.typeId}>
-                  {item.label}: {item.count} intervención(es).
+              {sessionFeedback.formativeCriteria.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="feedback-block">
+            <h2>Referencias usadas</h2>
+            <ul>
+              {sessionFeedback.referencesUsed.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        {report.therapeuticApproach && (
+          <section className="feedback-block">
+            <h2>Enfoque observado</h2>
+            <p>{report.therapeuticApproach.feedbackText}</p>
+            <ul>
+              <li>Predominante: {report.therapeuticApproach.primaryApproach.label}.</li>
+              {report.therapeuticApproach.secondaryApproaches.length > 0 && (
+                <li>
+                  Secundarios:{" "}
+                  {report.therapeuticApproach.secondaryApproaches
+                    .map((approach) => approach.label)
+                    .join(", ")}.
+                </li>
+              )}
+              {report.therapeuticApproach.suggestions.slice(0, 2).map((suggestion) => (
+                <li key={suggestion}>{suggestion}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {report.objectiveEvaluation?.length > 0 && (
+          <section className="feedback-block">
+            <h2>Objetivos del caso</h2>
+            <ul className="objective-feedback-list">
+              {report.objectiveEvaluation.slice(0, 5).map((item) => (
+                <li className={item.level} key={item.objective}>
+                  <span>{item.objective}</span>
+                  <strong>{item.levelLabel}</strong>
                 </li>
               ))}
-              <li>
-                Coherencia selector-texto: {report.guidedInterventionFeedback.coherentCount} de{" "}
-                {report.guidedInterventionFeedback.totalGuided} intervención(es) guiadas.
-              </li>
             </ul>
-          )}
-          <ul>
-            {report.guidedInterventionFeedback.suggestions.map((suggestion) => (
-              <li key={suggestion}>{suggestion}</li>
-            ))}
-          </ul>
-        </section>
-      )}
+          </section>
+        )}
 
-      <div className="criteria-list">
-        {report.criteria.map((criterion) => (
-          <article className={`criterion ${criterion.level}`} key={criterion.id}>
-            <CriterionIcon level={criterion.level} />
-            <div>
-              <h2>{criterion.title}</h2>
-              <p>{criterion.description}</p>
-            </div>
-            <strong>{criterion.levelLabel} · {Math.round((criterion.score / 2) * 100)}%</strong>
-          </article>
-        ))}
-      </div>
-
-      {report.objectiveEvaluation?.length > 0 && (
-        <section className="feedback-block">
-          <h2>Objetivos del caso</h2>
-          <ul className="objective-feedback-list">
-            {report.objectiveEvaluation.map((item) => (
-              <li className={item.level} key={item.objective}>
-                <span>{item.objective}</span>
-                <strong>{item.levelLabel}</strong>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {report.reformulationSuggestions?.length > 0 && (
-        <section className="feedback-block">
-          <h2>Sugerencias concretas de reformulación</h2>
-          <ul className="reformulation-list">
-            {report.reformulationSuggestions.map((item) => (
-              <li key={`${item.insteadOf}-${item.tryThis}`}>
-                <span>En vez de: “{item.insteadOf}”</span>
-                <strong>Podrías decir: “{item.tryThis}”</strong>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {report.skillClassification?.length > 0 && (
-        <section className="feedback-block">
-          <h2>Habilidades observadas durante la entrevista</h2>
-          <div className="skill-chip-list">
-            {report.skillClassification.map((item) => (
-              <span key={item.label}>{item.label}: {item.count}</span>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="feedback-block">
-        <h2>Sugerencias para una próxima entrevista</h2>
-        <ul>
-          {report.nextSuggestions.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </section>
+        {report.reformulationSuggestions?.length > 0 && (
+          <section className="feedback-block">
+            <h2>Reformulaciones sugeridas</h2>
+            <ul className="reformulation-list">
+              {report.reformulationSuggestions.slice(0, 2).map((item) => (
+                <li key={`${item.insteadOf}-${item.tryThis}`}>
+                  <span>En vez de: "{item.insteadOf}"</span>
+                  <strong>Podrias decir: "{item.tryThis}"</strong>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </details>
 
       <details className="history-details">
-        <summary>Ver conversación completa ({visibleHistory.length})</summary>
+        <summary>Ver conversacion completa ({visibleHistory.length})</summary>
         <ol>
           {visibleHistory.map((entry) => (
             <li key={entry.id}>
@@ -204,7 +154,7 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
         </button>
         <button className="primary-action" type="button" onClick={onRestart}>
           <RotateCcw aria-hidden="true" />
-          Repetir simulación
+          Repetir simulacion
         </button>
       </div>
     </section>

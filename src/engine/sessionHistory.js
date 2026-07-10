@@ -1,4 +1,5 @@
 import { buildSessionSummary } from "./sessionMemory.js";
+import { buildSessionFeedback } from "./sessionFeedback.js";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 
 const HISTORY_STORAGE_KEY = "simuladorClinicoLdp.sessionHistory.v1";
@@ -28,6 +29,15 @@ export function buildSessionHistoryRecord({
     clinicalDecision,
     clinicalPlanEvaluation
   });
+  const sessionFeedback = buildSessionFeedback({
+    sessionNumber,
+    selectedCase: caseItem,
+    conversation: history,
+    clinicalDecision,
+    studentPlan: preSessionPlan,
+    selectedApproach: report?.therapeuticApproach,
+    report
+  });
   const visibleHistory = history
     .filter((entry) => !entry.isSessionPrelude)
     .map((entry) => ({
@@ -55,7 +65,7 @@ export function buildSessionHistoryRecord({
     updatedAt: new Date().toISOString(),
     conversationHistory: visibleHistory,
     summary: {
-      brief: report.summary,
+      brief: sessionFeedback.briefSummary,
       closure: sessionSummary.resumenConversacion,
       exploredTopics: sessionSummary.temasExplorados,
       pendingTopics: sessionSummary.temasPendientes,
@@ -70,6 +80,7 @@ export function buildSessionHistoryRecord({
     },
     feedback: {
       generalScore: report.generalScore,
+      sessionFeedback,
       strengths: report.strengths,
       improvements: report.improvements,
       criteria: report.criteria,

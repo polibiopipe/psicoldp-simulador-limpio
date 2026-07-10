@@ -9,7 +9,6 @@ import {
   TrendingUp
 } from "lucide-react";
 import {
-  closureExamples,
   getNextSessionAgreement,
   getNextSessionNumber,
   getSessionClosureTitle,
@@ -35,6 +34,7 @@ import {
   evaluateClinicalArtifacts,
   normalizeClinicalArtifacts
 } from "../engine/clinicalArtifacts.js";
+import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 import { clinicalInstrumentOptions } from "../data/clinicalWorkflow.js";
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
 
@@ -98,6 +98,19 @@ export function SessionClosure({
   const clinicalArtifactsEvaluation = useMemo(
     () => evaluateClinicalArtifacts({ artifacts: normalizedClinicalArtifacts, report, history }),
     [normalizedClinicalArtifacts, report, history]
+  );
+  const sessionFeedback = useMemo(
+    () =>
+      buildSessionFeedback({
+        sessionNumber,
+        selectedCase: caseItem,
+        conversation: history,
+        clinicalDecision: normalizedClinicalDecision,
+        studentPlan: preSessionPlan,
+        selectedApproach: report.therapeuticApproach,
+        report
+      }),
+    [sessionNumber, caseItem, history, normalizedClinicalDecision, preSessionPlan, report]
   );
   const agreement = useMemo(
     () =>
@@ -319,49 +332,66 @@ export function SessionClosure({
       )}
 
       <div className="closure-panels">
-        <section className="session-summary-card closure-panel closure-panel-wide">
-          <span className="eyebrow">Resumen narrativo</span>
-          <h2>Sesión {summary.sessionNumber} con {summary.patientName}</h2>
-          <p>{summary.resumenConversacion}</p>
-        </section>
+        <section className="session-summary-card closure-panel closure-panel-wide session-feedback-compact">
+          <span className="eyebrow">Retroalimentacion breve</span>
+          <div className="feedback-brief-header">
+            <div>
+              <h2>{sessionFeedback.levelLabel}</h2>
+              <p>{sessionFeedback.levelDescription}</p>
+            </div>
+            <strong>Sesion {summary.sessionNumber}</strong>
+          </div>
 
-        <section className="closure-card closure-panel">
-          <h2>Aspectos logrados</h2>
-          <ul>
-            {report.strengths.slice(0, 3).map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
+          <div className="feedback-sections feedback-brief-grid">
+            <article className="feedback-block">
+              <h3>Sintesis breve</h3>
+              <p>{sessionFeedback.briefSummary}</p>
+            </article>
+            <article className="feedback-block">
+              <h3>Fortalezas observadas</h3>
+              <ul>
+                {sessionFeedback.strengths.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+            <article className="feedback-block">
+              <h3>Aspecto a mejorar</h3>
+              <ul>
+                {sessionFeedback.improvements.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+            <article className="feedback-block">
+              <h3>Proximo paso sugerido</h3>
+              <p>{sessionFeedback.nextStep}</p>
+            </article>
+          </div>
 
-        <section className="closure-card closure-panel">
-          <h2>Aspectos por mejorar</h2>
-          <ul>
-            {report.improvements.slice(0, 3).map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="closure-card closure-panel">
-          <h2>Temas pendientes</h2>
-          <ul>
-            {summary.temasPendientes.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="closure-card closure-panel">
-          <h2>Ejemplos de cierre formativo</h2>
-          <ul>
-            {closureExamples.slice(0, 3).map((example) => (
-              <li key={example}>"{example}"</li>
-            ))}
-          </ul>
+          <details className="history-details feedback-detail-toggle">
+            <summary>Ver detalle formativo</summary>
+            <div className="session-summary-grid">
+              <div>
+                <h3>Criterios</h3>
+                <ul>
+                  {sessionFeedback.formativeCriteria.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3>Referencias formativas</h3>
+                <ul>
+                  {sessionFeedback.referencesUsed.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </details>
         </section>
       </div>
-
       <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
         <span className="eyebrow">Formulacion y registro</span>
         <h2>Hipotesis, instrumentos y nota clinica</h2>

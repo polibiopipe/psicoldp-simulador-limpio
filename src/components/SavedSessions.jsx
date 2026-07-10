@@ -95,12 +95,12 @@ export function SavedSessions({ authSession, onBackHome }) {
                   <div className="saved-session-meta">
                     <span>{formatDate(session.createdAt)}</span>
                     <span>{session.conversationHistory?.length || 0} turnos</span>
-                    <span>Puntaje {session.feedback?.generalScore ?? session.patientOpenness?.final ?? "N/O"}/100</span>
+                    <span>Nivel {getSessionFeedback(session).levelLabel}</span>
                     {getClinicalPlanEvaluation(session) && (
                       <span>{getClinicalPlanEvaluation(session).decisionLabel}</span>
                     )}
                   </div>
-                  <p>{session.summary?.brief || session.summary?.closure}</p>
+                  <p>{getSessionFeedback(session).briefSummary || session.summary?.brief || session.summary?.closure}</p>
                   <div className="saved-session-actions">
                     <button
                       className="secondary-action"
@@ -128,11 +128,33 @@ export function SavedSessions({ authSession, onBackHome }) {
                 <>
                   <span className="eyebrow">Detalle local</span>
                   <h2>{selectedSession.caseName} - Sesion {selectedSession.sessionNumber}</h2>
-                  <p>{selectedSession.summary?.closure}</p>
+                  <p>{getSessionFeedback(selectedSession).briefSummary || selectedSession.summary?.closure}</p>
                   <p>
-                    Puntaje formativo:{" "}
-                    <strong>{selectedSession.feedback?.generalScore ?? selectedSession.patientOpenness?.final ?? "N/O"}/100</strong>
+                    Nivel formativo: <strong>{getSessionFeedback(selectedSession).levelLabel}</strong>
                   </p>
+
+                  <section>
+                    <h3>Fortalezas observadas</h3>
+                    <ul>
+                      {getSessionFeedback(selectedSession).strengths.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3>Aspecto a mejorar</h3>
+                    <ul>
+                      {getSessionFeedback(selectedSession).improvements.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3>Proximo paso sugerido</h3>
+                    <p>{getSessionFeedback(selectedSession).nextStep}</p>
+                  </section>
 
                   {getPreSessionEvaluation(selectedSession) && (
                     <section>
@@ -177,32 +199,25 @@ export function SavedSessions({ authSession, onBackHome }) {
                     </section>
                   )}
 
-                  <section>
-                    <h3>Aspectos logrados</h3>
-                    <ul>
-                      {(selectedSession.feedback?.strengths || []).slice(0, 4).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </section>
-
-                  <section>
-                    <h3>Aspectos por mejorar</h3>
-                    <ul>
-                      {(selectedSession.feedback?.improvements || selectedSession.feedback?.nextSuggestions || []).slice(0, 4).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </section>
-
-                  <section>
-                    <h3>Sugerencias</h3>
-                    <ul>
-                      {(selectedSession.feedback?.nextSuggestions || []).slice(0, 4).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </section>
+                  <details className="history-details feedback-detail-toggle">
+                    <summary>Ver detalle formativo</summary>
+                    <section>
+                      <h3>Criterios formativos</h3>
+                      <ul>
+                        {getSessionFeedback(selectedSession).formativeCriteria.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </section>
+                    <section>
+                      <h3>Referencias usadas</h3>
+                      <ul>
+                        {getSessionFeedback(selectedSession).referencesUsed.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  </details>
 
                   {selectedSession.feedback?.objectiveEvaluation?.length > 0 && (
                     <section>
@@ -291,4 +306,45 @@ function getClinicalArtifactsEvaluation(session) {
     session?.summary?.clinicalArtifactsEvaluation ||
     null
   );
+}
+
+function getSessionFeedback(session) {
+  const feedback = session?.feedback?.sessionFeedback;
+  if (feedback) {
+    return {
+      levelLabel: feedback.levelLabel || "En desarrollo",
+      briefSummary: feedback.briefSummary || session?.summary?.brief || "",
+      strengths: ensureList(feedback.strengths, ["Se sostuvo una entrevista formativa."]),
+      improvements: ensureList(feedback.improvements, ["Profundizar el foco clinico en la siguiente revision."]),
+      nextStep: feedback.nextStep || "Revisar el motivo de consulta y definir un siguiente paso formativo.",
+      formativeCriteria: ensureList(feedback.formativeCriteria, ["Alianza", "Motivo de consulta", "Cierre"]),
+      referencesUsed: ensureList(feedback.referencesUsed, ["Apuntes formativos UNIACC"])
+    };
+  }
+
+  return {
+    levelLabel: resolveSavedLevel(session?.feedback?.generalScore ?? session?.patientOpenness?.final),
+    briefSummary: session?.summary?.brief || session?.summary?.closure || "Sesion guardada para revision formativa.",
+    strengths: ensureList((session?.feedback?.strengths || []).slice(0, 3), ["Se sostuvo una entrevista formativa."]),
+    improvements: ensureList(
+      (session?.feedback?.improvements || session?.feedback?.nextSuggestions || []).slice(0, 2),
+      ["Profundizar el foco clinico en la siguiente revision."]
+    ),
+    nextStep: (session?.feedback?.nextSuggestions || [])[0] || "Definir continuidad, cierre o derivacion segun lo observado.",
+    formativeCriteria: ["Alianza", "Motivo de consulta", "Decision clinica"],
+    referencesUsed: ["Apuntes formativos UNIACC"]
+  };
+}
+
+function ensureList(value, fallback) {
+  return Array.isArray(value) && value.length ? value : fallback;
+}
+
+function resolveSavedLevel(score) {
+  const numericScore = Number(score);
+  if (!Number.isFinite(numericScore)) return "En desarrollo";
+  if (numericScore >= 85) return "Destacado";
+  if (numericScore >= 65) return "Logrado";
+  if (numericScore >= 40) return "En desarrollo";
+  return "Inicial";
 }
