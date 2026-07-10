@@ -37,7 +37,6 @@ import {
   normalizeClinicalArtifacts
 } from "../engine/clinicalArtifacts.js";
 import { clinicalInstrumentOptions } from "../data/clinicalWorkflow.js";
-import { NextSessionModal } from "./NextSessionModal.jsx";
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
 
 export function SessionClosure({
@@ -52,10 +51,10 @@ export function SessionClosure({
   onBackHome,
   onSaveSessionRecord
 }) {
-  const [modalOpen, setModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [processCopied, setProcessCopied] = useState(false);
   const [hasSavedSessionRecord, setHasSavedSessionRecord] = useState(false);
+  const [hasSavedContinuityAgreement, setHasSavedContinuityAgreement] = useState(false);
   const [clinicalArtifacts, setClinicalArtifacts] = useState(() => buildInitialClinicalArtifacts());
   const sessionPlan = useMemo(() => getClinicalSessionPlan(caseItem), [caseItem.id]);
   const [clinicalDecision, setClinicalDecision] = useState(() =>
@@ -164,6 +163,7 @@ export function SessionClosure({
     setClinicalDecision(buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan }));
     setClinicalArtifacts(buildInitialClinicalArtifacts());
     setHasSavedSessionRecord(false);
+    setHasSavedContinuityAgreement(false);
   }, [caseItem.id, sessionNumber, sessionPlan, preSessionPlanKey]);
 
   function updateDecision(patch) {
@@ -215,6 +215,11 @@ export function SessionClosure({
   async function continueToNextSession() {
     await saveCurrentSummary({ includeHistory: true });
     if (canContinueInSimulator) onContinueSession(summary);
+  }
+
+  async function saveContinuityAgreement() {
+    await saveCurrentSummary({ includeHistory: true });
+    setHasSavedContinuityAgreement(true);
   }
 
   async function backHomeAfterSave() {
@@ -645,8 +650,12 @@ export function SessionClosure({
 
       <div className="continuity-callout">
         <div>
-          <h2>{closureAction.title}</h2>
-          <p>{closureAction.description}</p>
+          <h2>{canContinueInSimulator && hasSavedContinuityAgreement ? "Continuidad registrada" : closureAction.title}</h2>
+          <p>
+            {canContinueInSimulator && hasSavedContinuityAgreement
+              ? `El acuerdo de nueva sesion quedo guardado. Puedes iniciar la sesion ${nextSessionNumber} ahora o volver al inicio para retomarla luego.`
+              : closureAction.description}
+          </p>
         </div>
         <PedagogicalGuide
           guideId="cierre_seguimiento"
@@ -655,17 +664,30 @@ export function SessionClosure({
           className="clinical-inline-guide"
         />
         <div className="closure-actions">
-          {canContinueInSimulator ? (
-            <button className="primary-action" type="button" onClick={() => setModalOpen(true)}>
+          {canContinueInSimulator && !hasSavedContinuityAgreement ? (
+            <button className="primary-action" type="button" onClick={saveContinuityAgreement}>
               {closureAction.primaryLabel}
-              <ArrowRight aria-hidden="true" />
+              <CheckCircle2 aria-hidden="true" />
             </button>
-          ) : (
+          ) : null}
+          {canContinueInSimulator && hasSavedContinuityAgreement ? (
+            <>
+              <button className="primary-action" type="button" onClick={backHomeAfterSave}>
+                <Home aria-hidden="true" />
+                Volver al inicio
+              </button>
+              <button className="secondary-action" type="button" onClick={continueToNextSession}>
+                <ArrowRight aria-hidden="true" />
+                Iniciar sesion {nextSessionNumber} ahora
+              </button>
+            </>
+          ) : null}
+          {!canContinueInSimulator ? (
             <button className="primary-action" type="button" onClick={backHomeAfterSave}>
               <Home aria-hidden="true" />
               {closureAction.primaryLabel}
             </button>
-          )}
+          ) : null}
           <button className="secondary-action" type="button" onClick={copyProcessSummary}>
             <Clipboard aria-hidden="true" />
             {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
@@ -725,17 +747,6 @@ export function SessionClosure({
         </section>
       )}
 
-      <NextSessionModal
-        open={modalOpen}
-        summary={summary}
-        patientAgreement={agreement}
-        nextSessionNumber={nextSessionNumber}
-        nextSessionStage={nextSessionStage}
-        onClose={() => setModalOpen(false)}
-        onContinueSession={continueToNextSession}
-        onSaveSummary={() => saveCurrentSummary({ includeHistory: true })}
-        onBackHome={backHomeAfterSave}
-      />
     </section>
   );
 }
@@ -750,9 +761,9 @@ function getClosureActionConfig({
 }) {
   if (canContinueInSimulator) {
     return {
-      title: "Continuar segun tu decision",
-      description: `Puedes avanzar a ${nextSessionStage?.title?.toLowerCase() || "la siguiente sesion"} porque propusiste continuidad dentro de las ${plannedSessionTotal} sesiones propuestas.`,
-      primaryLabel: `Continuar a sesion ${nextSessionNumber}`
+      title: "Registrar continuidad",
+      description: `Guarda primero el acuerdo de nueva sesion. Luego podras iniciar ${nextSessionStage?.title?.toLowerCase() || "la siguiente sesion"} si quieres continuar ahora.`,
+      primaryLabel: "Guardar acuerdo de nueva sesion"
     };
   }
 
