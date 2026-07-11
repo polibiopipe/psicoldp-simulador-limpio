@@ -12,6 +12,11 @@ import {
   getZonedDateKey,
   trimConversationForGemini
 } from "./simulationUsagePolicy.js";
+import {
+  getEmptyWeeklyAvailability,
+  hasConfiguredAvailability,
+  validateAgendaSchedule
+} from "./clinicalAgenda.js";
 
 const checks = [];
 
@@ -28,6 +33,8 @@ const student = { role: "student" };
 const admin = { role: "admin" };
 const sql = readFileSync(resolve(process.cwd(), "supabase/simulation_appointments.sql"), "utf8");
 const rollback = readFileSync(resolve(process.cwd(), "supabase/simulation_appointments_rollback.sql"), "utf8");
+const availabilitySql = readFileSync(resolve(process.cwd(), "supabase/simulation_student_availability.sql"), "utf8");
+const availabilityRollback = readFileSync(resolve(process.cwd(), "supabase/simulation_student_availability_rollback.sql"), "utf8");
 const endpoint = readFileSync(resolve(process.cwd(), "api/gemini-patient-response.js"), "utf8");
 const clinicalAgendaComponent = readFileSync(resolve(process.cwd(), "src/components/ClinicalAgenda.jsx"), "utf8");
 const clinicalAgendaEngine = readFileSync(resolve(process.cwd(), "src/engine/clinicalAgenda.js"), "utf8");
@@ -37,6 +44,31 @@ const baseAppointment = {
   sessionNumber: 1,
   scheduledLocalDate: "2026-07-10",
   status: "scheduled"
+};
+const agendaCase = {
+  id: "claudio",
+  name: "Claudio",
+  age: "40 años",
+  motive: "Estancamiento vital",
+  shortTitle: "Caso piloto"
+};
+const mondayAvailability = {
+  ...getEmptyWeeklyAvailability(),
+  monday: {
+    enabled: true,
+    start: "09:00",
+    end: "13:00",
+    blocks: [{ start: "09:00", end: "13:00" }]
+  }
+};
+const editedAvailability = {
+  ...getEmptyWeeklyAvailability(),
+  monday: {
+    enabled: true,
+    start: "15:00",
+    end: "19:00",
+    blocks: [{ start: "15:00", end: "19:00" }]
+  }
 };
 
 check("timezone uses America/Santiago calendar day", () =>
@@ -128,6 +160,177 @@ check("ClinicalAgenda imports defined local date formatter", () =>
   clinicalAgendaEngine.includes("Number.isNaN(value.getTime())") &&
   clinicalAgendaComponent.includes("formatDateInput") &&
   /import\s*{[\s\S]*formatDateInput[\s\S]*}\s*from\s*"\.\.\/engine\/clinicalAgenda\.js"/.test(clinicalAgendaComponent)
+);
+
+check("student without availability cannot schedule silently", () => {
+  const result = validateAgendaSchedule({
+    caseId: "claudio",
+    draft: { date: "2026-07-06", time: "09:00", durationMinutes: 45, plannedSessionNumber: 1 },
+    cases: [agendaCase],
+    availability: getEmptyWeeklyAvailability()
+  });
+  return !result.ok && result.type === "no_availability";
+});
+
+check("missing availability table is handled without blank screen", () =>
+  clinicalAgendaEngine.includes("classifyAvailabilityError") &&
+  clinicalAgendaEngine.includes("source: \"schema_missing\"") &&
+  clinicalAgendaEngine.includes("La configuración de disponibilidad aún no está habilitada en este entorno") &&
+  clinicalAgendaComponent.includes("availabilityStatus?.authoritative")
+);
+
+check("availability network and permission errors are controlled", () =>
+  clinicalAgendaEngine.includes("source: \"permission_denied\"") &&
+  clinicalAgendaEngine.includes("No tienes permiso para modificar esta disponibilidad") &&
+  clinicalAgendaEngine.includes("source: \"network_or_supabase_error\"") &&
+  clinicalAgendaEngine.includes("No pudimos verificar tu disponibilidad")
+);
+
+check("student can define availability for one day", () =>
+  hasConfiguredAvailability(mondayAvailability) &&
+  validateAgendaSchedule({
+    caseId: "claudio",
+    draft: { date: "2026-07-06", time: "09:00", durationMinutes: 45, plannedSessionNumber: 1 },
+    cases: [agendaCase],
+    availability: mondayAvailability
+  }).ok
+);
+
+check("student can edit availability block", () =>
+  validateAgendaSchedule({
+    caseId: "claudio",
+    draft: { date: "2026-07-06", time: "15:00", durationMinutes: 45, plannedSessionNumber: 1 },
+    cases: [agendaCase],
+    availability: editedAvailability
+  }).ok
+);
+
+check("student can remove availability blocks", () =>
+  !hasConfiguredAvailability(getEmptyWeeklyAvailability())
+);
+
+check("appointment fully inside availability block is accepted near the end", () =>
+  validateAgendaSchedule({
+    caseId: "claudio",
+    draft: { date: "2026-07-06", time: "12:15", durationMinutes: 45, plannedSessionNumber: 1 },
+    cases: [agendaCase],
+    availability: mondayAvailability
+  }).ok
+);
+
+check("appointment ending one minute outside availability is rejected", () => {
+  const result = validateAgendaSchedule({
+    caseId: "claudio",
+    draft: { date: "2026-07-06", time: "12:16", durationMinutes: 45, plannedSessionNumber: 1 },
+    cases: [agendaCase],
+    availability: mondayAvailability
+  });
+  return !result.ok && result.type === "outside_availability";
+});
+
+check("appointment at availability end is rejected", () => {
+  const result = validateAgendaSchedule({
+    caseId: "claudio",
+    draft: { date: "2026-07-06", time: "13:00", durationMinutes: 45, plannedSessionNumber: 1 },
+    cases: [agendaCase],
+    availability: mondayAvailability
+  });
+  return !result.ok && result.type === "outside_availability";
+});
+
+check("appointment outside availability block is rejected", () => {
+  const result = validateAgendaSchedule({
+    caseId: "claudio",
+    draft: { date: "2026-07-06", time: "08:00", durationMinutes: 45, plannedSessionNumber: 1 },
+    cases: [agendaCase],
+    availability: mondayAvailability
+  });
+  return !result.ok && result.type === "outside_availability";
+});
+
+check("day without availability is rejected", () => {
+  const result = validateAgendaSchedule({
+    caseId: "claudio",
+    draft: { date: "2026-07-07", time: "09:00", durationMinutes: 45, plannedSessionNumber: 1 },
+    cases: [agendaCase],
+    availability: mondayAvailability
+  });
+  return !result.ok && result.type === "outside_availability";
+});
+
+check("daily session limit remains independent from availability blocks", () =>
+  !canScheduleSession(student, "2026-07-06", [{ ...baseAppointment, scheduledLocalDate: "2026-07-06" }]).ok
+);
+
+check("availability RLS isolates each student's rows", () =>
+  availabilitySql.includes("auth.uid() = user_id") &&
+  availabilitySql.includes("profile.approved = true") &&
+  availabilitySql.includes("with check") &&
+  availabilitySql.includes("for select") &&
+  availabilitySql.includes("for insert") &&
+  availabilitySql.includes("for update") &&
+  availabilitySql.includes("for delete")
+);
+
+check("availability model uses explicit day and time columns", () =>
+  availabilitySql.includes("day_of_week smallint not null") &&
+  availabilitySql.includes("start_time time not null") &&
+  availabilitySql.includes("end_time time not null") &&
+  availabilitySql.includes("check (day_of_week between 0 and 6)") &&
+  availabilitySql.includes("check (start_time < end_time)") &&
+  availabilitySql.includes("check (timezone = 'America/Santiago')")
+);
+
+check("availability migration rejects duplicates and overlapping blocks", () =>
+  availabilitySql.includes("simulation_student_availability_exact_block_idx") &&
+  availabilitySql.includes("public.validate_simulation_student_availability_block") &&
+  availabilitySql.includes("availability blocks cannot overlap") &&
+  availabilitySql.includes("new.start_time < other.end_time") &&
+  availabilitySql.includes("new.end_time > other.start_time")
+);
+
+check("availability migration validates appointments server-side", () =>
+  availabilitySql.includes("public.validate_simulation_appointment_student_availability") &&
+  availabilitySql.includes("on_simulation_appointments_student_availability") &&
+  availabilitySql.includes("appointment outside student availability") &&
+  availabilitySql.includes("new.scheduled_for at time zone 'America/Santiago'") &&
+  availabilitySql.includes("local_end::date <> local_start::date") &&
+  availabilitySql.includes("local_end::time <= availability.end_time") &&
+  availabilitySql.includes("caller_role in ('admin', 'qa')") &&
+  availabilitySql.includes("before insert or update of scheduled_for, duration_minutes, timezone, user_id") &&
+  availabilityRollback.includes("drop trigger if exists on_simulation_appointments_student_availability")
+);
+
+check("existing appointments remain valid after availability edits", () =>
+  availabilitySql.includes("before insert or update of scheduled_for, duration_minutes, timezone, user_id") &&
+  !availabilitySql.includes("update public.simulation_appointments") &&
+  !availabilitySql.includes("delete from public.simulation_appointments") &&
+  !availabilitySql.includes("status, user_id")
+);
+
+check("localStorage cache does not authorize appointment scheduling", () =>
+  clinicalAgendaComponent.includes("availabilityStatus?.authoritative") &&
+  clinicalAgendaComponent.includes("availabilityState.authoritative ? availability : getEmptyWeeklyAvailability()") &&
+  clinicalAgendaComponent.includes("source: result.ok ? \"supabase\" : result.source || \"supabase_error\"") &&
+  clinicalAgendaEngine.includes("if (!raw) return getEmptyWeeklyAvailability()")
+);
+
+check("availability migration has rollback and data protection", () =>
+  availabilitySql.includes("create table if not exists public.simulation_student_availability") &&
+  availabilityRollback.includes("Rollback detenido: existen registros de disponibilidad") &&
+  availabilityRollback.includes("drop table if exists public.simulation_student_availability") &&
+  !availabilityRollback.includes("drop table if exists public.simulation_appointments") &&
+  !availabilityRollback.includes("drop table if exists public.simulation_interventions")
+);
+
+check("availability migration is idempotent and isolated", () =>
+  availabilitySql.includes("drop trigger if exists on_simulation_student_availability_updated_at") &&
+  availabilitySql.includes("drop trigger if exists on_simulation_student_availability_validate_block") &&
+  availabilitySql.includes("drop trigger if exists on_simulation_appointments_student_availability") &&
+  availabilitySql.includes("drop policy if exists \"Students can read own availability\"") &&
+  !availabilitySql.includes("create table if not exists public.simulation_appointments") &&
+  !availabilitySql.includes("update public.simulation_sessions") &&
+  !availabilitySql.includes("update public.user_profiles")
 );
 
 check("migration includes atomic intervention RPC and unique idempotency", () => {

@@ -6,11 +6,14 @@ import {
   getSessionSummariesForCase,
   mergeSessionSummaryList
 } from "./sessionMemory.js";
+import { SIMULATION_TIMEZONE } from "./simulationUsagePolicy.js";
 
 const AGENDA_STORAGE_KEY = "escuchaViva.clinicalAgenda.v1";
 const AVAILABILITY_STORAGE_KEY = "escuchaViva.weeklyAvailability.v1";
+const AVAILABILITY_TABLE = "simulation_student_availability";
 const MAX_SIMULATED_SESSIONS = 12;
 const DEFAULT_SESSION_DURATION = 45;
+const DEFAULT_EDIT_BLOCK = { start: "09:00", end: "10:00" };
 
 export const SESSION_DURATION_OPTIONS = [30, 45, 60];
 
@@ -24,15 +27,9 @@ export const WEEK_DAYS = [
   { key: "sunday", label: "Domingo", shortLabel: "Dom", dayIndex: 0 }
 ];
 
-const DEFAULT_WEEKLY_AVAILABILITY = {
-  monday: { enabled: true, start: "18:00", end: "21:00" },
-  tuesday: { enabled: true, start: "19:00", end: "22:00" },
-  wednesday: { enabled: false, start: "18:00", end: "20:00" },
-  thursday: { enabled: true, start: "18:00", end: "20:00" },
-  friday: { enabled: true, start: "17:00", end: "19:00" },
-  saturday: { enabled: true, start: "10:00", end: "13:00" },
-  sunday: { enabled: false, start: "10:00", end: "12:00" }
-};
+const EMPTY_WEEKLY_AVAILABILITY = buildEmptyWeeklyAvailability();
+const DAY_KEY_TO_INDEX = Object.fromEntries(WEEK_DAYS.map((day) => [day.key, day.dayIndex]));
+const DAY_INDEX_TO_KEY = Object.fromEntries(WEEK_DAYS.map((day) => [day.dayIndex, day.key]));
 
 export const CLINICAL_PROCESS_STATES = {
   notStarted: "No iniciado",
@@ -42,7 +39,7 @@ export const CLINICAL_PROCESS_STATES = {
   taskAssigned: "Tarea asignada",
   riskOpen: "Riesgo abierto",
   needsReevaluation: "Requiere reevaluacion",
-  readyForNext: "Listo para proxima sesion",
+  readyForNext: "Listo para próxima sesión",
   closing: "En cierre",
   closed: "Cerrado",
   referred: "Derivado",
@@ -149,12 +146,14 @@ export function clearClinicalAgendaEntry(caseId) {
 }
 
 export function getWeeklyAvailability() {
-  if (!canUseStorage()) return DEFAULT_WEEKLY_AVAILABILITY;
+  if (!canUseStorage()) return getEmptyWeeklyAvailability();
   try {
-    const parsed = JSON.parse(localStorage.getItem(AVAILABILITY_STORAGE_KEY) || "{}");
+    const raw = localStorage.getItem(AVAILABILITY_STORAGE_KEY);
+    if (!raw) return getEmptyWeeklyAvailability();
+    const parsed = JSON.parse(raw);
     return normalizeWeeklyAvailability(parsed);
   } catch {
-    return DEFAULT_WEEKLY_AVAILABILITY;
+    return getEmptyWeeklyAvailability();
   }
 }
 
@@ -164,6 +163,122 @@ export function saveWeeklyAvailability(availability = {}) {
     localStorage.setItem(AVAILABILITY_STORAGE_KEY, JSON.stringify(normalized));
   }
   return normalized;
+}
+
+export async function loadStudentWeeklyAvailability(authSession = null) {
+  const { isSupabaseConfigured, supabase } = await getSupabaseRuntime();
+  if (!isSupabaseConfigured || !supabase || !authSession?.user?.id) {
+    return {
+      availability: getEmptyWeeklyAvailability(),
+      configured: false,
+      authoritative: false,
+      source: "unavailable",
+      error: "No podemos verificar tu disponibilidad en este momento."
+    };
+  }
+
+  const { data, error } = await supabase
+    .from(AVAILABILITY_TABLE)
+    .select("id,day_of_week,start_time,end_time,timezone,updated_at")
+    .eq("user_id", authSession.user.id)
+    .order("day_of_week", { ascending: true })
+    .order("start_time", { ascending: true });
+
+  if (error) {
+    console.warn("[availability] load error message", error.message);
+    console.warn("[availability] load error code", error.code || null);
+    const classified = classifyAvailabilityError(error);
+    return {
+      availability: getEmptyWeeklyAvailability(),
+      configured: false,
+      authoritative: false,
+      source: classified.source,
+      error: classified.message
+    };
+  }
+
+  const availability = mapAvailabilityRowsToWeekly(data || []);
+  saveWeeklyAvailability(availability);
+  return {
+    availability,
+    configured: hasConfiguredAvailability(availability),
+    authoritative: true,
+    source: "supabase",
+    error: ""
+  };
+}
+
+export async function saveStudentWeeklyAvailability(authSession = null, availability = {}) {
+  const normalized = normalizeWeeklyAvailability(availability);
+  const { isSupabaseConfigured, supabase } = await getSupabaseRuntime();
+  if (!isSupabaseConfigured || !supabase || !authSession?.user?.id) {
+    return {
+      ok: false,
+      availability: normalized,
+      error: "No podemos guardar tu disponibilidad sin conexión segura a Supabase."
+    };
+  }
+
+  const rows = mapWeeklyAvailabilityToRows(authSession.user.id, normalized);
+
+  const { error: deleteError } = await supabase
+    .from(AVAILABILITY_TABLE)
+    .delete()
+    .eq("user_id", authSession.user.id);
+
+  if (deleteError) {
+    console.warn("[availability] delete error message", deleteError.message);
+    console.warn("[availability] delete error code", deleteError.code || null);
+    const classified = classifyAvailabilityError(deleteError);
+    return { ok: false, availability: normalized, error: classified.message, source: classified.source };
+  }
+
+  if (!rows.length) {
+    const empty = getEmptyWeeklyAvailability();
+    saveWeeklyAvailability(empty);
+    return {
+      ok: true,
+      availability: empty,
+      configured: false,
+      error: ""
+    };
+  }
+
+  const { data, error } = await supabase
+    .from(AVAILABILITY_TABLE)
+    .insert(rows)
+    .select("id,day_of_week,start_time,end_time,timezone,updated_at");
+
+  if (error) {
+    console.warn("[availability] save error message", error.message);
+    console.warn("[availability] save error code", error.code || null);
+    const classified = classifyAvailabilityError(error);
+    return { ok: false, availability: normalized, error: classified.message, source: classified.source };
+  }
+
+  const saved = mapAvailabilityRowsToWeekly(data || rows);
+  saveWeeklyAvailability(saved);
+  return {
+    ok: true,
+    availability: saved,
+    configured: hasConfiguredAvailability(saved),
+    error: ""
+  };
+}
+
+export function getEmptyWeeklyAvailability() {
+  return normalizeWeeklyAvailability(EMPTY_WEEKLY_AVAILABILITY);
+}
+
+export function hasConfiguredAvailability(availability = {}) {
+  const normalized = normalizeWeeklyAvailability(availability);
+  return WEEK_DAYS.some((day) => normalized[day.key]?.blocks?.length > 0);
+}
+
+export function formatAvailabilityForDay(dayAvailability = {}) {
+  const blocks = Array.isArray(dayAvailability.blocks) ? dayAvailability.blocks : [];
+  if (!dayAvailability.enabled || !blocks.length) return "Sin disponibilidad";
+  return blocks.map((block) => `${block.start} a ${block.end}`).join(", ");
 }
 
 export function getWeekStartDate(baseDate = new Date()) {
@@ -236,30 +351,32 @@ export function buildAvailableSlots({
     const dayAvailability = normalizedAvailability[day.key];
     if (!dayAvailability?.enabled) return;
     const date = formatDateInput(addDays(weekStart, index));
-    const start = timeToMinutes(dayAvailability.start);
-    const end = timeToMinutes(dayAvailability.end);
+    dayAvailability.blocks.forEach((availabilityBlock) => {
+      const start = timeToMinutes(availabilityBlock.start);
+      const end = timeToMinutes(availabilityBlock.end);
 
-    for (let current = start; current + duration <= end; current += duration) {
-      const candidate = {
-        date,
-        time: minutesToTime(current),
-        durationMinutes: duration
-      };
-      const conflict = findScheduleConflict({
-        caseId: "",
-        date,
-        time: candidate.time,
-        durationMinutes: duration,
-        blocks
-      });
-      if (!conflict) {
-        slots.push({
-          ...candidate,
-          dayLabel: day.label,
-          endTime: minutesToTime(current + duration)
+      for (let current = start; current + duration <= end; current += duration) {
+        const candidate = {
+          date,
+          time: minutesToTime(current),
+          durationMinutes: duration
+        };
+        const conflict = findScheduleConflict({
+          caseId: "",
+          date,
+          time: candidate.time,
+          durationMinutes: duration,
+          blocks
         });
+        if (!conflict) {
+          slots.push({
+            ...candidate,
+            dayLabel: day.label,
+            endTime: minutesToTime(current + duration)
+          });
+        }
       }
-    }
+    });
   });
 
   return slots.slice(0, limit);
@@ -269,7 +386,7 @@ export function validateAgendaSchedule({
   caseId,
   draft = {},
   cases = [],
-  availability = getWeeklyAvailability()
+  availability = getEmptyWeeklyAvailability()
 } = {}) {
   const item = cases.find((caseItem) => caseItem.id === caseId)
     ? buildClinicalAgendaItem(cases.find((caseItem) => caseItem.id === caseId))
@@ -665,27 +782,43 @@ function buildScheduledSessionBlocks(cases = []) {
 }
 
 function validateAvailability({ date, time, durationMinutes, availability }) {
+  const normalizedAvailability = normalizeWeeklyAvailability(availability);
+  if (!hasConfiguredAvailability(normalizedAvailability)) {
+    return {
+      ok: false,
+      type: "no_availability",
+      message: "Aún no has definido tu disponibilidad.",
+      detail: "Configúrala para organizar tus próximas sesiones.",
+      actionLabel: "Editar disponibilidad"
+    };
+  }
+
   const dayKey = getDayKey(date);
-  const dayAvailability = normalizeWeeklyAvailability(availability)[dayKey];
+  const dayAvailability = normalizedAvailability[dayKey];
   if (!dayAvailability?.enabled) {
     return {
       ok: false,
       type: "outside_availability",
-      message: "Este horario esta fuera de tu disponibilidad definida.",
-      detail: "Puedes ajustar tu disponibilidad o elegir otro horario."
+      message: "Este horario está fuera de tu disponibilidad.",
+      detail: "Ese día no tiene disponibilidad configurada.",
+      actionLabel: "Editar disponibilidad"
     };
   }
 
   const start = timeToMinutes(time);
   const end = start + normalizeDuration(durationMinutes);
-  const availableStart = timeToMinutes(dayAvailability.start);
-  const availableEnd = timeToMinutes(dayAvailability.end);
-  if (start < availableStart || end > availableEnd) {
+  const matchingBlock = dayAvailability.blocks.find((block) => {
+    const availableStart = timeToMinutes(block.start);
+    const availableEnd = timeToMinutes(block.end);
+    return start >= availableStart && end <= availableEnd;
+  });
+  if (!matchingBlock) {
     return {
       ok: false,
       type: "outside_availability",
-      message: "Este horario esta fuera de tu disponibilidad definida.",
-      detail: `Disponibilidad del dia: ${dayAvailability.start} a ${dayAvailability.end}.`
+      message: "Este horario está fuera de tu disponibilidad.",
+      detail: `Disponibilidad del día: ${formatAvailabilityForDay(dayAvailability)}.`,
+      actionLabel: "Editar disponibilidad"
     };
   }
 
@@ -704,17 +837,106 @@ function findScheduleConflict({ caseId, date, time, durationMinutes, blocks = []
 
 function normalizeWeeklyAvailability(availability = {}) {
   return WEEK_DAYS.reduce((acc, day) => {
-    const source = availability?.[day.key] || DEFAULT_WEEKLY_AVAILABILITY[day.key];
+    const source = availability?.[day.key] || {};
+    const rawBlocks = Array.isArray(source.blocks)
+      ? source.blocks
+      : source.enabled && source.start && source.end
+        ? [{ start: source.start, end: source.end }]
+        : [];
+    const blocks = rawBlocks
+      .map((block) => ({
+        start: isValidTime(block?.start) ? block.start : "",
+        end: isValidTime(block?.end) ? block.end : ""
+      }))
+      .filter((block) => block.start && block.end && timeToMinutes(block.end) > timeToMinutes(block.start))
+      .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+    const enabled = source.enabled !== false && blocks.length > 0;
+    const firstBlock = blocks[0] || DEFAULT_EDIT_BLOCK;
     acc[day.key] = {
-      enabled: Boolean(source.enabled),
-      start: isValidTime(source.start) ? source.start : DEFAULT_WEEKLY_AVAILABILITY[day.key].start,
-      end: isValidTime(source.end) ? source.end : DEFAULT_WEEKLY_AVAILABILITY[day.key].end
+      enabled,
+      start: enabled ? firstBlock.start : "",
+      end: enabled ? firstBlock.end : "",
+      blocks: enabled ? blocks : []
     };
-    if (timeToMinutes(acc[day.key].end) <= timeToMinutes(acc[day.key].start)) {
-      acc[day.key].end = DEFAULT_WEEKLY_AVAILABILITY[day.key].end;
-    }
     return acc;
   }, {});
+}
+
+function buildEmptyWeeklyAvailability() {
+  return WEEK_DAYS.reduce((acc, day) => {
+    acc[day.key] = { enabled: false, start: "", end: "", blocks: [] };
+    return acc;
+  }, {});
+}
+
+function mapAvailabilityRowsToWeekly(rows = []) {
+  const base = buildEmptyWeeklyAvailability();
+  for (const row of rows) {
+    const dayKey = DAY_INDEX_TO_KEY[Number(row.day_of_week)];
+    if (!dayKey) continue;
+    const currentBlocks = Array.isArray(base[dayKey].blocks) ? base[dayKey].blocks : [];
+    base[dayKey] = {
+      enabled: true,
+      blocks: [
+        ...currentBlocks,
+        {
+          id: row.id || "",
+          start: normalizeTimeValue(row.start_time),
+          end: normalizeTimeValue(row.end_time)
+        }
+      ]
+    };
+  }
+  return normalizeWeeklyAvailability(base);
+}
+
+function mapWeeklyAvailabilityToRows(userId, availability = {}) {
+  const normalized = normalizeWeeklyAvailability(availability);
+  return WEEK_DAYS.flatMap((day) => {
+    const blocks = normalized[day.key]?.blocks || [];
+    return blocks.map((block) => ({
+      user_id: userId,
+      day_of_week: DAY_KEY_TO_INDEX[day.key],
+      start_time: block.start,
+      end_time: block.end,
+      timezone: SIMULATION_TIMEZONE
+    }));
+  });
+}
+
+function normalizeTimeValue(value = "") {
+  const match = String(value || "").match(/^(\d{2}:\d{2})/);
+  return match ? match[1] : "";
+}
+
+function classifyAvailabilityError(error = {}) {
+  const code = String(error.code || "");
+  const message = String(error.message || "");
+  if (code === "42P01" || /does not exist|schema cache|simulation_student_availability/i.test(message)) {
+    return {
+      source: "schema_missing",
+      message: "La configuración de disponibilidad aún no está habilitada en este entorno."
+    };
+  }
+  if (code === "42501" || /permission|row-level security|rls/i.test(message)) {
+    return {
+      source: "permission_denied",
+      message: "No tienes permiso para modificar esta disponibilidad."
+    };
+  }
+  return {
+    source: "network_or_supabase_error",
+    message: "No pudimos verificar tu disponibilidad. Intenta nuevamente."
+  };
+}
+
+async function getSupabaseRuntime() {
+  try {
+    return await import("../lib/supabaseClient.js");
+  } catch (error) {
+    console.warn("[availability] supabase runtime unavailable", error?.message || error);
+    return { isSupabaseConfigured: false, supabase: null };
+  }
 }
 
 function getDayKey(dateValue) {

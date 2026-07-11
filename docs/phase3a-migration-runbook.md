@@ -65,7 +65,28 @@ npm run audit:phase3a-safety
 supabase/simulation_appointments.sql
 ```
 
-4. No ejecutar rollback salvo que falle la validacion posterior.
+4. Para habilitar disponibilidad personal del estudiante, ejecutar despues:
+
+```text
+supabase/simulation_student_availability.sql
+```
+
+Modelo de disponibilidad:
+
+- `id uuid`
+- `user_id uuid`
+- `day_of_week smallint`
+- `start_time time`
+- `end_time time`
+- `timezone text`
+- `created_at timestamptz`
+- `updated_at timestamptz`
+
+Convenio `day_of_week`: `0=domingo`, `1=lunes`, `2=martes`, `3=miercoles`, `4=jueves`, `5=viernes`, `6=sabado`.
+La zona operativa autorizada para esta version es `America/Santiago`.
+Cada fila representa un bloque horario. La base rechaza bloques superpuestos, duplicados exactos, `start_time >= end_time`, zonas horarias distintas y dias fuera de rango.
+
+5. No ejecutar rollback salvo que falle la validacion posterior.
 
 ## 4. Verificacion de migracion
 
@@ -232,6 +253,9 @@ Ejecutar `supabase/simulation_appointments_rollback.sql` solo si:
 El rollback aborta si detecta datos en appointments, interventions o sesiones vinculadas por `appointment_id`.
 Tambien aborta si existen usuarios con `role = 'qa'`, porque no es seguro restaurar la restriccion previa sin reasignar primero esos usuarios.
 Si no hay usuarios QA, restaura `user_profiles_role_check` a roles `student` y `admin`.
+
+Para disponibilidad personal, usar `supabase/simulation_student_availability_rollback.sql` solo si no hay registros de disponibilidad que conservar.
+Ese rollback aborta si detecta filas en `public.simulation_student_availability`.
 
 ## 11. Prohibicion de promocion a produccion
 
