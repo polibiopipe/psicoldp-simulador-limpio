@@ -7746,3 +7746,917 @@ body,
     flex-direction: column;
   }
 }
+
+/* RC v1.0 prelaunch visual polish */
+:root {
+  --ev-ink: #10212b;
+  --ev-ink-soft: #405462;
+  --ev-muted: #6b7d86;
+  --ev-navy: #17395d;
+  --ev-navy-strong: #102f4e;
+  --ev-teal: #176d75;
+  --ev-teal-soft: #e8f4f3;
+  --ev-amber: #c9a45a;
+  --ev-bg: #f7f9f8;
+  --ev-bg-soft: #eef5f3;
+  --ev-surface: #ffffff;
+  --ev-line: rgba(18, 48, 67, 0.12);
+  --ev-line-strong: rgba(18, 48, 67, 0.18);
+  --ev-shadow-soft: 0 14px 34px rgba(16, 47, 78, 0.08);
+  --ev-shadow-lift: 0 18px 42px rgba(16, 47, 78, 0.12);
+  --ev-radius: 8px;
+  --ev-transition: 160ms ease;
+  --brand: var(--ev-teal);
+  --brand-strong: var(--ev-navy);
+  --muted: var(--ev-muted);
+}
+
+html {
+  background: var(--ev-bg);
+  color: var(--ev-ink);
+}
+
+body {
+  background:
+    linear-gradient(180deg, rgba(232, 244, 243, 0.48) 0, rgba(247, 249, 248, 0) 260px),
+    var(--ev-bg);
+  color: var(--ev-ink);
+}
+
+.app-shell,
+.authenticated-shell,
+.simulator-shell {
+  background: transparent;
+}
+
+.screen {
+  width: min(1220px, calc(100% - 40px));
+  padding-top: 28px;
+  padding-bottom: 40px;
+}
+
+.eyebrow,
+.auth-kicker,
+.case-practice-label {
+  color: var(--ev-teal);
+  letter-spacing: 0.04em;
+}
+
+.section-header h1,
+.dashboard-hero h1,
+.clinical-agenda-header h1,
+.saved-sessions-header h1,
+.session-closure-header h1,
+.chat-title-line h1,
+.auth-intro-panel h1 {
+  color: var(--ev-navy-strong);
+  letter-spacing: 0;
+}
+
+.section-header p,
+.dashboard-hero p,
+.clinical-agenda-header p,
+.saved-sessions-header p,
+.auth-intro-panel > p,
+.auth-card-heading p {
+  color: var(--ev-ink-soft);
+}
+
+.primary-action,
+.secondary-action,
+.danger-action,
+.text-action,
+.inline-link-button,
+.agenda-calendar-actions > button,
+.prep-step,
+.dashboard-metric-card,
+.agenda-patient-card,
+.saved-session-card,
+.clinical-decision-option {
+  transition:
+    background-color var(--ev-transition),
+    border-color var(--ev-transition),
+    box-shadow var(--ev-transition),
+    color var(--ev-transition),
+    transform var(--ev-transition);
+}
+
+.primary-action {
+  background: var(--ev-navy);
+  border-color: var(--ev-navy);
+  box-shadow: 0 10px 22px rgba(16, 47, 78, 0.18);
+}
+
+.primary-action:hover:not(:disabled) {
+  background: var(--ev-navy-strong);
+  border-color: var(--ev-navy-strong);
+  box-shadow: var(--ev-shadow-lift);
+  transform: translateY(-1px);
+}
+
+.secondary-action {
+  border-color: var(--ev-line);
+  color: var(--ev-navy);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.secondary-action:hover:not(:disabled),
+.text-action:hover:not(:disabled),
+.inline-link-button:hover:not(:disabled) {
+  border-color: rgba(23, 109, 117, 0.28);
+  color: var(--ev-teal);
+  background: var(--ev-teal-soft);
+}
+
+.primary-action:disabled,
+.secondary-action:disabled,
+.danger-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  box-shadow: none;
+  transform: none;
+}
+
+.primary-action:focus-visible,
+.secondary-action:focus-visible,
+.danger-action:focus-visible,
+.text-action:focus-visible,
+.inline-link-button:focus-visible,
+.auth-form input:focus-visible,
+.auth-form select:focus-visible,
+.auth-form textarea:focus-visible,
+.clinical-prep-field textarea:focus-visible,
+.clinical-prep-field select:focus-visible,
+.clinical-prep-field input:focus-visible,
+.schedule-form-grid input:focus-visible,
+.schedule-form-grid select:focus-visible,
+.schedule-form-grid textarea:focus-visible,
+.chat-panel textarea:focus-visible {
+  outline: 3px solid rgba(42, 154, 164, 0.22);
+  outline-offset: 2px;
+}
+
+.auth-card,
+.refined-auth-card,
+.dashboard-hero,
+.dashboard-panel,
+.dashboard-metric-card,
+.agenda-overview article,
+.agenda-guide-card,
+.agenda-patient-card,
+.clinical-registry-panel,
+.availability-editor,
+.agenda-calendar-panel,
+.agenda-available-slots,
+.schedule-editor-card,
+.info-panel,
+.patient-card,
+.learning-box,
+.chat-panel,
+.closure-card,
+.session-summary-card,
+.feedback-block,
+.saved-session-card,
+.saved-session-detail,
+.prep-sidebar-card,
+.clinical-preparation-panel {
+  border: 1px solid var(--ev-line);
+  border-radius: var(--ev-radius);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--ev-shadow-soft);
+}
+
+.dashboard-hero,
+.clinical-agenda-header,
+.saved-sessions-header,
+.session-closure-header {
+  padding: 22px 24px;
+  border-radius: var(--ev-radius);
+}
+
+.dashboard-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.dashboard-hero h1 {
+  margin-bottom: 6px;
+  font-size: 2rem;
+}
+
+.dashboard-hero p {
+  max-width: 720px;
+  margin: 0;
+}
+
+.dashboard-hero-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dashboard-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dashboard-metric-card {
+  min-height: 112px;
+  padding: 16px;
+  align-content: start;
+}
+
+.dashboard-metric-card svg,
+.dashboard-panel-heading svg,
+.agenda-panel-heading svg,
+.agenda-overview svg {
+  color: var(--ev-teal);
+}
+
+.dashboard-grid {
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 16px;
+}
+
+.dashboard-panel {
+  padding: 18px;
+}
+
+.dashboard-panel-heading {
+  margin-bottom: 14px;
+}
+
+.dashboard-patient-strip,
+.dashboard-clinical-summary div,
+.pending-action-item,
+.dashboard-patient-list button,
+.registry-next-card,
+.registry-summary-grid div,
+.agenda-reminder-grid div,
+.prep-summary-grid div,
+.session-summary-grid div {
+  border-radius: var(--ev-radius);
+  border-color: var(--ev-line);
+  background: #fbfdfc;
+}
+
+.dashboard-patient-list button,
+.pending-action-item,
+.agenda-patient-card,
+.saved-session-card {
+  box-shadow: none;
+}
+
+.dashboard-patient-list button:hover,
+.pending-action-item:hover,
+.agenda-patient-card:hover,
+.saved-session-card:hover {
+  border-color: rgba(23, 109, 117, 0.28);
+  box-shadow: 0 12px 24px rgba(16, 47, 78, 0.08);
+  transform: translateY(-1px);
+}
+
+.pending-list,
+.pending-action-list,
+.dashboard-patient-list,
+.saved-sessions-list {
+  gap: 10px;
+}
+
+.clinical-agenda-screen {
+  width: min(1320px, calc(100% - 40px));
+}
+
+.clinical-agenda-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.agenda-overview {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.agenda-control-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.availability-editor,
+.agenda-calendar-panel,
+.agenda-available-slots {
+  padding: 18px;
+}
+
+.availability-grid {
+  gap: 8px;
+}
+
+.availability-day-row {
+  grid-template-columns: 132px minmax(90px, 104px) minmax(84px, 96px) minmax(84px, 96px) minmax(90px, 1fr);
+  align-items: center;
+  min-height: 54px;
+  padding: 10px;
+}
+
+.availability-day-row.enabled {
+  border-color: rgba(23, 109, 117, 0.24);
+  background: rgba(232, 244, 243, 0.7);
+}
+
+.availability-toggle {
+  min-width: 0;
+}
+
+.availability-day-row input[type="time"],
+.schedule-form-grid input,
+.schedule-form-grid select,
+.schedule-form-grid textarea,
+.auth-form input,
+.clinical-prep-field textarea,
+.clinical-prep-field select,
+.clinical-prep-field input {
+  border-radius: var(--ev-radius);
+  border-color: var(--ev-line);
+  background: #ffffff;
+}
+
+.availability-save,
+.schedule-actions .primary-action {
+  width: auto;
+}
+
+.agenda-calendar-toolbar {
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ev-line);
+}
+
+.agenda-calendar-actions {
+  gap: 8px;
+}
+
+.agenda-calendar-actions > button {
+  border-radius: 999px;
+}
+
+.agenda-calendar-actions > button.selected {
+  background: var(--ev-navy);
+  border-color: var(--ev-navy);
+  color: #ffffff;
+}
+
+.agenda-calendar-grid {
+  gap: 8px;
+}
+
+.agenda-day-column {
+  border-radius: var(--ev-radius);
+  border-color: var(--ev-line);
+  background: #ffffff;
+}
+
+.agenda-day-column.today {
+  border-color: rgba(23, 109, 117, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(23, 109, 117, 0.14);
+}
+
+.agenda-session-block {
+  border-radius: 7px;
+  border-left-color: var(--ev-teal);
+  box-shadow: none;
+}
+
+.agenda-session-block:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(16, 47, 78, 0.1);
+}
+
+.clinical-agenda-layout {
+  grid-template-columns: minmax(300px, 0.88fr) minmax(0, 1.12fr);
+  gap: 16px;
+}
+
+.agenda-patient-list {
+  gap: 12px;
+}
+
+.agenda-card-main {
+  gap: 12px;
+}
+
+.agenda-card-main img,
+.dashboard-patient-strip img,
+.dashboard-patient-list img {
+  border-radius: var(--ev-radius);
+}
+
+.agenda-card-actions,
+.agenda-reminder-actions,
+.schedule-actions,
+.saved-session-actions,
+.closure-actions {
+  gap: 10px;
+}
+
+.schedule-editor-panel {
+  backdrop-filter: blur(8px);
+}
+
+.schedule-editor-card {
+  width: min(760px, calc(100% - 32px));
+  max-height: min(86vh, 820px);
+  overflow: auto;
+}
+
+.schedule-form-grid {
+  gap: 12px;
+}
+
+.preparation-brief-layout {
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.brief-sidebar-stack {
+  gap: 14px;
+}
+
+.preparation-brief-layout .patient-card,
+.prep-sidebar-card {
+  position: sticky;
+  top: 18px;
+}
+
+.preparation-brief-layout .patient-card {
+  padding: 18px;
+}
+
+.preparation-brief-layout .patient-portrait {
+  max-height: 180px;
+  object-fit: cover;
+}
+
+.clinical-preparation-panel {
+  padding: 20px;
+}
+
+.clinical-prep-hero {
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.clinical-prep-hero h2 {
+  margin-bottom: 4px;
+  color: var(--ev-navy-strong);
+}
+
+.clinical-preparation-panel .prep-workflow-stepper {
+  align-items: stretch;
+  margin: 12px 0;
+}
+
+.clinical-preparation-panel .prep-step {
+  min-height: 76px;
+  border-radius: var(--ev-radius);
+  background: #ffffff;
+  border-color: var(--ev-line);
+}
+
+.clinical-preparation-panel .prep-step.is-active {
+  border-color: rgba(23, 109, 117, 0.38);
+  background: var(--ev-teal-soft);
+  box-shadow: inset 0 0 0 1px rgba(23, 109, 117, 0.08);
+}
+
+.prep-step-index {
+  background: rgba(23, 109, 117, 0.08);
+  color: var(--ev-teal);
+}
+
+.prep-step-panel {
+  border-radius: var(--ev-radius);
+  border: 1px solid var(--ev-line);
+  background: #fbfdfc;
+  padding: 16px;
+}
+
+.clinical-preparation-panel .clinical-area-grid label,
+.ethical-care-grid label,
+.clinical-decision-option {
+  border-radius: var(--ev-radius);
+  border-color: var(--ev-line);
+  background: #ffffff;
+}
+
+.clinical-preparation-panel .clinical-area-grid label:has(input:checked),
+.ethical-care-grid label:has(input:checked),
+.clinical-decision-option.selected {
+  border-color: rgba(23, 109, 117, 0.42);
+  background: var(--ev-teal-soft);
+}
+
+.prep-step-actions {
+  border-radius: 0 0 var(--ev-radius) var(--ev-radius);
+}
+
+.prep-assistant-card {
+  border-color: rgba(23, 109, 117, 0.16);
+  background: linear-gradient(180deg, #ffffff, #f5fbfa);
+}
+
+.chat-screen {
+  width: min(1320px, calc(100% - 40px));
+  grid-template-columns: minmax(250px, 310px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.chat-sidebar {
+  gap: 12px;
+}
+
+.chat-sidebar .patient-card,
+.chat-sidebar .learning-box {
+  box-shadow: none;
+}
+
+.chat-panel {
+  min-height: min(760px, calc(100vh - 120px));
+  overflow: hidden;
+}
+
+.chat-header {
+  gap: 16px;
+  border-bottom: 1px solid var(--ev-line);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.chat-title-line {
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-actions {
+  gap: 8px;
+}
+
+.session-usage-chip,
+.session-context,
+.agenda-state-pill,
+.saved-session-meta span,
+.closure-case-strip span,
+.closure-metrics article {
+  border-radius: 999px;
+  border-color: var(--ev-line);
+  background: #f7fbfa;
+}
+
+.chat-phase-guide {
+  margin: 12px 16px 0;
+  border-radius: var(--ev-radius);
+  border-color: rgba(23, 109, 117, 0.16);
+  background: rgba(232, 244, 243, 0.55);
+}
+
+.interview-experience.chat-only > .conversation,
+.conversation {
+  background:
+    linear-gradient(180deg, rgba(247, 249, 248, 0.88), rgba(255, 255, 255, 0.98)),
+    #ffffff;
+}
+
+.exchange {
+  gap: 8px;
+}
+
+.message {
+  max-width: min(760px, 78%);
+  border-radius: var(--ev-radius);
+  box-shadow: 0 8px 20px rgba(16, 47, 78, 0.06);
+}
+
+.student-message {
+  background: var(--ev-navy);
+  color: #ffffff;
+}
+
+.student-message span,
+.student-message p {
+  color: #ffffff;
+}
+
+.patient-message {
+  border-color: rgba(23, 109, 117, 0.18);
+  background: #ffffff;
+  color: var(--ev-ink);
+}
+
+.question-form {
+  border-top: 1px solid var(--ev-line);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.input-row {
+  align-items: flex-end;
+}
+
+.chat-panel textarea {
+  min-height: 56px;
+  max-height: 150px;
+}
+
+.chat-panel .icon-action,
+.chat-panel .voice-dictation-button {
+  border-radius: var(--ev-radius);
+}
+
+.session-closure {
+  width: min(1180px, calc(100% - 40px));
+}
+
+.closure-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.closure-panels {
+  gap: 16px;
+}
+
+.clinical-decision-grid {
+  gap: 12px;
+}
+
+.clinical-decision-option {
+  min-height: 132px;
+  padding: 16px;
+}
+
+.clinical-decision-option:hover {
+  border-color: rgba(23, 109, 117, 0.3);
+  box-shadow: 0 12px 24px rgba(16, 47, 78, 0.08);
+}
+
+.continuity-callout {
+  border-radius: var(--ev-radius);
+  border: 1px solid rgba(23, 109, 117, 0.18);
+  background: #f6fbfa;
+  box-shadow: var(--ev-shadow-soft);
+}
+
+.feedback-brief-grid {
+  gap: 12px;
+}
+
+.feedback-brief-grid .feedback-block {
+  min-height: 128px;
+  box-shadow: none;
+}
+
+.feedback-brief-header strong {
+  background: #f7fbfa;
+}
+
+.saved-sessions-screen {
+  width: min(1180px, calc(100% - 40px));
+}
+
+.saved-sessions-layout {
+  grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.15fr);
+  gap: 16px;
+}
+
+.saved-session-card {
+  padding: 16px;
+}
+
+.saved-session-detail {
+  padding: 20px;
+}
+
+.history-details {
+  border-radius: var(--ev-radius);
+  border-color: var(--ev-line);
+}
+
+.modal-backdrop,
+.schedule-editor-panel {
+  background: rgba(11, 30, 46, 0.38);
+}
+
+.confirmation-modal,
+.delete-session-modal {
+  border-radius: var(--ev-radius);
+  border: 1px solid var(--ev-line);
+  box-shadow: var(--ev-shadow-lift);
+}
+
+.refined-auth-screen {
+  width: min(1120px, calc(100% - 40px));
+  min-height: calc(100vh - 72px);
+  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 430px);
+  gap: 44px;
+  align-items: center;
+}
+
+.auth-intro-panel {
+  gap: 16px;
+}
+
+.auth-brand-lockup {
+  align-items: center;
+}
+
+.auth-brand-lockup img {
+  border-radius: var(--ev-radius);
+}
+
+.auth-intro-panel h1 {
+  max-width: 720px;
+}
+
+.auth-intro-panel .auth-ethical-notice,
+.auth-warning {
+  border-radius: var(--ev-radius);
+  border-color: var(--ev-line);
+  background: #fbfdfc;
+}
+
+.refined-auth-card {
+  padding: 24px;
+}
+
+.refined-auth-card .auth-tabs {
+  border-radius: var(--ev-radius);
+}
+
+.refined-auth-card .auth-tabs button {
+  border-radius: 6px;
+}
+
+.auth-error,
+.auth-message {
+  border-radius: var(--ev-radius);
+}
+
+@media (max-width: 1180px) {
+  .screen,
+  .clinical-agenda-screen,
+  .chat-screen,
+  .session-closure,
+  .saved-sessions-screen,
+  .refined-auth-screen {
+    width: min(100% - 28px, 1000px);
+  }
+
+  .dashboard-hero,
+  .clinical-agenda-header,
+  .refined-auth-screen,
+  .preparation-brief-layout,
+  .chat-screen,
+  .clinical-agenda-layout,
+  .saved-sessions-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-hero-actions {
+    justify-content: flex-start;
+  }
+
+  .dashboard-metrics,
+  .agenda-overview,
+  .closure-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agenda-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preparation-brief-layout .patient-card,
+  .prep-sidebar-card {
+    position: static;
+  }
+
+  .chat-panel {
+    min-height: 680px;
+  }
+}
+
+@media (max-width: 820px) {
+  .screen,
+  .clinical-agenda-screen,
+  .chat-screen,
+  .session-closure,
+  .saved-sessions-screen,
+  .refined-auth-screen {
+    width: min(100% - 20px, 720px);
+    padding-top: 18px;
+    padding-bottom: 28px;
+  }
+
+  .dashboard-hero,
+  .clinical-agenda-header,
+  .saved-sessions-header,
+  .session-closure-header,
+  .dashboard-panel,
+  .clinical-preparation-panel,
+  .chat-panel,
+  .saved-session-detail,
+  .refined-auth-card {
+    padding: 16px;
+  }
+
+  .dashboard-metrics,
+  .dashboard-grid,
+  .agenda-overview,
+  .closure-metrics,
+  .feedback-brief-grid,
+  .prep-summary-grid,
+  .session-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .availability-day-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .availability-toggle,
+  .availability-day-row small,
+  .availability-clear {
+    grid-column: 1 / -1;
+  }
+
+  .agenda-calendar-toolbar,
+  .agenda-calendar-actions,
+  .chat-header,
+  .chat-actions,
+  .closure-actions,
+  .saved-session-actions,
+  .schedule-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .agenda-calendar-actions > button,
+  .chat-actions .primary-action,
+  .chat-actions .secondary-action,
+  .closure-actions .primary-action,
+  .closure-actions .secondary-action,
+  .saved-session-actions .primary-action,
+  .saved-session-actions .secondary-action,
+  .schedule-actions .primary-action,
+  .schedule-actions .secondary-action {
+    width: 100%;
+  }
+
+  .message {
+    max-width: 92%;
+  }
+
+  .chat-panel {
+    min-height: 640px;
+  }
+
+  .refined-auth-screen {
+    min-height: auto;
+    gap: 18px;
+  }
+}
+
+@media (max-width: 520px) {
+  .dashboard-hero h1,
+  .clinical-agenda-header h1,
+  .saved-sessions-header h1,
+  .session-closure-header h1,
+  .auth-intro-panel h1 {
+    font-size: 1.55rem;
+  }
+
+  .clinical-decision-grid,
+  .clinical-preparation-panel .clinical-area-grid,
+  .ethical-care-grid,
+  .schedule-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .message {
+    max-width: 100%;
+  }
+
+  .schedule-editor-card {
+    width: calc(100% - 20px);
+    max-height: 88vh;
+  }
+}
