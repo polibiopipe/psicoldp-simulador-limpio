@@ -310,9 +310,44 @@ check("existing appointments remain valid after availability edits", () =>
 
 check("localStorage cache does not authorize appointment scheduling", () =>
   clinicalAgendaComponent.includes("availabilityStatus?.authoritative") &&
-  clinicalAgendaComponent.includes("availabilityState.authoritative ? availability : getEmptyWeeklyAvailability()") &&
-  clinicalAgendaComponent.includes("source: result.ok ? \"supabase\" : result.source || \"supabase_error\"") &&
+  clinicalAgendaComponent.includes("availabilityState.authoritative ? availability : emptyAvailability") &&
+  clinicalAgendaComponent.includes("source: finalResult.source || \"supabase\"") &&
   clinicalAgendaEngine.includes("if (!raw) return getEmptyWeeklyAvailability()")
+);
+
+check("availability save refreshes authoritative Supabase state", () =>
+  clinicalAgendaComponent.includes("const refreshed = await loadStudentWeeklyAvailability(authSession)") &&
+  clinicalAgendaComponent.includes("finalResult = refreshed.authoritative") &&
+  clinicalAgendaComponent.includes("setAvailability(finalResult.availability)") &&
+  clinicalAgendaComponent.includes("configured: Boolean(finalResult.configured)")
+);
+
+check("stale availability loads cannot override saved blocks", () =>
+  clinicalAgendaComponent.includes("availabilityRequestRef") &&
+  clinicalAgendaComponent.includes("requestId !== availabilityRequestRef.current") &&
+  clinicalAgendaComponent.includes("availabilityRequestRef.current = requestId")
+);
+
+check("editing availability from scheduler closes modal and preserves draft", () =>
+  clinicalAgendaComponent.includes("function openAvailabilityFromScheduling") &&
+  clinicalAgendaComponent.includes("updateScheduleDraft(caseId, draft)") &&
+  clinicalAgendaComponent.includes("setScheduleCaseId(\"\")") &&
+  clinicalAgendaComponent.includes("savedDraft={scheduleDrafts[scheduleItem.caseItem.id]}") &&
+  clinicalAgendaComponent.includes("onAction: () => onEditAvailability?.(draft)")
+);
+
+check("availability save failure keeps previous authoritative state visible", () =>
+  clinicalAgendaComponent.includes("const previousAvailability = availability") &&
+  clinicalAgendaComponent.includes("const previousState = availabilityState") &&
+  clinicalAgendaComponent.includes("setAvailability(previousAvailability)") &&
+  clinicalAgendaComponent.includes("...previousState")
+);
+
+check("availability save blocks double click duplicates", () =>
+  clinicalAgendaComponent.includes("const [localSaving, setLocalSaving]") &&
+  clinicalAgendaComponent.includes("if (localSaving || status?.saving) return") &&
+  clinicalAgendaComponent.includes("disabled={status?.saving || localSaving}") &&
+  clinicalAgendaComponent.includes("Guardando...")
 );
 
 check("availability migration has rollback and data protection", () =>

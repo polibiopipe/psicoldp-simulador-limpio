@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   AlertTriangle,
@@ -62,11 +62,13 @@ export function ClinicalAgenda({
   onStartSession,
   onAppointmentsChange
 }) {
+  const availabilityRequestRef = useRef(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const agendaItems = useMemo(
     () => applyAppointmentsToAgendaItems(buildClinicalAgendaItems(cases), appointments),
     [cases, appointments, refreshKey]
   );
+  const emptyAvailability = useMemo(() => getEmptyWeeklyAvailability(), []);
   const [availability, setAvailability] = useState(() => getEmptyWeeklyAvailability());
   const [availabilityState, setAvailabilityState] = useState({
     loading: true,
@@ -85,13 +87,18 @@ export function ClinicalAgenda({
     () => initialCaseId || agendaItems[0]?.caseItem.id || cases[0]?.id || ""
   );
   const [scheduleCaseId, setScheduleCaseId] = useState("");
+  const [scheduleDrafts, setScheduleDrafts] = useState({});
+  const [availabilityReturnCaseId, setAvailabilityReturnCaseId] = useState("");
   const [reminderCaseId, setReminderCaseId] = useState("");
   const selectedItem =
     agendaItems.find((item) => item.caseItem.id === selectedCaseId) || agendaItems[0] || null;
   const scheduleItem = agendaItems.find((item) => item.caseItem.id === scheduleCaseId) || null;
   const reminderItem = agendaItems.find((item) => item.caseItem.id === reminderCaseId) || null;
   const stats = buildAgendaStats(agendaItems);
-  const scheduleAvailability = availabilityState.authoritative ? availability : getEmptyWeeklyAvailability();
+  const scheduleAvailability = useMemo(
+    () => availabilityState.authoritative ? availability : emptyAvailability,
+    [availabilityState.authoritative, availability, emptyAvailability]
+  );
   const weeklyAgenda = useMemo(
     () => calendarView === "mes"
       ? buildAppointmentMonthAgenda({ cases, appointments, baseDate: weekStart, availability: scheduleAvailability })
@@ -105,9 +112,11 @@ export function ClinicalAgenda({
 
   useEffect(() => {
     let active = true;
+    const requestId = availabilityRequestRef.current + 1;
+    availabilityRequestRef.current = requestId;
     setAvailabilityState((current) => ({ ...current, loading: true, error: "" }));
     loadStudentWeeklyAvailability(authSession).then((result) => {
-      if (!active) return;
+      if (!active || requestId !== availabilityRequestRef.current) return;
       setAvailability(result.availability);
       setAvailabilityState({
         loading: false,
@@ -140,18 +149,74 @@ export function ClinicalAgenda({
   }
 
   async function updateAvailability(nextAvailability) {
+    const previousAvailability = availability;
+    const previousState = availabilityState;
+    const requestId = availabilityRequestRef.current + 1;
+    availabilityRequestRef.current = requestId;
     setAvailabilityState((current) => ({ ...current, saving: true, error: "" }));
     const result = await saveStudentWeeklyAvailability(authSession, nextAvailability);
-    setAvailability(result.availability);
+    let finalResult = result;
+    if (result.ok) {
+      const refreshed = await loadStudentWeeklyAvailability(authSession);
+      finalResult = refreshed.authoritative
+        ? { ...refreshed, ok: true }
+        : result;
+    }
+    if (requestId !== availabilityRequestRef.current) return finalResult;
+    if (!finalResult.ok && !finalResult.authoritative) {
+      setAvailability(previousAvailability);
+      setAvailabilityState({
+        ...previousState,
+        loading: false,
+        saving: false,
+        error: finalResult.error || "No pudimos guardar tu disponibilidad.",
+        source: finalResult.source || "supabase_error"
+      });
+      return finalResult;
+    }
+    setAvailability(finalResult.availability);
     setAvailabilityState({
       loading: false,
       saving: false,
-      authoritative: Boolean(result.ok),
-      configured: Boolean(result.configured),
-      source: result.ok ? "supabase" : result.source || "supabase_error",
-      error: result.error || ""
+      authoritative: true,
+      configured: Boolean(finalResult.configured),
+      source: finalResult.source || "supabase",
+      error: finalResult.error || ""
     });
     refreshAgenda();
+    if (availabilityReturnCaseId) {
+      const returnCaseId = availabilityReturnCaseId;
+      setAvailabilityReturnCaseId("");
+      setSelectedCaseId(returnCaseId);
+      setScheduleCaseId(returnCaseId);
+    }
+    return finalResult;
+  }
+
+  function updateScheduleDraft(caseId, draft) {
+    if (!caseId) return;
+    setScheduleDrafts((current) => ({
+      ...current,
+      [caseId]: draft
+    }));
+  }
+
+  function clearScheduleDraft(caseId) {
+    if (!caseId) return;
+    setScheduleDrafts((current) => {
+      const next = { ...current };
+      delete next[caseId];
+      return next;
+    });
+  }
+
+  function openAvailabilityFromScheduling(caseId, draft) {
+    if (caseId && draft) updateScheduleDraft(caseId, draft);
+    setAvailabilityReturnCaseId(caseId || "");
+    setScheduleCaseId("");
+    window.setTimeout(() => {
+      document.querySelector(".availability-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
   }
 
   function updateLanguagePreference(patch) {
@@ -202,6 +267,7 @@ export function ClinicalAgenda({
     const result = await saveSimulationAppointment(authSession, appointment);
     const saved = result.data || appointment;
     onAppointmentsChange?.(mergeAppointmentList(appointments, saved));
+    clearScheduleDraft(item.caseItem.id);
     setScheduleCaseId("");
     setSuggestedSlot(null);
     refreshAgenda();
@@ -221,6 +287,7 @@ export function ClinicalAgenda({
       clearClinicalAgendaEntry(item.caseItem.id);
     }
     setScheduleCaseId("");
+    clearScheduleDraft(item.caseItem.id);
     setSuggestedSlot(null);
     refreshAgenda();
   }
@@ -511,11 +578,14 @@ export function ClinicalAgenda({
           availabilityStatus={availabilityState}
           appointments={appointments}
           suggestedSlot={suggestedSlot}
+          savedDraft={scheduleDrafts[scheduleItem.caseItem.id]}
           termCopy={termCopy}
-          onEditAvailability={() => {
-            document.querySelector(".availability-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          onDraftChange={(draft) => updateScheduleDraft(scheduleItem.caseItem.id, draft)}
+          onEditAvailability={(draft) => openAvailabilityFromScheduling(scheduleItem.caseItem.id, draft)}
+          onCancel={() => {
+            clearScheduleDraft(scheduleItem.caseItem.id);
+            setScheduleCaseId("");
           }}
-          onCancel={() => setScheduleCaseId("")}
           onSave={(entry) => {
             void saveAppointmentFromDraft(scheduleItem, entry);
           }}
@@ -966,10 +1036,15 @@ function ClinicalLanguagePanel({ preference, termCopy, onChange }) {
 
 function AvailabilityEditor({ availability, status, onChange }) {
   const [draft, setDraft] = useState(availability);
+  const [localSaving, setLocalSaving] = useState(false);
 
   useEffect(() => {
     setDraft(availability);
   }, [availability]);
+
+  useEffect(() => {
+    if (!status?.saving) setLocalSaving(false);
+  }, [status?.saving]);
 
   function updateDay(dayKey, patch) {
     setDraft((current) => ({
@@ -1008,8 +1083,11 @@ function AvailabilityEditor({ availability, status, onChange }) {
 
   const configured = hasConfiguredAvailability(draft);
 
-  function handleSave() {
-    void onChange(draft);
+  async function handleSave() {
+    if (localSaving || status?.saving) return;
+    setLocalSaving(true);
+    await onChange(draft);
+    setLocalSaving(false);
   }
 
   return (
@@ -1078,10 +1156,12 @@ function AvailabilityEditor({ availability, status, onChange }) {
         className="primary-action availability-save"
         type="button"
         onClick={handleSave}
-        disabled={status?.saving}
+        disabled={status?.saving || localSaving}
       >
         <CheckCircle2 aria-hidden="true" />
-        {status?.configured ? "Editar mi disponibilidad" : "Definir mi disponibilidad"}
+        {status?.saving || localSaving
+          ? "Guardando..."
+          : status?.configured ? "Editar mi disponibilidad" : "Definir mi disponibilidad"}
       </button>
       {!configured && (
         <p className="availability-status">Activa al menos un día y define un bloque horario para guardar.</p>
@@ -1205,13 +1285,15 @@ function ScheduleEditor({
   availabilityStatus,
   appointments = [],
   suggestedSlot,
+  savedDraft,
   termCopy,
+  onDraftChange,
   onEditAvailability,
   onSave,
   onCancel,
   onClear
 }) {
-  const [draft, setDraft] = useState(() => ({
+  const [draft, setDraft] = useState(() => savedDraft || {
     date: suggestedSlot?.date || item.agendaEntry?.date || "",
     time: suggestedSlot?.time || item.agendaEntry?.time || "",
     durationMinutes: SESSION_DURATION_MINUTES,
@@ -1220,7 +1302,12 @@ function ScheduleEditor({
     status: item.agendaEntry?.status || "programada",
     nextObjective: item.agendaEntry?.nextObjective || item.nextFocus || "",
     reminderNote: item.agendaEntry?.reminderNote || item.task?.description || ""
-  }));
+  });
+
+  useEffect(() => {
+    if (savedDraft) setDraft(savedDraft);
+  }, [savedDraft]);
+
   const validation = validateAppointmentSchedule({
     item,
     draft,
@@ -1230,11 +1317,15 @@ function ScheduleEditor({
     cases
   });
   const validationWithAction = validation.actionLabel
-    ? { ...validation, onAction: onEditAvailability }
+    ? { ...validation, onAction: () => onEditAvailability?.(draft) }
     : validation;
 
   function updateDraft(patch) {
-    setDraft((current) => ({ ...current, ...patch }));
+    setDraft((current) => {
+      const next = { ...current, ...patch };
+      onDraftChange?.(next);
+      return next;
+    });
   }
 
   return (
