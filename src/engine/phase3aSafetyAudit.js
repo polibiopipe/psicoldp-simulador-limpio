@@ -35,6 +35,7 @@ const sql = readFileSync(resolve(process.cwd(), "supabase/simulation_appointment
 const rollback = readFileSync(resolve(process.cwd(), "supabase/simulation_appointments_rollback.sql"), "utf8");
 const availabilitySql = readFileSync(resolve(process.cwd(), "supabase/simulation_student_availability.sql"), "utf8");
 const availabilityRollback = readFileSync(resolve(process.cwd(), "supabase/simulation_student_availability_rollback.sql"), "utf8");
+const runbook = readFileSync(resolve(process.cwd(), "docs/phase3a-migration-runbook.md"), "utf8");
 const endpoint = readFileSync(resolve(process.cwd(), "api/gemini-patient-response.js"), "utf8");
 const clinicalAgendaComponent = readFileSync(resolve(process.cwd(), "src/components/ClinicalAgenda.jsx"), "utf8");
 const clinicalAgendaEngine = readFileSync(resolve(process.cwd(), "src/engine/clinicalAgenda.js"), "utf8");
@@ -380,71 +381,83 @@ check("migration includes atomic intervention RPC and unique idempotency", () =>
   ].every((needle) => sql.includes(needle));
 });
 
-check("migration creates simulation_sessions status before status constraint", () => {
-  const statusColumn = sql.indexOf("add column if not exists status text");
-  const statusConstraint = sql.indexOf("simulation_sessions_status_check");
-  return statusColumn !== -1 && statusConstraint !== -1 && statusColumn < statusConstraint;
-});
-
-check("migration normalizes historical sessions as completed", () =>
-  sql.includes("set status = 'completed'") &&
-  sql.includes("where status is null or btrim(status) = ''") &&
-  sql.includes("alter column status set default 'completed'") &&
-  sql.includes("alter column status set not null")
+check("runbook records Supabase v2 snapshot", () =>
+  runbook.includes("dstmscvnaziqptpomssv") &&
+  runbook.includes("`public.user_profiles`: 4 filas") &&
+  runbook.includes("`public.simulation_sessions`: 10 filas") &&
+  runbook.includes("9 `completed`, 1 `in_progress`") &&
+  runbook.includes("danieltoledohein@gmail.com")
 );
 
-check("migration creates simulation_sessions updated_at before trigger", () => {
-  const updatedAtColumn = sql.indexOf("add column if not exists updated_at timestamptz");
-  const updatedAtTrigger = sql.indexOf("on_simulation_sessions_updated_at");
-  return updatedAtColumn !== -1 && updatedAtTrigger !== -1 && updatedAtColumn < updatedAtTrigger;
-});
-
-check("migration backfills updated_at from historical created_at", () =>
-  sql.includes("set updated_at = coalesce(updated_at, created_at, now())") &&
-  sql.includes("where updated_at is null") &&
-  sql.includes("alter column updated_at set default now()") &&
-  sql.includes("alter column updated_at set not null")
+check("migration expects existing v2 session status and updated_at", () =>
+  sql.includes("public.simulation_sessions.status must exist before this v2 migration") &&
+  sql.includes("public.simulation_sessions.updated_at must exist before this v2 migration") &&
+  !sql.includes("add column if not exists status text") &&
+  !sql.includes("add column if not exists updated_at timestamptz")
 );
 
-check("migration keeps historical sessions unlinked to appointments", () =>
+check("migration expands existing session status constraint only to closure_pending", () =>
+  sql.includes("alter table public.simulation_sessions drop constraint simulation_sessions_status_check") &&
+  sql.includes("check (status in ('in_progress', 'closure_pending', 'completed'))") &&
+  !/simulation_sessions_status_check[\s\S]{0,260}scheduled/i.test(sql) &&
+  !/simulation_sessions_status_check[\s\S]{0,260}cancelled/i.test(sql)
+);
+
+check("migration preserves Daniel in_progress and completed historical sessions", () =>
+  sql.includes("where status not in ('in_progress', 'completed')") &&
+  !sql.includes("set status = 'completed'") &&
+  !/update\s+public\.simulation_sessions/i.test(sql) &&
+  !/delete\s+from\s+public\.simulation_sessions/i.test(sql)
+);
+
+check("migration keeps historical ids and appointment_id null", () =>
   sql.includes("add column if not exists appointment_id uuid references public.simulation_appointments(id) on delete set null") &&
-  !/update\s+public\.simulation_sessions[\s\S]{0,240}set\s+appointment_id/i.test(sql)
+  !/set\s+appointment_id/i.test(sql) &&
+  !/insert\s+into\s+public\.simulation_appointments[\s\S]{0,240}select/i.test(sql)
 );
 
-check("migration updates simulation_sessions updated_at by trigger", () =>
-  sql.includes("create or replace function public.set_simulation_session_updated_at()") &&
-  sql.includes("drop trigger if exists on_simulation_sessions_updated_at on public.simulation_sessions") &&
-  sql.includes("create trigger on_simulation_sessions_updated_at")
+check("migration adds only v2 phase3a nullable session columns", () =>
+  sql.includes("add column if not exists appointment_id uuid references public.simulation_appointments(id) on delete set null") &&
+  sql.includes("add column if not exists started_at timestamptz") &&
+  sql.includes("add column if not exists ends_at timestamptz") &&
+  sql.includes("add column if not exists completed_at timestamptz")
 );
 
-check("rollback removes phase3a columns without dropping simulation_sessions", () =>
+check("migration respects existing session policies and updated_at trigger", () =>
+  !/drop\s+policy[\s\S]{0,120}on\s+public\.simulation_sessions/i.test(sql) &&
+  !/create\s+policy[\s\S]{0,120}on\s+public\.simulation_sessions/i.test(sql) &&
+  sql.includes("on_phase3a_simulation_sessions_updated_at") &&
+  sql.includes("trigger_info.tgname ilike '%updated_at%'")
+);
+
+check("rollback removes only phase3a session columns and preserves status updated_at", () =>
   [
     "drop column if exists appointment_id",
     "drop column if exists started_at",
     "drop column if exists ends_at",
-    "drop column if exists completed_at",
-    "drop column if exists status",
-    "drop column if exists updated_at"
+    "drop column if exists completed_at"
   ].every((needle) => rollback.includes(needle)) &&
+  !rollback.includes("drop column if exists status") &&
+  !rollback.includes("drop column if exists updated_at") &&
   !rollback.includes("drop table if exists public.simulation_sessions")
 );
 
-check("rollback protects new operational data before dropping objects", () =>
-  rollback.includes("appointment_count > 0 or intervention_count > 0 or linked_session_count > 0") &&
-  rollback.includes("Rollback detenido: existen datos en appointments/interventions o sesiones vinculadas")
+check("rollback protects operational data and restores original v2 status constraint", () =>
+  rollback.includes("appointment_count > 0 or intervention_count > 0 or linked_session_count > 0 or incompatible_session_status_count > 0") &&
+  rollback.includes("Rollback detenido: existen datos operativos") &&
+  rollback.includes("check (status in ('in_progress', 'completed'))")
 );
 
-check("rollback removes simulation_sessions trigger and status constraint", () =>
-  rollback.includes("drop trigger if exists on_simulation_sessions_updated_at on public.simulation_sessions") &&
-  rollback.includes("drop function if exists public.set_simulation_session_updated_at()") &&
-  rollback.includes("alter table public.simulation_sessions drop constraint simulation_sessions_status_check")
+check("rollback preserves existing session policies and user profile role model", () =>
+  !/drop\s+policy[\s\S]{0,120}on\s+public\.simulation_sessions/i.test(rollback) &&
+  !/create\s+policy[\s\S]{0,120}on\s+public\.simulation_sessions/i.test(rollback) &&
+  !rollback.includes("user_profiles_role_check") &&
+  !rollback.includes("where role = 'qa'")
 );
 
-check("rollback restores previous role constraint only without qa users", () =>
-  rollback.includes("where role = 'qa'") &&
-  rollback.includes("Rollback detenido: existen usuarios con role=qa") &&
-  rollback.includes("add constraint user_profiles_role_check") &&
-  rollback.includes("check (role in ('student', 'admin'))")
+check("availability migration depends on appointments being applied first", () =>
+  availabilitySql.includes("public.simulation_appointments is required before running student availability migration") &&
+  availabilitySql.includes("to_regclass('public.simulation_appointments') is null")
 );
 
 check("foreign appointment ownership is rejected server-side", () =>

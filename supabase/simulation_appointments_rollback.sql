@@ -9,6 +9,7 @@ declare
   appointment_count bigint := 0;
   intervention_count bigint := 0;
   linked_session_count bigint := 0;
+  incompatible_session_status_count bigint := 0;
 begin
   if to_regclass('public.simulation_appointments') is not null then
     execute 'select count(*) from public.simulation_appointments' into appointment_count;
@@ -28,9 +29,19 @@ begin
     execute 'select count(*) from public.simulation_sessions where appointment_id is not null' into linked_session_count;
   end if;
 
-  if appointment_count > 0 or intervention_count > 0 or linked_session_count > 0 then
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'simulation_sessions'
+      and column_name = 'status'
+  ) then
+    execute 'select count(*) from public.simulation_sessions where status not in (''in_progress'', ''completed'')' into incompatible_session_status_count;
+  end if;
+
+  if appointment_count > 0 or intervention_count > 0 or linked_session_count > 0 or incompatible_session_status_count > 0 then
     raise exception
-      'Rollback detenido: existen datos en appointments/interventions o sesiones vinculadas. Respaldar y resolver manualmente antes de eliminar objetos.';
+      'Rollback detenido: existen datos operativos, sesiones vinculadas o estados no compatibles con el constraint original.';
   end if;
 end;
 $$;
@@ -86,7 +97,7 @@ begin
     drop trigger if exists on_simulation_appointments_derived_fields on public.simulation_appointments;
   end if;
   if to_regclass('public.simulation_sessions') is not null then
-    drop trigger if exists on_simulation_sessions_updated_at on public.simulation_sessions;
+    drop trigger if exists on_phase3a_simulation_sessions_updated_at on public.simulation_sessions;
   end if;
 end;
 $$;
@@ -95,7 +106,7 @@ drop function if exists public.fail_simulation_intervention(uuid, uuid, uuid);
 drop function if exists public.complete_simulation_intervention(uuid, uuid, uuid, text, text);
 drop function if exists public.reserve_simulation_intervention(uuid, uuid, uuid, uuid, text, integer);
 drop function if exists public.set_simulation_intervention_updated_at();
-drop function if exists public.set_simulation_session_updated_at();
+drop function if exists public.set_phase3a_simulation_session_updated_at();
 drop function if exists public.validate_simulation_appointment_transition();
 drop function if exists public.set_simulation_appointment_updated_at();
 drop function if exists public.set_simulation_appointment_derived_fields();
@@ -121,6 +132,10 @@ begin
   ) then
     alter table public.simulation_sessions drop constraint simulation_sessions_status_check;
   end if;
+
+  alter table public.simulation_sessions
+  add constraint simulation_sessions_status_check
+  check (status in ('in_progress', 'completed'));
 exception
   when undefined_table then
     null;
@@ -139,44 +154,9 @@ drop column if exists ends_at;
 alter table if exists public.simulation_sessions
 drop column if exists completed_at;
 
-alter table if exists public.simulation_sessions
-drop column if exists status;
-
-alter table if exists public.simulation_sessions
-drop column if exists updated_at;
-
 -- No se elimina public.simulation_sessions ni su contenido.
 
 drop table if exists public.simulation_interventions;
 drop table if exists public.simulation_appointments;
-
-do $$
-begin
-  if exists (
-    select 1
-    from public.user_profiles
-    where role = 'qa'
-  ) then
-    raise exception
-      'Rollback detenido: existen usuarios con role=qa. Reasignar roles QA antes de restaurar la restriccion previa.';
-  end if;
-
-  if exists (
-    select 1
-    from pg_constraint
-    where conname = 'user_profiles_role_check'
-      and conrelid = 'public.user_profiles'::regclass
-  ) then
-    alter table public.user_profiles drop constraint user_profiles_role_check;
-  end if;
-
-  alter table public.user_profiles
-  add constraint user_profiles_role_check
-  check (role in ('student', 'admin'));
-exception
-  when undefined_table then
-    null;
-end;
-$$;
 
 commit;

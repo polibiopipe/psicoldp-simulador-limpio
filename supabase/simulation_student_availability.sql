@@ -4,6 +4,14 @@
 
 begin;
 
+do $$
+begin
+  if to_regclass('public.simulation_appointments') is null then
+    raise exception 'public.simulation_appointments is required before running student availability migration';
+  end if;
+end;
+$$;
+
 create table if not exists public.simulation_student_availability (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,

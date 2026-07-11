@@ -18,26 +18,34 @@ begin
 end;
 $$;
 
-drop policy if exists "Students can read own availability"
-on public.simulation_student_availability;
+do $$
+begin
+  if to_regclass('public.simulation_student_availability') is not null then
+    drop policy if exists "Students can read own availability"
+    on public.simulation_student_availability;
 
-drop policy if exists "Students can insert own availability"
-on public.simulation_student_availability;
+    drop policy if exists "Students can insert own availability"
+    on public.simulation_student_availability;
 
-drop policy if exists "Students can update own availability"
-on public.simulation_student_availability;
+    drop policy if exists "Students can update own availability"
+    on public.simulation_student_availability;
 
-drop policy if exists "Students can delete own availability"
-on public.simulation_student_availability;
+    drop policy if exists "Students can delete own availability"
+    on public.simulation_student_availability;
 
-drop trigger if exists on_simulation_student_availability_updated_at
-on public.simulation_student_availability;
+    drop trigger if exists on_simulation_student_availability_updated_at
+    on public.simulation_student_availability;
 
-drop trigger if exists on_simulation_student_availability_validate_block
-on public.simulation_student_availability;
+    drop trigger if exists on_simulation_student_availability_validate_block
+    on public.simulation_student_availability;
+  end if;
 
-drop trigger if exists on_simulation_appointments_student_availability
-on public.simulation_appointments;
+  if to_regclass('public.simulation_appointments') is not null then
+    drop trigger if exists on_simulation_appointments_student_availability
+    on public.simulation_appointments;
+  end if;
+end;
+$$;
 
 drop function if exists public.validate_simulation_appointment_student_availability();
 

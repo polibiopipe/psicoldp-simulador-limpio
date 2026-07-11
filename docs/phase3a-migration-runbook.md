@@ -5,25 +5,30 @@ No promover a produccion hasta aprobar Preview con pruebas funcionales.
 
 ## 0. Snapshot real usado para compatibilidad
 
-Snapshot informado antes de empaquetar Fase 3A:
+Snapshot real del proyecto activo `escucha-viva-simulador-v2`:
 
-- `public.user_profiles`: 5 filas.
-- `public.simulation_sessions`: 9 filas.
+- Project ref: `dstmscvnaziqptpomssv`.
+- `public.user_profiles`: 4 filas.
 - `public.user_profiles.role`: existe.
-- `public.simulation_sessions.status`: no existe antes de esta migracion.
-- `public.simulation_sessions.updated_at`: no existe antes de esta migracion.
+- `public.simulation_sessions`: 10 filas.
+- `public.simulation_sessions.status`: existe.
+- Estados actuales: 9 `completed`, 1 `in_progress`.
+- Sesion activa a preservar: `danieltoledohein@gmail.com`, caso `claudio`, sesion 1, `status = in_progress`.
+- `public.simulation_sessions.updated_at`: existe y no tiene nulos.
 - `public.simulation_sessions.started_at`: no existe antes de esta migracion.
 - `public.simulation_sessions.ends_at`: no existe antes de esta migracion.
 - `public.simulation_sessions.completed_at`: no existe antes de esta migracion.
 - `public.simulation_sessions.appointment_id`: no existe antes de esta migracion.
+- Constraint actual: `simulation_sessions_status_check` con `status in ('in_progress', 'completed')`.
 
 Compatibilidad aplicada:
 
 - Las sesiones historicas se conservan.
-- `status` se crea, se normaliza como `completed` en registros previos y queda `not null`.
-- `updated_at` se crea desde `coalesce(updated_at, created_at, now())` y queda `not null`.
+- `status` no se crea ni se normaliza; se conserva el valor de las 10 sesiones existentes.
+- La sesion `in_progress` de Daniel no se completa, no se vincula a appointment y no se elimina.
+- `updated_at` no se crea ni se sobrescribe.
 - `appointment_id` queda nullable y no se asigna artificialmente a sesiones antiguas.
-- El constraint `simulation_sessions_status_check` se crea solo despues de crear y normalizar `status`.
+- El constraint `simulation_sessions_status_check` se reemplaza para aceptar `closure_pending` sin agregar `scheduled` ni `cancelled` a `simulation_sessions`.
 
 ## 1. Entorno objetivo
 
@@ -40,6 +45,12 @@ Antes de ejecutar la migracion:
 ```sql
 select count(*) as simulation_sessions_count from public.simulation_sessions;
 select count(*) as user_profiles_count from public.user_profiles;
+select status, count(*) from public.simulation_sessions group by status order by status;
+select id, user_email, case_id, session_number, status
+from public.simulation_sessions
+where lower(user_email) = lower('danieltoledohein@gmail.com')
+  and case_id = 'claudio'
+  and session_number = 1;
 ```
 
 Exportar respaldo desde Supabase Dashboard o CLI para:
@@ -88,6 +99,8 @@ Cada fila representa un bloque horario. La base rechaza bloques superpuestos, du
 
 5. No ejecutar rollback salvo que falle la validacion posterior.
 
+La migracion de disponibilidad depende de que `public.simulation_appointments` exista. No ejecutarla antes de validar la migracion principal.
+
 ## 4. Verificacion de migracion
 
 ```sql
@@ -116,6 +129,13 @@ select status, count(*) as total
 from public.simulation_sessions
 group by status
 order by status;
+
+select count(*) as daniel_claudio_in_progress
+from public.simulation_sessions
+where lower(user_email) = lower('danieltoledohein@gmail.com')
+  and case_id = 'claudio'
+  and session_number = 1
+  and status = 'in_progress';
 
 select count(*) as historical_sessions_linked_to_appointments
 from public.simulation_sessions
@@ -251,8 +271,8 @@ Ejecutar `supabase/simulation_appointments_rollback.sql` solo si:
 - se cuenta con respaldo.
 
 El rollback aborta si detecta datos en appointments, interventions o sesiones vinculadas por `appointment_id`.
-Tambien aborta si existen usuarios con `role = 'qa'`, porque no es seguro restaurar la restriccion previa sin reasignar primero esos usuarios.
-Si no hay usuarios QA, restaura `user_profiles_role_check` a roles `student` y `admin`.
+Tambien aborta si existen sesiones con estados no compatibles con el constraint original `status in ('in_progress', 'completed')`.
+El rollback restaura `simulation_sessions_status_check` a su forma original y no elimina `status`, `updated_at`, policies existentes ni contenido historico.
 
 Para disponibilidad personal, usar `supabase/simulation_student_availability_rollback.sql` solo si no hay registros de disponibilidad que conservar.
 Ese rollback aborta si detecta filas en `public.simulation_student_availability`.
