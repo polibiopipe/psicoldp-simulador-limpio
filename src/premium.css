@@ -8662,30 +8662,48 @@ body {
 }
 
 /* Focused preparation layout refinement */
-.preparation-brief-layout {
-  grid-template-columns: minmax(0, 960px);
-  justify-content: center;
-  gap: 14px;
+.screen:has(.preparation-brief-layout) {
+  width: min(1180px, calc(100% - 40px));
 }
 
-.preparation-brief-layout .brief-sidebar-stack {
+.preparation-brief-layout,
+.authenticated-shell .preparation-brief-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1120px);
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.preparation-brief-layout .brief-sidebar-stack,
+.authenticated-shell .preparation-brief-layout .brief-sidebar-stack {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
   position: static;
   top: auto;
   gap: 10px;
+  width: 100%;
 }
 
-.preparation-brief-layout .patient-card {
+.preparation-brief-layout .patient-card,
+.authenticated-shell .preparation-brief-layout .patient-card {
   position: static;
   top: auto;
+  align-self: start;
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr) minmax(230px, 0.72fr);
-  gap: 8px 14px;
-  align-items: center;
+  grid-template-columns: 88px minmax(190px, 0.72fr) minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto;
+  gap: 8px 12px;
+  align-items: stretch;
   padding: 14px 16px;
+  width: 100%;
   box-shadow: 0 10px 24px rgba(16, 47, 78, 0.06);
 }
 
 .preparation-brief-layout .patient-portrait {
+  grid-column: 1;
   grid-row: 1 / span 4;
   width: 88px;
   height: 88px;
@@ -8700,6 +8718,8 @@ body {
 }
 
 .preparation-brief-layout .patient-card h2 {
+  grid-column: 2;
+  grid-row: 1;
   margin: 0;
   color: var(--ev-navy-strong);
   font-size: 1.28rem;
@@ -8707,6 +8727,8 @@ body {
 }
 
 .preparation-brief-layout .patient-card > p {
+  grid-column: 2;
+  grid-row: 2;
   margin: 0;
   color: var(--ev-muted);
   font-size: 0.92rem;
@@ -8722,6 +8744,32 @@ body {
   line-height: 1.3;
 }
 
+.preparation-brief-layout .patient-stat:nth-of-type(2),
+.preparation-brief-layout .patient-stat:nth-of-type(3) {
+  grid-column: 2;
+}
+
+.preparation-brief-layout .patient-stat:nth-of-type(2) {
+  grid-row: 3;
+}
+
+.preparation-brief-layout .patient-stat:nth-of-type(3) {
+  grid-row: 4;
+}
+
+.preparation-brief-layout .patient-stat:nth-of-type(4),
+.preparation-brief-layout .patient-stat:nth-of-type(5) {
+  grid-column: 3;
+}
+
+.preparation-brief-layout .patient-stat:nth-of-type(4) {
+  grid-row: 3;
+}
+
+.preparation-brief-layout .patient-stat:nth-of-type(5) {
+  grid-row: 4;
+}
+
 .preparation-brief-layout .patient-stat svg {
   width: 15px;
   height: 15px;
@@ -8729,12 +8777,19 @@ body {
 
 .preparation-brief-layout .patient-clinical-note {
   grid-column: 3;
-  grid-row: 1 / span 4;
+  grid-row: 1 / span 2;
   align-self: stretch;
   min-height: 0;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
   padding: 10px 12px;
   border-radius: 7px;
   background: var(--ev-teal-soft);
+}
+
+.preparation-brief-layout .patient-clinical-note > div {
+  grid-column: 2;
+  min-width: 0;
 }
 
 .preparation-brief-layout .patient-clinical-note strong {
@@ -8747,32 +8802,21 @@ body {
 }
 
 .preparation-brief-layout .brief-content {
+  grid-column: 1;
+  grid-row: 2;
   gap: 12px;
+  min-width: 0;
 }
 
 .preparation-brief-layout .section-header {
-  margin: 0;
-  padding: 4px 2px 0;
-}
-
-.preparation-brief-layout .section-header h1 {
-  margin: 4px 0;
-  font-size: 1.55rem;
-  line-height: 1.18;
-}
-
-.preparation-brief-layout .section-header p {
-  max-width: 74ch;
-  margin-top: 6px;
-  font-size: 0.95rem;
-  line-height: 1.45;
-}
-
-.preparation-brief-layout .case-practice-label {
-  font-size: 0.82rem;
+  display: none;
 }
 
 .preparation-brief-layout > .brief-content > .info-panel:not(.clinical-preparation-panel) {
+  position: static;
+  z-index: auto;
+  width: 100%;
+  margin: 0;
   padding: 13px 14px;
   box-shadow: 0 8px 18px rgba(16, 47, 78, 0.05);
 }
@@ -9024,7 +9068,7 @@ body {
 
 @media (max-width: 1020px) {
   .preparation-brief-layout {
-    grid-template-columns: minmax(0, 820px);
+    grid-template-columns: minmax(0, 900px);
   }
 
   .preparation-brief-layout .patient-card {
@@ -9037,6 +9081,14 @@ body {
   }
 
   .preparation-brief-layout .patient-clinical-note {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  .preparation-brief-layout .patient-stat:nth-of-type(2),
+  .preparation-brief-layout .patient-stat:nth-of-type(3),
+  .preparation-brief-layout .patient-stat:nth-of-type(4),
+  .preparation-brief-layout .patient-stat:nth-of-type(5) {
     grid-column: 1 / -1;
     grid-row: auto;
   }
