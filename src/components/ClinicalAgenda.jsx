@@ -24,6 +24,7 @@ import {
   buildClinicalAgendaItems,
   clearClinicalAgendaEntry,
   formatAgendaDate,
+  formatDateInput,
   getWeekStartDate,
   getWeeklyAvailability,
   addDays,

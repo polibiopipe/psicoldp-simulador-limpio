@@ -29,6 +29,8 @@ const admin = { role: "admin" };
 const sql = readFileSync(resolve(process.cwd(), "supabase/simulation_appointments.sql"), "utf8");
 const rollback = readFileSync(resolve(process.cwd(), "supabase/simulation_appointments_rollback.sql"), "utf8");
 const endpoint = readFileSync(resolve(process.cwd(), "api/gemini-patient-response.js"), "utf8");
+const clinicalAgendaComponent = readFileSync(resolve(process.cwd(), "src/components/ClinicalAgenda.jsx"), "utf8");
+const clinicalAgendaEngine = readFileSync(resolve(process.cwd(), "src/engine/clinicalAgenda.js"), "utf8");
 const baseAppointment = {
   id: "appointment-1",
   caseId: "claudio",
@@ -119,6 +121,13 @@ check("closure_pending and completed records merge by same id", () => {
 check("appointment statuses include closure_pending as consumed/active", () =>
   ACTIVE_APPOINTMENT_STATUSES.has("closure_pending") &&
   CONSUMED_APPOINTMENT_STATUSES.has("closure_pending")
+);
+
+check("ClinicalAgenda imports defined local date formatter", () =>
+  clinicalAgendaEngine.includes("export function formatDateInput") &&
+  clinicalAgendaEngine.includes("Number.isNaN(value.getTime())") &&
+  clinicalAgendaComponent.includes("formatDateInput") &&
+  /import\s*{[\s\S]*formatDateInput[\s\S]*}\s*from\s*"\.\.\/engine\/clinicalAgenda\.js"/.test(clinicalAgendaComponent)
 );
 
 check("migration includes atomic intervention RPC and unique idempotency", () => {
