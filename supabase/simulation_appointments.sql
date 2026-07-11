@@ -163,6 +163,32 @@ for each row
 execute function public.validate_simulation_appointment_transition();
 
 alter table public.simulation_sessions
+add column if not exists status text;
+
+update public.simulation_sessions
+set status = 'completed'
+where status is null or btrim(status) = '';
+
+alter table public.simulation_sessions
+alter column status set default 'completed';
+
+alter table public.simulation_sessions
+alter column status set not null;
+
+alter table public.simulation_sessions
+add column if not exists updated_at timestamptz;
+
+update public.simulation_sessions
+set updated_at = coalesce(updated_at, created_at, now())
+where updated_at is null;
+
+alter table public.simulation_sessions
+alter column updated_at set default now();
+
+alter table public.simulation_sessions
+alter column updated_at set not null;
+
+alter table public.simulation_sessions
 add column if not exists appointment_id uuid references public.simulation_appointments(id) on delete set null;
 
 alter table public.simulation_sessions
@@ -190,6 +216,23 @@ begin
   check (status in ('in_progress', 'closure_pending', 'completed'));
 end;
 $$;
+
+create or replace function public.set_simulation_session_updated_at()
+returns trigger
+language plpgsql
+set search_path = public, auth, pg_temp
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists on_simulation_sessions_updated_at on public.simulation_sessions;
+create trigger on_simulation_sessions_updated_at
+before update on public.simulation_sessions
+for each row
+execute function public.set_simulation_session_updated_at();
 
 drop index if exists public.simulation_appointments_one_active_per_user_day_idx;
 create unique index simulation_appointments_one_active_per_user_day_idx

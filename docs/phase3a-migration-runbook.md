@@ -3,6 +3,28 @@
 Este runbook prepara la aplicacion controlada de `supabase/simulation_appointments.sql`.
 No promover a produccion hasta aprobar Preview con pruebas funcionales.
 
+## 0. Snapshot real usado para compatibilidad
+
+Snapshot informado antes de empaquetar Fase 3A:
+
+- `public.user_profiles`: 5 filas.
+- `public.simulation_sessions`: 9 filas.
+- `public.user_profiles.role`: existe.
+- `public.simulation_sessions.status`: no existe antes de esta migracion.
+- `public.simulation_sessions.updated_at`: no existe antes de esta migracion.
+- `public.simulation_sessions.started_at`: no existe antes de esta migracion.
+- `public.simulation_sessions.ends_at`: no existe antes de esta migracion.
+- `public.simulation_sessions.completed_at`: no existe antes de esta migracion.
+- `public.simulation_sessions.appointment_id`: no existe antes de esta migracion.
+
+Compatibilidad aplicada:
+
+- Las sesiones historicas se conservan.
+- `status` se crea, se normaliza como `completed` en registros previos y queda `not null`.
+- `updated_at` se crea desde `coalesce(updated_at, created_at, now())` y queda `not null`.
+- `appointment_id` queda nullable y no se asigna artificialmente a sesiones antiguas.
+- El constraint `simulation_sessions_status_check` se crea solo despues de crear y normalizar `status`.
+
 ## 1. Entorno objetivo
 
 1. Confirmar si Vercel Preview apunta a un Supabase separado o al mismo proyecto de produccion.
@@ -62,6 +84,28 @@ from pg_indexes
 where schemaname = 'public'
   and tablename in ('simulation_appointments', 'simulation_interventions', 'simulation_sessions')
 order by tablename, indexname;
+
+select count(*) as user_profiles_count
+from public.user_profiles;
+
+select count(*) as simulation_sessions_count
+from public.simulation_sessions;
+
+select status, count(*) as total
+from public.simulation_sessions
+group by status
+order by status;
+
+select count(*) as historical_sessions_linked_to_appointments
+from public.simulation_sessions
+where appointment_id is not null;
+
+select column_name, is_nullable, column_default
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'simulation_sessions'
+  and column_name in ('status', 'updated_at', 'started_at', 'ends_at', 'completed_at', 'appointment_id')
+order by column_name;
 ```
 
 ## 5. Verificacion RLS
@@ -186,6 +230,8 @@ Ejecutar `supabase/simulation_appointments_rollback.sql` solo si:
 - se cuenta con respaldo.
 
 El rollback aborta si detecta datos en appointments, interventions o sesiones vinculadas por `appointment_id`.
+Tambien aborta si existen usuarios con `role = 'qa'`, porque no es seguro restaurar la restriccion previa sin reasignar primero esos usuarios.
+Si no hay usuarios QA, restaura `user_profiles_role_check` a roles `student` y `admin`.
 
 ## 11. Prohibicion de promocion a produccion
 

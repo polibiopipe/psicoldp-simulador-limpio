@@ -27,6 +27,7 @@ function check(name, assertion) {
 const student = { role: "student" };
 const admin = { role: "admin" };
 const sql = readFileSync(resolve(process.cwd(), "supabase/simulation_appointments.sql"), "utf8");
+const rollback = readFileSync(resolve(process.cwd(), "supabase/simulation_appointments_rollback.sql"), "utf8");
 const endpoint = readFileSync(resolve(process.cwd(), "api/gemini-patient-response.js"), "utf8");
 const baseAppointment = {
   id: "appointment-1",
@@ -131,6 +132,73 @@ check("migration includes atomic intervention RPC and unique idempotency", () =>
     "alter table public.simulation_interventions enable row level security"
   ].every((needle) => sql.includes(needle));
 });
+
+check("migration creates simulation_sessions status before status constraint", () => {
+  const statusColumn = sql.indexOf("add column if not exists status text");
+  const statusConstraint = sql.indexOf("simulation_sessions_status_check");
+  return statusColumn !== -1 && statusConstraint !== -1 && statusColumn < statusConstraint;
+});
+
+check("migration normalizes historical sessions as completed", () =>
+  sql.includes("set status = 'completed'") &&
+  sql.includes("where status is null or btrim(status) = ''") &&
+  sql.includes("alter column status set default 'completed'") &&
+  sql.includes("alter column status set not null")
+);
+
+check("migration creates simulation_sessions updated_at before trigger", () => {
+  const updatedAtColumn = sql.indexOf("add column if not exists updated_at timestamptz");
+  const updatedAtTrigger = sql.indexOf("on_simulation_sessions_updated_at");
+  return updatedAtColumn !== -1 && updatedAtTrigger !== -1 && updatedAtColumn < updatedAtTrigger;
+});
+
+check("migration backfills updated_at from historical created_at", () =>
+  sql.includes("set updated_at = coalesce(updated_at, created_at, now())") &&
+  sql.includes("where updated_at is null") &&
+  sql.includes("alter column updated_at set default now()") &&
+  sql.includes("alter column updated_at set not null")
+);
+
+check("migration keeps historical sessions unlinked to appointments", () =>
+  sql.includes("add column if not exists appointment_id uuid references public.simulation_appointments(id) on delete set null") &&
+  !/update\s+public\.simulation_sessions[\s\S]{0,240}set\s+appointment_id/i.test(sql)
+);
+
+check("migration updates simulation_sessions updated_at by trigger", () =>
+  sql.includes("create or replace function public.set_simulation_session_updated_at()") &&
+  sql.includes("drop trigger if exists on_simulation_sessions_updated_at on public.simulation_sessions") &&
+  sql.includes("create trigger on_simulation_sessions_updated_at")
+);
+
+check("rollback removes phase3a columns without dropping simulation_sessions", () =>
+  [
+    "drop column if exists appointment_id",
+    "drop column if exists started_at",
+    "drop column if exists ends_at",
+    "drop column if exists completed_at",
+    "drop column if exists status",
+    "drop column if exists updated_at"
+  ].every((needle) => rollback.includes(needle)) &&
+  !rollback.includes("drop table if exists public.simulation_sessions")
+);
+
+check("rollback protects new operational data before dropping objects", () =>
+  rollback.includes("appointment_count > 0 or intervention_count > 0 or linked_session_count > 0") &&
+  rollback.includes("Rollback detenido: existen datos en appointments/interventions o sesiones vinculadas")
+);
+
+check("rollback removes simulation_sessions trigger and status constraint", () =>
+  rollback.includes("drop trigger if exists on_simulation_sessions_updated_at on public.simulation_sessions") &&
+  rollback.includes("drop function if exists public.set_simulation_session_updated_at()") &&
+  rollback.includes("alter table public.simulation_sessions drop constraint simulation_sessions_status_check")
+);
+
+check("rollback restores previous role constraint only without qa users", () =>
+  rollback.includes("where role = 'qa'") &&
+  rollback.includes("Rollback detenido: existen usuarios con role=qa") &&
+  rollback.includes("add constraint user_profiles_role_check") &&
+  rollback.includes("check (role in ('student', 'admin'))")
+);
 
 check("foreign appointment ownership is rejected server-side", () =>
   endpoint.includes("appointment.user_id !== user.id") &&
