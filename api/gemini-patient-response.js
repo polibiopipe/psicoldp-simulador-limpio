@@ -5,7 +5,6 @@ import { clinicalSimulationProfiles } from "../src/data/clinicalAvatars/clinical
 import { generateLocalPatientResponse } from "../src/engine/localMiniAI.js";
 import { createClient } from "@supabase/supabase-js";
 import {
-  CONSUMED_APPOINTMENT_STATUSES,
   MAX_CONTEXT_TURNS,
   MAX_STUDENT_TURNS,
   SESSION_DURATION_MINUTES,
@@ -461,28 +460,6 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
       return usageError("APPOINTMENT_NOT_TODAY", "Esta sesion esta programada para otro dia.", 409);
     }
 
-    const { data: dailyRows, error: dailyError } = await serviceClient
-      .from("simulation_appointments")
-      .select("id,status,scheduled_local_date,started_at")
-      .eq("user_id", user.id)
-      .eq("scheduled_local_date", today)
-      .neq("id", appointment.id);
-
-    if (dailyError) {
-      return usageError("DAILY_USAGE_LOOKUP_FAILED", "No pudimos validar el cupo diario.", 500);
-    }
-
-    const consumedToday = (dailyRows || []).find((row) =>
-      CONSUMED_APPOINTMENT_STATUSES.has(row.status) && row.started_at
-    );
-    if (consumedToday) {
-      return usageError(
-        "DAILY_LIMIT_REACHED",
-        "Ya realizaste tu sesion clinica de hoy. Puedes revisar tus resultados, completar notas o agendar una nueva sesion para otro dia.",
-        429
-      );
-    }
-
     if (appointment.started_at) {
       const startedAt = new Date(appointment.started_at);
       const duration = Number(appointment.duration_minutes) || SESSION_DURATION_MINUTES;
@@ -654,8 +631,6 @@ function usageMessageForCode(code) {
     APPOINTMENT_REQUIRED: "Agenda la sesion antes de iniciar la entrevista.",
     CASE_MISMATCH: "La cita no corresponde al paciente seleccionado.",
     CLOSURE_PENDING: "Esta sesion tiene cierre pendiente. Retoma la decision clinica antes de volver al chat.",
-    DAILY_LIMIT_REACHED:
-      "Ya realizaste tu sesion clinica de hoy. Puedes revisar tus resultados, completar notas o agendar una nueva sesion para otro dia.",
     INTERVENTION_ALREADY_PROCESSING: "Ya hay una respuesta en proceso para esta intervencion. Espera unos segundos e intenta nuevamente.",
     INTERVENTION_ALREADY_RESERVED: "Ya hay una respuesta en proceso para esta intervencion. Espera unos segundos e intenta nuevamente.",
     SESSION_ALREADY_ACTIVE: "Ya hay una respuesta en proceso para esta sesion. Espera unos segundos e intenta nuevamente.",
@@ -667,7 +642,7 @@ function usageMessageForCode(code) {
 }
 
 function statusForUsageCode(code) {
-  if (code === "DAILY_LIMIT_REACHED" || code === "TURN_LIMIT_REACHED") return 429;
+  if (code === "TURN_LIMIT_REACHED") return 429;
   if (code === "APPOINTMENT_NOT_OWNED") return 403;
   if (code === "INTERVENTION_ALREADY_PROCESSING" || code === "INTERVENTION_ALREADY_RESERVED" || code === "SESSION_ALREADY_ACTIVE") return 409;
   if (code === "APPOINTMENT_NOT_FOUND" || code === "APPOINTMENT_REQUIRED") return 409;

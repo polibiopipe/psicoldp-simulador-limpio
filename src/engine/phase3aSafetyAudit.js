@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   ACTIVE_APPOINTMENT_STATUSES,
-  CONSUMED_APPOINTMENT_STATUSES,
   MAX_CONTEXT_TURNS,
   MAX_STUDENT_TURNS,
   SIMULATION_TIMEZONE,
@@ -77,16 +76,16 @@ check("timezone uses America/Santiago calendar day", () =>
   getZonedDateKey(new Date("2026-07-10T03:30:00Z"), SIMULATION_TIMEZONE) === "2026-07-09"
 );
 
-check("daily scheduling rejects consumed appointment", () =>
-  !canScheduleSession(student, "2026-07-10", [baseAppointment]).ok
+check("daily scheduling allows another active appointment", () =>
+  canScheduleSession(student, "2026-07-10", [baseAppointment]).ok
 );
 
-check("daily scheduling rejects completed appointment", () =>
-  !canScheduleSession(student, "2026-07-10", [{ ...baseAppointment, status: "completed" }]).ok
+check("daily scheduling allows another completed appointment", () =>
+  canScheduleSession(student, "2026-07-10", [{ ...baseAppointment, status: "completed" }]).ok
 );
 
-check("daily scheduling rejects closure_pending appointment", () =>
-  !canScheduleSession(student, "2026-07-10", [{ ...baseAppointment, status: "closure_pending" }]).ok
+check("daily scheduling allows another closure_pending appointment", () =>
+  canScheduleSession(student, "2026-07-10", [{ ...baseAppointment, status: "closure_pending" }]).ok
 );
 
 check("daily scheduling allows cancelled appointment", () =>
@@ -151,9 +150,8 @@ check("closure_pending and completed records merge by same id", () => {
   return merged.size === 1 && merged.get("session-1").status === "completed";
 });
 
-check("appointment statuses include closure_pending as consumed/active", () =>
-  ACTIVE_APPOINTMENT_STATUSES.has("closure_pending") &&
-  CONSUMED_APPOINTMENT_STATUSES.has("closure_pending")
+check("appointment statuses include closure_pending as active", () =>
+  ACTIVE_APPOINTMENT_STATUSES.has("closure_pending")
 );
 
 check("ClinicalAgenda imports defined local date formatter", () =>
@@ -259,8 +257,8 @@ check("day without availability is rejected", () => {
   return !result.ok && result.type === "outside_availability";
 });
 
-check("daily session limit remains independent from availability blocks", () =>
-  !canScheduleSession(student, "2026-07-06", [{ ...baseAppointment, scheduledLocalDate: "2026-07-06" }]).ok
+check("daily scheduling allows multiple appointments inside availability blocks", () =>
+  canScheduleSession(student, "2026-07-06", [{ ...baseAppointment, scheduledLocalDate: "2026-07-06" }]).ok
 );
 
 check("availability RLS isolates each student's rows", () =>

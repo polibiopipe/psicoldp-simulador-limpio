@@ -1,5 +1,4 @@
 export const SIMULATION_TIMEZONE = "America/Santiago";
-export const DAILY_SESSION_LIMIT = 1;
 export const SESSION_DURATION_MINUTES = 45;
 export const MAX_STUDENT_TURNS = 24;
 export const MAX_CONTEXT_TURNS = 10;
@@ -16,17 +15,10 @@ export const ACTIVE_APPOINTMENT_STATUSES = new Set([
   "completed"
 ]);
 
-export const CONSUMED_APPOINTMENT_STATUSES = new Set([
-  "in_progress",
-  "closure_pending",
-  "completed"
-]);
-
 export function getSimulationUsagePolicy(user = null) {
   const role = String(user?.role || user?.app_metadata?.role || user?.user_metadata?.role || "student").toLowerCase();
   const hasBypass = role === "admin" || role === "qa";
   return {
-    dailySessionLimit: DAILY_SESSION_LIMIT,
     sessionDurationMinutes: SESSION_DURATION_MINUTES,
     maxStudentTurns: MAX_STUDENT_TURNS,
     maxContextTurns: MAX_CONTEXT_TURNS,
@@ -42,18 +34,6 @@ export function canScheduleSession(user, date, appointments = []) {
   const localDate = normalizeLocalDate(date, policy.timezone);
   if (!localDate) {
     return { ok: false, reason: "INVALID_DATE", message: "Elige una fecha valida para agendar." };
-  }
-  const conflict = appointments.find((appointment) =>
-    appointment.scheduledLocalDate === localDate &&
-    ACTIVE_APPOINTMENT_STATUSES.has(appointment.status)
-  );
-  if (conflict) {
-    return {
-      ok: false,
-      reason: "DAILY_APPOINTMENT_EXISTS",
-      message: "Ya existe una sesion programada o consumida para ese dia.",
-      conflict
-    };
   }
   return { ok: true, reason: "" };
 }
@@ -83,21 +63,6 @@ export function canStartSession(user, appointment, appointments = [], now = new 
       ok: false,
       reason: "APPOINTMENT_NOT_TODAY",
       message: "Esta sesion esta programada para otro dia."
-    };
-  }
-
-  const consumedToday = appointments.find((candidate) =>
-    candidate.id !== appointment.id &&
-    candidate.scheduledLocalDate === today &&
-    CONSUMED_APPOINTMENT_STATUSES.has(candidate.status)
-  );
-  if (consumedToday) {
-    return {
-      ok: false,
-      reason: "DAILY_LIMIT_REACHED",
-      message:
-        "Ya realizaste tu sesion clinica de hoy. Puedes revisar resultados, completar notas o agendar otra sesion para otro dia.",
-      conflict: consumedToday
     };
   }
 
