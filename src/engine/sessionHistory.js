@@ -16,6 +16,9 @@ export function buildSessionHistoryRecord({
   clinicalArtifacts = null,
   clinicalDecision = null,
   clinicalPlanEvaluation = null,
+  appointmentId = "",
+  startedAt = "",
+  endsAt = "",
   status = "completed"
 }) {
   const sessionSummary = buildSessionSummary({
@@ -62,12 +65,15 @@ export function buildSessionHistoryRecord({
     storageScope: isSupabaseConfigured ? "supabase" : "localStorage",
     studentScope: LOCAL_STUDENT_ID,
     status,
+    appointmentId,
     caseId: caseItem.id,
     caseName: caseItem.name,
     caseTitle: caseItem.title,
     sessionNumber,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    startedAt,
+    endsAt,
     conversationHistory: visibleHistory,
     summary: {
       brief: sessionFeedback.briefSummary,
@@ -346,10 +352,14 @@ function mapRecordToSupabasePayload(record, user) {
     case_id: record.caseId,
     case_name: record.caseName,
     session_number: record.sessionNumber,
+    appointment_id: record.appointmentId || null,
     conversation: record.conversationHistory,
     feedback: feedbackPayload,
     score: Math.round(record.feedback?.generalScore ?? record.patientOpenness?.final ?? 0),
     status: record.status || "completed",
+    started_at: record.startedAt || null,
+    ends_at: record.endsAt || null,
+    completed_at: record.status === "completed" ? new Date().toISOString() : null,
     created_at: record.createdAt,
     updated_at: record.updatedAt || new Date().toISOString()
   };
@@ -362,12 +372,15 @@ function mapSupabaseRowToRecord(row) {
     storageScope: "supabase",
     studentScope: row.user_id,
     status: row.status || "completed",
+    appointmentId: row.appointment_id || "",
     userEmail: row.user_email,
     caseId: row.case_id,
     caseName: row.case_name,
     sessionNumber: row.session_number,
     createdAt: row.created_at,
     updatedAt: row.updated_at || row.created_at,
+    startedAt: row.started_at || "",
+    endsAt: row.ends_at || "",
     conversationHistory: row.conversation || [],
     summary: row.feedback?.summary || {
       brief: "Sesion guardada en Supabase.",

@@ -12,6 +12,11 @@ import {
   resolveConversationStage
 } from "../data/guidedConversation.js";
 import { resolveInterviewGuideId } from "../data/pedagogicalGuides.js";
+import {
+  MAX_STUDENT_TURNS,
+  SESSION_DURATION_MINUTES,
+  TURN_WARNING_THRESHOLD
+} from "../engine/simulationUsagePolicy.js";
 
 export function SimulationChat({
   caseItem,
@@ -20,6 +25,7 @@ export function SimulationChat({
   totalSessions = 4,
   sessionSummary,
   history,
+  sessionUsage = null,
   onAsk,
   onFinish,
   onRestart,
@@ -38,6 +44,7 @@ export function SimulationChat({
   const [validationFeedback, setValidationFeedback] = useState("");
   const [canRetryLastMessage, setCanRetryLastMessage] = useState(false);
   const [failedTurn, setFailedTurn] = useState(null);
+  const [clockTick, setClockTick] = useState(0);
   const conversationRef = useRef(null);
   const previousHistoryLengthRef = useRef(history.length);
   const avatarIdleTimerRef = useRef(null);
@@ -45,6 +52,14 @@ export function SimulationChat({
   const closeTimerRef = useRef(null);
   const visibleHistory = history.filter(isDisplayableEntry);
   const interviewTurns = visibleHistory.filter((entry) => !entry.isSessionPrelude);
+  const usageStartedAt = sessionUsage?.startedAt || "";
+  const usedTurns = sessionUsage?.usedTurns ?? interviewTurns.length;
+  const remainingTurns = Math.max(0, sessionUsage?.remainingTurns ?? (MAX_STUDENT_TURNS - usedTurns));
+  const remainingMs = calculateRemainingMs(sessionUsage, clockTick);
+  const timeExpired = Boolean(usageStartedAt) && remainingMs <= 0;
+  const turnLimitReached = remainingTurns <= 0;
+  const usageBlocked = timeExpired || turnLimitReached;
+  const usageNotice = resolveUsageNotice({ usedTurns, remainingTurns, remainingMs, timeExpired, turnLimitReached });
   const currentStage = resolveConversationStage({
     sessionNumber,
     history: interviewTurns,
@@ -88,6 +103,12 @@ export function SimulationChat({
     window.clearTimeout(closeTimerRef.current);
   }, []);
 
+  useEffect(() => {
+    if (!usageStartedAt) return undefined;
+    const interval = window.setInterval(() => setClockTick((current) => current + 1), 30000);
+    return () => window.clearInterval(interval);
+  }, [usageStartedAt]);
+
   function submitQuestion(event) {
     event.preventDefault();
     attemptSendQuestion(question);
@@ -103,6 +124,14 @@ export function SimulationChat({
     });
     if (!validation.isValid) {
       setValidationFeedback(validation.suggestion);
+      return;
+    }
+    if (usageBlocked) {
+      setValidationFeedback(
+        timeExpired
+          ? "El tiempo de entrevista ha finalizado. Continua con el cierre y la retroalimentacion."
+          : "Alcanzaste el maximo de intervenciones de esta sesion. Continua con el cierre."
+      );
       return;
     }
     if (avatarState === "thinking" || avatarState === "closed") return;
@@ -122,7 +151,8 @@ export function SimulationChat({
     responseTimerRef.current = window.setTimeout(async () => {
       try {
         const patientResponse = await onAsk(studentMessage, selectedInterventionType, {
-          conversationStage: currentStage
+          conversationStage: currentStage,
+          interventionId: failedTurnId
         });
         logSimulationDebug("MESSAGE_SENT", {
           studentMessage,
@@ -133,14 +163,16 @@ export function SimulationChat({
         setFailedTurn(null);
       } catch (error) {
         console.error("PATIENT_RESPONSE_ERROR", error);
+        const retryAvailable = error?.retryAvailable !== false;
         setAvatarState("idle");
-        setCanRetryLastMessage(true);
+        setCanRetryLastMessage(retryAvailable);
         setFailedTurn({
           id: failedTurnId,
           question: studentMessage,
           status: "failed",
           errorType: error?.errorType || "unknown",
-          retryAvailable: true
+          message: error?.message || "",
+          retryAvailable
         });
         setValidationFeedback("");
       }
@@ -226,6 +258,10 @@ export function SimulationChat({
             </div>
           </div>
           <div className="chat-actions">
+            <div className="session-usage-chip" title="Control formativo de tiempo e intervenciones">
+              <span>{usedTurns} de {MAX_STUDENT_TURNS} intervenciones</span>
+              <strong>{formatRemainingTime(remainingMs)}</strong>
+            </div>
             <button
               className="secondary-action video-view-toggle"
               type="button"
@@ -318,13 +354,16 @@ export function SimulationChat({
                       ) : (
                         <>
                           <p>No pudimos obtener la respuesta del paciente. Tu intervención está guardada.</p>
-                          <button
-                            className="secondary-action retry-response-action"
-                            type="button"
-                            onClick={retryLastMessage}
-                          >
-                            Reintentar
-                          </button>
+                          {failedTurn.message && <p>{failedTurn.message}</p>}
+                          {failedTurn.retryAvailable && (
+                            <button
+                              className="secondary-action retry-response-action"
+                              type="button"
+                              onClick={retryLastMessage}
+                            >
+                              Reintentar
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -386,14 +425,14 @@ export function SimulationChat({
           <div className="input-row">
             <textarea
               id="student-question"
-              disabled={avatarState === "thinking" || avatarState === "closed"}
+              disabled={avatarState === "thinking" || avatarState === "closed" || usageBlocked}
               value={question}
               onChange={(event) => updateQuestion(event.target.value)}
               placeholder="Ej.: Antes de comenzar, quisiera explicarte el objetivo de esta entrevista. ¿Qué te gustaría que entienda de lo que estás viviendo?"
               rows={3}
             />
             <VoiceDictationButton
-              disabled={avatarState === "thinking" || avatarState === "closed"}
+              disabled={avatarState === "thinking" || avatarState === "closed" || usageBlocked}
               onTranscript={appendDictatedText}
               onStatusChange={setValidationFeedback}
             />
@@ -401,7 +440,7 @@ export function SimulationChat({
               className="icon-action"
               type="submit"
               aria-label="Enviar intervención"
-              disabled={avatarState === "thinking" || avatarState === "closed"}
+              disabled={avatarState === "thinking" || avatarState === "closed" || usageBlocked}
             >
               <Send aria-hidden="true" />
             </button>
@@ -411,10 +450,69 @@ export function SimulationChat({
               {writingSuggestion}
             </p>
           )}
+          {usageNotice && (
+            <p className={`writing-suggestion usage-${usageNotice.tone}`} aria-live="polite">
+              {usageNotice.text}
+            </p>
+          )}
         </form>
       </section>
     </section>
   );
+}
+
+function calculateRemainingMs(sessionUsage, clockTick = 0) {
+  void clockTick;
+  if (!sessionUsage?.startedAt) {
+    return (sessionUsage?.durationMinutes || SESSION_DURATION_MINUTES) * 60 * 1000;
+  }
+  const startedAt = new Date(sessionUsage.startedAt);
+  if (Number.isNaN(startedAt.getTime())) {
+    return (sessionUsage.durationMinutes || SESSION_DURATION_MINUTES) * 60 * 1000;
+  }
+  const duration = Number(sessionUsage.durationMinutes) || SESSION_DURATION_MINUTES;
+  return Math.max(0, startedAt.getTime() + duration * 60 * 1000 - Date.now());
+}
+
+function formatRemainingTime(ms) {
+  const totalSeconds = Math.max(0, Math.ceil(Number(ms || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function resolveUsageNotice({ usedTurns, remainingTurns, remainingMs, timeExpired, turnLimitReached }) {
+  if (timeExpired) {
+    return {
+      tone: "error",
+      text: "El tiempo de entrevista ha finalizado. Continua con el cierre y la retroalimentacion."
+    };
+  }
+  if (turnLimitReached) {
+    return {
+      tone: "error",
+      text: "Alcanzaste el maximo de intervenciones. Continua con el cierre de la sesion."
+    };
+  }
+  if (remainingMs <= 60 * 1000) {
+    return {
+      tone: "warning",
+      text: "Queda 1 minuto. Formula tu ultima intervencion."
+    };
+  }
+  if (remainingMs <= 5 * 60 * 1000) {
+    return {
+      tone: "warning",
+      text: "Quedan 5 minutos. Comienza a preparar el cierre de la sesion."
+    };
+  }
+  if (usedTurns >= TURN_WARNING_THRESHOLD || remainingTurns <= 4) {
+    return {
+      tone: "warning",
+      text: `${usedTurns} de ${MAX_STUDENT_TURNS} intervenciones. Prioriza las preguntas necesarias para el cierre.`
+    };
+  }
+  return null;
 }
 
 function logSimulationDebug(label, payload) {

@@ -47,6 +47,7 @@ export function SessionClosure({
   previousSessionSummaries = [],
   preSessionPlan = null,
   onContinueSession,
+  onScheduleNextSession,
   onBackHome,
   onRequestExit,
   onSaveSessionRecord
@@ -227,6 +228,11 @@ export function SessionClosure({
   async function continueToNextSession() {
     await saveCurrentSummary({ includeHistory: true });
     if (canContinueInSimulator) onContinueSession(summary);
+  }
+
+  async function scheduleNextSession() {
+    await saveCurrentSummary({ includeHistory: true });
+    if (canContinueInSimulator) onScheduleNextSession?.(nextSessionNumber);
   }
 
   async function saveContinuityAgreement() {
@@ -685,7 +691,7 @@ export function SessionClosure({
           <h2>{canContinueInSimulator && hasSavedContinuityAgreement ? "Continuidad registrada" : closureAction.title}</h2>
           <p>
             {canContinueInSimulator && hasSavedContinuityAgreement
-              ? `La continuidad dentro del simulador quedo registrada. Puedes iniciar la sesion ${nextSessionNumber} ahora o volver al inicio para retomarla luego.`
+              ? `La continuidad dentro del simulador quedo registrada. Agenda la sesion ${nextSessionNumber} para sostener el proceso sin iniciar otra entrevista ahora.`
               : closureAction.description}
           </p>
         </div>
@@ -704,13 +710,13 @@ export function SessionClosure({
           ) : null}
           {canContinueInSimulator && hasSavedContinuityAgreement ? (
             <>
-              <button className="primary-action" type="button" onClick={backHomeAfterSave}>
+              <button className="primary-action" type="button" onClick={scheduleNextSession}>
+                <ArrowRight aria-hidden="true" />
+                Agendar sesion {nextSessionNumber}
+              </button>
+              <button className="secondary-action" type="button" onClick={backHomeAfterSave}>
                 <Home aria-hidden="true" />
                 Volver al inicio
-              </button>
-              <button className="secondary-action" type="button" onClick={continueToNextSession}>
-                <ArrowRight aria-hidden="true" />
-                Iniciar sesion {nextSessionNumber} ahora
               </button>
             </>
           ) : null}

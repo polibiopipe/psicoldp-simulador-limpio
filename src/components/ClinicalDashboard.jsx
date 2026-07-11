@@ -13,6 +13,7 @@ import { buildClinicalAgendaItems, formatAgendaDate } from "../engine/clinicalAg
 
 export function ClinicalDashboard({
   cases,
+  appointments = [],
   sessionRecords = [],
   userEmail,
   onOpenCases,
@@ -22,6 +23,10 @@ export function ClinicalDashboard({
   onStartSession
 }) {
   const agendaItems = useMemo(() => buildClinicalAgendaItems(cases), [cases]);
+  const appointmentItems = useMemo(
+    () => buildAppointmentDashboardItems({ appointments, cases, agendaItems }),
+    [appointments, cases, agendaItems]
+  );
   const draftSessionItems = useMemo(
     () => buildDraftSessionItems({ sessionRecords, cases, agendaItems }),
     [sessionRecords, cases, agendaItems]
@@ -29,6 +34,7 @@ export function ClinicalDashboard({
   const agendaActiveItems = agendaItems.filter((item) => item.completedSessions > 0 || item.agendaEntry);
   const activeItems = [
     ...draftSessionItems,
+    ...appointmentItems.filter((item) => !draftSessionItems.some((draft) => draft.caseItem.id === item.caseItem.id)),
     ...agendaActiveItems.filter((item) => !draftSessionItems.some((draft) => draft.caseItem.id === item.caseItem.id))
   ];
   const pendingNotes = agendaItems.filter((item) => item.noteStatus.status === "pending");
@@ -36,10 +42,12 @@ export function ClinicalDashboard({
   const riskItems = agendaItems.filter((item) => item.risk.status === "open");
   const resumableSessions = [
     ...draftSessionItems,
+    ...appointmentItems.filter((item) => !draftSessionItems.some((draft) => draft.caseItem.id === item.caseItem.id)),
     ...agendaItems.filter((item) => !draftSessionItems.some((draft) => draft.caseItem.id === item.caseItem.id) && isResumableSession(item))
   ];
   const nextItem =
     draftSessionItems[0] ||
+    appointmentItems[0] ||
     agendaItems.find((item) => item.nextSessionNumber && (item.completedSessions > 0 || item.agendaEntry)) ||
     agendaItems.find((item) => item.caseItem.id === "claudio") ||
     agendaItems[0];
@@ -387,6 +395,57 @@ function orderFeaturedCases(cases) {
     if (bIndex === -1) return -1;
     return aIndex - bIndex;
   });
+}
+
+function buildAppointmentDashboardItems({ appointments = [], cases = [], agendaItems = [] }) {
+  return appointments
+    .filter((appointment) => ["scheduled", "in_progress", "closure_pending"].includes(appointment.status))
+    .map((appointment) => {
+      const caseItem = cases.find((candidate) => candidate.id === appointment.caseId);
+      if (!caseItem) return null;
+      const agendaItem = agendaItems.find((item) => item.caseItem.id === appointment.caseId);
+      return {
+        ...(agendaItem || {}),
+        caseItem,
+        appointment,
+        latestSummary: agendaItem?.latestSummary || null,
+        completedSessions: agendaItem?.completedSessions || 0,
+        plannedSessions: agendaItem?.plannedSessions || 4,
+        nextSessionNumber: appointment.sessionNumber,
+        nextSessionLabel:
+          appointment.status === "closure_pending"
+            ? `Sesion ${appointment.sessionNumber} con cierre pendiente`
+            : `Sesion ${appointment.sessionNumber} agendada`,
+        processState: appointmentStatusLabel(appointment.status),
+        noteStatus: agendaItem?.noteStatus || { status: "ok", label: "Sin nota pendiente" },
+        task: agendaItem?.task || null,
+        risk: agendaItem?.risk || { status: "closed", label: "Sin alertas abiertas" },
+        nextFocus: appointment.nextObjective || agendaItem?.nextFocus || caseItem.motive,
+        agendaEntry: {
+          date: appointment.scheduledLocalDate,
+          time: appointment.scheduledTime,
+          durationMinutes: appointment.durationMinutes,
+          plannedSessionNumber: appointment.sessionNumber,
+          status: appointment.status
+        }
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) =>
+      new Date(a.appointment?.scheduledFor || a.appointment?.createdAt).getTime() -
+      new Date(b.appointment?.scheduledFor || b.appointment?.createdAt).getTime()
+    );
+}
+
+function appointmentStatusLabel(status = "") {
+  const labels = {
+    scheduled: "Agendada",
+    in_progress: "En curso",
+    closure_pending: "Cierre pendiente",
+    completed: "Completada",
+    cancelled: "Cancelada"
+  };
+  return labels[status] || "Agendada";
 }
 
 function buildDraftSessionItems({ sessionRecords = [], cases = [], agendaItems = [] }) {

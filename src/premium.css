@@ -762,6 +762,35 @@ textarea:focus {
   gap: 7px;
 }
 
+.session-usage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(23, 109, 117, 0.18);
+  border-radius: 999px;
+  background: rgba(248, 251, 250, 0.88);
+  color: var(--nv-muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.session-usage-chip strong {
+  color: var(--nv-navy);
+  font-weight: 800;
+}
+
+.writing-suggestion.usage-warning {
+  border-color: rgba(201, 164, 90, 0.32);
+  background: rgba(255, 248, 232, 0.88);
+}
+
+.writing-suggestion.usage-error {
+  border-color: rgba(160, 54, 54, 0.28);
+  background: rgba(255, 243, 243, 0.9);
+}
+
 .chat-actions .primary-action,
 .chat-actions .secondary-action {
   min-height: 38px;

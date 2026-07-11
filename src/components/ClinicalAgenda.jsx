@@ -22,19 +22,24 @@ import {
 import {
   buildAgendaReminder,
   buildClinicalAgendaItems,
-  buildAvailableSlots,
-  buildWeeklyAgenda,
   clearClinicalAgendaEntry,
   formatAgendaDate,
   getWeekStartDate,
   getWeeklyAvailability,
   addDays,
-  saveClinicalAgendaEntry,
   saveWeeklyAvailability,
-  SESSION_DURATION_OPTIONS,
   validateAgendaSchedule,
   WEEK_DAYS
 } from "../engine/clinicalAgenda.js";
+import {
+  buildAppointmentRecord,
+  cancelSimulationAppointment,
+  saveSimulationAppointment
+} from "../engine/simulationAppointments.js";
+import {
+  ACTIVE_APPOINTMENT_STATUSES,
+  SESSION_DURATION_MINUTES
+} from "../engine/simulationUsagePolicy.js";
 import {
   CLINICAL_TERM_OPTIONS,
   getClinicalTermCopy,
@@ -42,12 +47,25 @@ import {
   saveClinicalTermPreference
 } from "../engine/clinicalLanguage.js";
 
-export function ClinicalAgenda({ cases, initialCaseId = "", onBackHome, onPrepareCase, onStartSession }) {
+export function ClinicalAgenda({
+  cases,
+  authSession = null,
+  appointments = [],
+  initialCaseId = "",
+  initialScheduleRequest = null,
+  onBackHome,
+  onPrepareCase,
+  onStartSession,
+  onAppointmentsChange
+}) {
   const [refreshKey, setRefreshKey] = useState(0);
-  const agendaItems = useMemo(() => buildClinicalAgendaItems(cases), [cases, refreshKey]);
+  const agendaItems = useMemo(
+    () => applyAppointmentsToAgendaItems(buildClinicalAgendaItems(cases), appointments),
+    [cases, appointments, refreshKey]
+  );
   const [availability, setAvailability] = useState(() => getWeeklyAvailability());
   const [weekStart, setWeekStart] = useState(() => getWeekStartDate());
-  const [calendarView, setCalendarView] = useState("semana");
+  const [calendarView, setCalendarView] = useState("mes");
   const [suggestedSlot, setSuggestedSlot] = useState(null);
   const [languagePreference, setLanguagePreference] = useState(() => getClinicalTermPreference());
   const termCopy = getClinicalTermCopy(languagePreference);
@@ -62,12 +80,14 @@ export function ClinicalAgenda({ cases, initialCaseId = "", onBackHome, onPrepar
   const reminderItem = agendaItems.find((item) => item.caseItem.id === reminderCaseId) || null;
   const stats = buildAgendaStats(agendaItems);
   const weeklyAgenda = useMemo(
-    () => buildWeeklyAgenda({ cases, weekStart, availability }),
-    [cases, weekStart, availability, refreshKey]
+    () => calendarView === "mes"
+      ? buildAppointmentMonthAgenda({ cases, appointments, baseDate: weekStart, availability })
+      : buildAppointmentWeeklyAgenda({ cases, appointments, weekStart, availability }),
+    [cases, appointments, weekStart, availability, calendarView, refreshKey]
   );
   const availableSlots = useMemo(
-    () => buildAvailableSlots({ cases, weekStart, availability, durationMinutes: 45, limit: 10 }),
-    [cases, weekStart, availability, refreshKey]
+    () => buildAppointmentAvailableSlots({ appointments, weekStart, availability, durationMinutes: SESSION_DURATION_MINUTES, limit: 10 }),
+    [appointments, weekStart, availability, refreshKey]
   );
 
   useEffect(() => {
@@ -75,6 +95,12 @@ export function ClinicalAgenda({ cases, initialCaseId = "", onBackHome, onPrepar
       setSelectedCaseId(initialCaseId);
     }
   }, [initialCaseId, agendaItems]);
+
+  useEffect(() => {
+    if (!initialScheduleRequest?.caseId) return;
+    setSelectedCaseId(initialScheduleRequest.caseId);
+    setScheduleCaseId(initialScheduleRequest.caseId);
+  }, [initialScheduleRequest?.caseId, initialScheduleRequest?.sessionNumber]);
 
   function refreshAgenda() {
     setRefreshKey((current) => current + 1);
@@ -110,6 +136,51 @@ export function ClinicalAgenda({ cases, initialCaseId = "", onBackHome, onPrepar
       return;
     }
     onStartSession?.(item.caseItem.id, nextSession);
+  }
+
+  async function saveAppointmentFromDraft(item, entry) {
+    if (!item) return;
+    const existing = appointments.find((appointment) =>
+      appointment.caseId === item.caseItem.id &&
+      Number(appointment.sessionNumber) === Number(entry.plannedSessionNumber || item.nextSessionNumber || 1) &&
+      appointment.status !== "cancelled"
+    );
+    const baseAppointment = buildAppointmentRecord({
+      authSession,
+      caseItem: item.caseItem,
+      sessionNumber: entry.plannedSessionNumber || item.nextSessionNumber || 1,
+      date: entry.date,
+      time: entry.time,
+      durationMinutes: SESSION_DURATION_MINUTES,
+      status: "scheduled",
+      nextObjective: entry.nextObjective,
+      reminderNote: entry.reminderNote
+    });
+    const appointment = existing ? { ...baseAppointment, id: existing.id } : baseAppointment;
+    const result = await saveSimulationAppointment(authSession, appointment);
+    const saved = result.data || appointment;
+    onAppointmentsChange?.(mergeAppointmentList(appointments, saved));
+    setScheduleCaseId("");
+    setSuggestedSlot(null);
+    refreshAgenda();
+  }
+
+  async function clearAppointment(item) {
+    const appointment = appointments.find((candidate) =>
+      candidate.caseId === item.caseItem.id &&
+      Number(candidate.sessionNumber) === Number(item.nextSessionNumber || item.agendaEntry?.plannedSessionNumber || 1) &&
+      candidate.status === "scheduled"
+    );
+    if (appointment?.id) {
+      const result = await cancelSimulationAppointment(authSession, appointment.id);
+      const cancelled = result.data || { ...appointment, status: "cancelled", cancelledAt: new Date().toISOString() };
+      onAppointmentsChange?.(mergeAppointmentList(appointments, cancelled));
+    } else {
+      clearClinicalAgendaEntry(item.caseItem.id);
+    }
+    setScheduleCaseId("");
+    setSuggestedSlot(null);
+    refreshAgenda();
   }
 
   return (
@@ -163,9 +234,16 @@ export function ClinicalAgenda({ cases, initialCaseId = "", onBackHome, onPrepar
         <div className="agenda-calendar-toolbar">
           <div>
             <span className="eyebrow">Calendario clinico</span>
-            <h2>Semana del {formatWeekRange(weekStart)}</h2>
+            <h2>{calendarView === "mes" ? formatMonthLabel(weekStart) : `Semana del ${formatWeekRange(weekStart)}`}</h2>
           </div>
           <div className="agenda-calendar-actions">
+            <button
+              className={calendarView === "mes" ? "selected" : ""}
+              type="button"
+              onClick={() => setCalendarView("mes")}
+            >
+              Mes
+            </button>
             <button
               className={calendarView === "dia" ? "selected" : ""}
               type="button"
@@ -183,7 +261,7 @@ export function ClinicalAgenda({ cases, initialCaseId = "", onBackHome, onPrepar
             <button
               className="secondary-action compact"
               type="button"
-              onClick={() => setWeekStart((current) => addDays(current, -7))}
+              onClick={() => setWeekStart((current) => calendarView === "mes" ? addMonths(current, -1) : addDays(current, -7))}
             >
               <ChevronLeft aria-hidden="true" />
             </button>
@@ -197,7 +275,7 @@ export function ClinicalAgenda({ cases, initialCaseId = "", onBackHome, onPrepar
             <button
               className="secondary-action compact"
               type="button"
-              onClick={() => setWeekStart((current) => addDays(current, 7))}
+              onClick={() => setWeekStart((current) => calendarView === "mes" ? addMonths(current, 1) : addDays(current, 7))}
             >
               <ChevronRight aria-hidden="true" />
             </button>
@@ -384,25 +462,254 @@ export function ClinicalAgenda({ cases, initialCaseId = "", onBackHome, onPrepar
           item={scheduleItem}
           cases={cases}
           availability={availability}
+          appointments={appointments}
           suggestedSlot={suggestedSlot}
           termCopy={termCopy}
           onCancel={() => setScheduleCaseId("")}
           onSave={(entry) => {
-            saveClinicalAgendaEntry(scheduleItem.caseItem.id, entry);
-            setScheduleCaseId("");
-            setSuggestedSlot(null);
-            refreshAgenda();
+            void saveAppointmentFromDraft(scheduleItem, entry);
           }}
           onClear={() => {
-            clearClinicalAgendaEntry(scheduleItem.caseItem.id);
-            setScheduleCaseId("");
-            setSuggestedSlot(null);
-            refreshAgenda();
+            void clearAppointment(scheduleItem);
           }}
         />
       )}
     </section>
   );
+}
+
+function applyAppointmentsToAgendaItems(items = [], appointments = []) {
+  return items.map((item) => {
+    const appointment = findRelevantAppointment(item, appointments);
+    if (!appointment) return item;
+    const agendaEntry = {
+      date: appointment.scheduledLocalDate,
+      time: appointment.scheduledTime,
+      durationMinutes: appointment.durationMinutes || SESSION_DURATION_MINUTES,
+      plannedSessionNumber: appointment.sessionNumber,
+      status: appointment.status,
+      nextObjective: appointment.nextObjective,
+      reminderNote: appointment.reminderNote,
+      appointmentId: appointment.id
+    };
+    return {
+      ...item,
+      agendaEntry,
+      nextSessionNumber: appointment.sessionNumber || item.nextSessionNumber,
+      nextSessionLabel:
+        appointment.status === "closure_pending"
+          ? `Sesion ${appointment.sessionNumber} con cierre pendiente`
+          : `Sesion ${appointment.sessionNumber} de ${item.plannedSessions}`,
+      processState: appointmentStatusLabel(appointment.status),
+      nextFocus: appointment.nextObjective || item.nextFocus
+    };
+  });
+}
+
+function findRelevantAppointment(item, appointments = []) {
+  return appointments
+    .filter((appointment) =>
+      appointment.caseId === item.caseItem.id &&
+      appointment.status !== "cancelled" &&
+      ACTIVE_APPOINTMENT_STATUSES.has(appointment.status)
+    )
+    .sort((a, b) => new Date(a.scheduledFor || a.createdAt).getTime() - new Date(b.scheduledFor || b.createdAt).getTime())[0] || null;
+}
+
+function buildAppointmentWeeklyAgenda({ cases = [], appointments = [], weekStart = getWeekStartDate(), availability = {} }) {
+  const days = WEEK_DAYS.map((day, index) => {
+    const date = addDays(weekStart, index);
+    const dateKey = formatDateInput(date);
+    return {
+      ...day,
+      key: day.key,
+      date,
+      dateKey,
+      dateLabel: formatSlotDate(dateKey),
+      availability: availability[day.key],
+      sessions: []
+    };
+  });
+
+  appointments
+    .filter((appointment) => appointment.status !== "cancelled")
+    .forEach((appointment) => {
+      const day = days.find((candidate) => candidate.dateKey === appointment.scheduledLocalDate);
+      if (!day) return;
+      const caseItem = cases.find((candidate) => candidate.id === appointment.caseId);
+      const startMinutes = timeToMinutes(appointment.scheduledTime);
+      const durationMinutes = Number(appointment.durationMinutes) || SESSION_DURATION_MINUTES;
+      day.sessions.push({
+        caseId: appointment.caseId,
+        patientName: appointment.caseName || caseItem?.name || appointment.caseId,
+        date: appointment.scheduledLocalDate,
+        time: appointment.scheduledTime || "09:00",
+        endTime: minutesToTime(startMinutes + durationMinutes),
+        durationMinutes,
+        sessionNumber: appointment.sessionNumber,
+        sessionLabel: `Sesion ${appointment.sessionNumber}`,
+        status: appointment.status,
+        focus: appointment.nextObjective || caseItem?.motive || "Sesion clinica simulada",
+        appointment
+      });
+    });
+
+  days.forEach((day) => day.sessions.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)));
+  return {
+    weekStart: formatDateInput(weekStart),
+    days,
+    blocks: days.flatMap((day) => day.sessions)
+  };
+}
+
+function buildAppointmentMonthAgenda({ cases = [], appointments = [], baseDate = new Date(), availability = {} }) {
+  const date = new Date(baseDate);
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+  const monthStart = getWeekStartDate(firstDay);
+  const days = Array.from({ length: 42 }, (_item, index) => {
+    const current = addDays(monthStart, index);
+    const dateKey = formatDateInput(current);
+    const dayKey = WEEK_DAYS.find((day) => day.dayIndex === current.getDay())?.key || "monday";
+    return {
+      key: dateKey,
+      date: current,
+      dateKey,
+      dateLabel: String(current.getDate()),
+      shortLabel: new Intl.DateTimeFormat("es-CL", { weekday: "short" }).format(current),
+      availability: availability[dayKey],
+      isOutsideMonth: current.getMonth() !== date.getMonth(),
+      sessions: []
+    };
+  });
+
+  appointments
+    .filter((appointment) => appointment.status !== "cancelled")
+    .forEach((appointment) => {
+      const day = days.find((candidate) => candidate.dateKey === appointment.scheduledLocalDate);
+      if (!day) return;
+      const caseItem = cases.find((candidate) => candidate.id === appointment.caseId);
+      const startMinutes = timeToMinutes(appointment.scheduledTime);
+      const durationMinutes = Number(appointment.durationMinutes) || SESSION_DURATION_MINUTES;
+      day.sessions.push({
+        caseId: appointment.caseId,
+        patientName: appointment.caseName || caseItem?.name || appointment.caseId,
+        date: appointment.scheduledLocalDate,
+        time: appointment.scheduledTime || "09:00",
+        endTime: minutesToTime(startMinutes + durationMinutes),
+        durationMinutes,
+        sessionNumber: appointment.sessionNumber,
+        sessionLabel: `Sesion ${appointment.sessionNumber}`,
+        status: appointment.status,
+        focus: appointment.nextObjective || caseItem?.motive || "Sesion clinica simulada",
+        appointment
+      });
+    });
+
+  days.forEach((day) => day.sessions.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)));
+  return {
+    weekStart: formatDateInput(monthStart),
+    days,
+    blocks: days.flatMap((day) => day.sessions)
+  };
+}
+
+function buildAppointmentAvailableSlots({
+  appointments = [],
+  weekStart = getWeekStartDate(),
+  availability = {},
+  durationMinutes = SESSION_DURATION_MINUTES,
+  limit = 10
+}) {
+  const slots = [];
+  WEEK_DAYS.forEach((day, index) => {
+    const dayAvailability = availability[day.key];
+    if (!dayAvailability?.enabled) return;
+    const date = formatDateInput(addDays(weekStart, index));
+    const start = timeToMinutes(dayAvailability.start);
+    const end = timeToMinutes(dayAvailability.end);
+    for (let current = start; current + durationMinutes <= end; current += durationMinutes) {
+      const conflict = appointments.some((appointment) =>
+        appointment.scheduledLocalDate === date &&
+        appointment.status !== "cancelled" &&
+        ACTIVE_APPOINTMENT_STATUSES.has(appointment.status)
+      );
+      if (conflict) break;
+      slots.push({
+        date,
+        time: minutesToTime(current),
+        endTime: minutesToTime(current + durationMinutes),
+        durationMinutes,
+        dayLabel: day.label
+      });
+    }
+  });
+  return slots.slice(0, limit);
+}
+
+function validateAppointmentSchedule({ item, draft, appointments = [], availability, cases }) {
+  const baseValidation = validateAgendaSchedule({
+    caseId: item.caseItem.id,
+    draft,
+    cases,
+    availability
+  });
+  if (!baseValidation.ok && baseValidation.type !== "conflict") return baseValidation;
+
+  const date = String(draft.date || "").trim();
+  const sessionNumber = Number(draft.plannedSessionNumber) || item.nextSessionNumber || 1;
+  const sameDayConflict = appointments.find((appointment) =>
+    appointment.scheduledLocalDate === date &&
+    appointment.status !== "cancelled" &&
+    ACTIVE_APPOINTMENT_STATUSES.has(appointment.status) &&
+    !(appointment.caseId === item.caseItem.id && Number(appointment.sessionNumber) === Number(sessionNumber))
+  );
+  if (sameDayConflict) {
+    return {
+      ok: false,
+      type: "daily_limit",
+      message: "Ya existe una sesion programada para ese dia.",
+      detail: "Cada estudiante puede tener maximo una sesion clinica simulada por dia."
+    };
+  }
+
+  return {
+    ok: true,
+    type: "available",
+    message: "Horario disponible. Puedes agendar esta sesion.",
+    detail: `${draft.time} - duracion ${SESSION_DURATION_MINUTES} minutos.`
+  };
+}
+
+function mergeAppointmentList(records = [], nextRecord = null) {
+  if (!nextRecord?.id) return records;
+  const merged = new Map(records.map((record) => [record.id, record]));
+  merged.set(nextRecord.id, { ...merged.get(nextRecord.id), ...nextRecord });
+  return Array.from(merged.values()).sort(
+    (a, b) => new Date(a.scheduledFor || a.createdAt).getTime() - new Date(b.scheduledFor || b.createdAt).getTime()
+  );
+}
+
+function appointmentStatusLabel(status = "") {
+  const labels = {
+    scheduled: "Agendada",
+    in_progress: "En curso",
+    closure_pending: "Cierre pendiente",
+    completed: "Completada",
+    cancelled: "Cancelada"
+  };
+  return labels[status] || "Agendada";
+}
+
+function timeToMinutes(time = "00:00") {
+  const [hours, minutes] = String(time || "00:00").split(":").map((part) => Number.parseInt(part, 10));
+  return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+}
+
+function minutesToTime(value) {
+  const safeValue = Math.max(0, Number(value) || 0);
+  const hours = Math.floor(safeValue / 60);
+  const minutes = safeValue % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function AgendaMetric({ icon: Icon, label, value }) {
@@ -649,7 +956,10 @@ function AgendaCalendar({ agenda, view, termCopy, onOpenCase }) {
   return (
     <div className={`agenda-calendar-grid view-${view}`}>
       {visibleDays.map((day) => (
-        <article className="agenda-day-column" key={day.key}>
+        <article
+          className={`agenda-day-column ${day.dateKey === todayKey ? "today" : ""} ${day.isOutsideMonth ? "outside-month" : ""}`}
+          key={day.key}
+        >
           <header className="agenda-day-header">
             <div>
               <span>{day.shortLabel}</span>
@@ -744,6 +1054,7 @@ function ScheduleEditor({
   item,
   cases,
   availability,
+  appointments = [],
   suggestedSlot,
   termCopy,
   onSave,
@@ -753,18 +1064,19 @@ function ScheduleEditor({
   const [draft, setDraft] = useState(() => ({
     date: suggestedSlot?.date || item.agendaEntry?.date || "",
     time: suggestedSlot?.time || item.agendaEntry?.time || "",
-    durationMinutes: suggestedSlot?.durationMinutes || item.agendaEntry?.durationMinutes || 45,
+    durationMinutes: SESSION_DURATION_MINUTES,
     modality: item.agendaEntry?.modality || "simulada",
     plannedSessionNumber: item.agendaEntry?.plannedSessionNumber || item.nextSessionNumber || 1,
     status: item.agendaEntry?.status || "programada",
     nextObjective: item.agendaEntry?.nextObjective || item.nextFocus || "",
     reminderNote: item.agendaEntry?.reminderNote || item.task?.description || ""
   }));
-  const validation = validateAgendaSchedule({
-    caseId: item.caseItem.id,
+  const validation = validateAppointmentSchedule({
+    item,
     draft,
-    cases,
-    availability
+    appointments,
+    availability,
+    cases
   });
 
   function updateDraft(patch) {
@@ -798,15 +1110,8 @@ function ScheduleEditor({
             />
           </label>
           <label>
-            <span>Duracion estimada</span>
-            <select
-              value={draft.durationMinutes}
-              onChange={(event) => updateDraft({ durationMinutes: Number(event.target.value) })}
-            >
-              {SESSION_DURATION_OPTIONS.map((minutes) => (
-                <option key={minutes} value={minutes}>{minutes} min</option>
-              ))}
-            </select>
+            <span>Duracion</span>
+            <input type="text" value={`${SESSION_DURATION_MINUTES} min`} readOnly />
           </label>
           <label>
             <span>Modalidad simulada</span>
@@ -924,6 +1229,23 @@ function formatWeekRange(weekStart) {
   } catch {
     return "la semana seleccionada";
   }
+}
+
+function formatMonthLabel(value) {
+  try {
+    return new Intl.DateTimeFormat("es-CL", {
+      month: "long",
+      year: "numeric"
+    }).format(new Date(value));
+  } catch {
+    return "Mes seleccionado";
+  }
+}
+
+function addMonths(value, amount) {
+  const date = new Date(value);
+  date.setMonth(date.getMonth() + amount);
+  return getWeekStartDate(date);
 }
 
 function formatSlotDate(value) {

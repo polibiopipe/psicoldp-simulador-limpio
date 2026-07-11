@@ -11,7 +11,8 @@
     "basicInterviewSmokeTest": "node src/engine/basicInterviewSmokeTest.js",
     "audit:claudio": "node src/engine/claudioConversationAudit.js",
     "audit:clinical-claudio": "node src/engine/clinicalSimulationEngine.claudioAudit.js",
-    "audit:clinical-all": "node src/engine/clinicalSimulationEngine.allAudit.js"
+    "audit:clinical-all": "node src/engine/clinicalSimulationEngine.allAudit.js",
+    "audit:phase3a-safety": "node src/engine/phase3aSafetyAudit.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",
