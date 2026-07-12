@@ -6,11 +6,7 @@ import { generateLocalPatientResponse } from "../src/engine/localMiniAI.js";
 import { createClient } from "@supabase/supabase-js";
 import {
   MAX_CONTEXT_TURNS,
-  MAX_STUDENT_TURNS,
-  SESSION_DURATION_MINUTES,
-  SIMULATION_TIMEZONE,
-  getSimulationUsagePolicy,
-  getZonedDateKey
+  getSimulationUsagePolicy
 } from "../src/engine/simulationUsagePolicy.js";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
@@ -389,146 +385,11 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
     return usageError("ACCESS_NOT_APPROVED", "Tu acceso aun no esta aprobado para iniciar sesiones.", 403);
   }
 
-  const policy = getSimulationUsagePolicy({ role: profile.role });
-  const appointmentId = sanitizeUuid(payload.appointmentId);
-  const sessionRecordId = sanitizeUuid(payload.sessionRecordId);
-  const interventionId = sanitizeUuid(payload.interventionId);
-  if (!appointmentId) {
-    return usageError("APPOINTMENT_REQUIRED", "Agenda la sesion antes de iniciar la entrevista.", 409);
-  }
-  if (!interventionId) {
-    return usageError("INTERVENTION_ID_REQUIRED", "No pudimos identificar la intervencion para reintentar con seguridad.", 400);
-  }
-
-  const { data: appointment, error: appointmentError } = await serviceClient
-    .from("simulation_appointments")
-    .select("*")
-    .eq("id", appointmentId)
-    .maybeSingle();
-
-  if (appointmentError) {
-    return usageError("APPOINTMENT_LOOKUP_FAILED", "No pudimos validar la cita de la sesion.", 500);
-  }
-  if (!appointment || appointment.user_id !== user.id) {
-    return usageError("APPOINTMENT_REQUIRED", "Agenda la sesion antes de iniciar la entrevista.", 409);
-  }
-  if (appointment.case_id !== caseId) {
-    return usageError("APPOINTMENT_CASE_MISMATCH", "La cita no corresponde al paciente seleccionado.", 409);
-  }
-  if (["cancelled", "completed"].includes(appointment.status)) {
-    return usageError("SESSION_ALREADY_CLOSED", "Esta sesion ya fue cerrada o cancelada.", 409);
-  }
-  if (appointment.status === "closure_pending") {
-    return usageError("CLOSURE_PENDING", "Esta sesion tiene cierre pendiente. Retoma la decision clinica antes de volver al chat.", 409);
-  }
-
-  let sessionRecord = null;
-  if (sessionRecordId) {
-    const { data: sessionData, error: sessionError } = await serviceClient
-      .from("simulation_sessions")
-      .select("id,user_id,case_id,status,appointment_id,session_number")
-      .eq("id", sessionRecordId)
-      .maybeSingle();
-
-    if (sessionError) {
-      return usageError("SESSION_LOOKUP_FAILED", "No pudimos validar la sesion activa.", 500);
-    }
-    if (sessionData) {
-      sessionRecord = sessionData;
-      if (sessionData.user_id !== user.id) {
-        return usageError("SESSION_NOT_OWNED", "La sesion activa no pertenece a tu usuario.", 403);
-      }
-      if (sessionData.case_id !== caseId) {
-        return usageError("SESSION_CASE_MISMATCH", "La sesion activa no corresponde al paciente seleccionado.", 409);
-      }
-      if (sessionData.appointment_id && sessionData.appointment_id !== appointment.id) {
-        return usageError("SESSION_APPOINTMENT_MISMATCH", "La sesion activa no corresponde a la cita seleccionada.", 409);
-      }
-      if (sessionData.status === "closure_pending") {
-        return usageError("CLOSURE_PENDING", "Esta sesion tiene cierre pendiente. Retoma la decision clinica antes de volver al chat.", 409);
-      }
-      if (sessionData.status === "completed") {
-        return usageError("SESSION_ALREADY_CLOSED", "Esta sesion ya fue cerrada.", 409);
-      }
-    }
-  }
-
-  if (!policy.hasBypass) {
-    const today = getZonedDateKey(new Date(), SIMULATION_TIMEZONE);
-    const scheduledLocalDate = String(appointment.scheduled_local_date || "").slice(0, 10);
-    if (appointment.status === "scheduled" && scheduledLocalDate !== today) {
-      return usageError("APPOINTMENT_NOT_TODAY", "Esta sesion esta programada para otro dia.", 409);
-    }
-
-    if (appointment.started_at) {
-      const startedAt = new Date(appointment.started_at);
-      const duration = Number(appointment.duration_minutes) || SESSION_DURATION_MINUTES;
-      const expiresAt = startedAt.getTime() + duration * 60 * 1000;
-      if (Date.now() > expiresAt) {
-        return usageError(
-          "SESSION_TIME_EXPIRED",
-          "El tiempo de entrevista ha finalizado. Continua con el cierre y la retroalimentacion.",
-          409
-        );
-      }
-    }
-  }
-
-  const { data: reservation, error: reserveError } = await serviceClient.rpc("reserve_simulation_intervention", {
-    p_appointment_id: appointment.id,
-    p_session_id: sessionRecordId || null,
-    p_intervention_id: interventionId,
-    p_user_id: user.id,
-    p_case_id: caseId,
-    p_max_turns: policy.hasBypass ? 100000 : MAX_STUDENT_TURNS
-  });
-
-  if (reserveError) {
-    return usageError(
-      "INTERVENTION_RESERVE_FAILED",
-      "No pudimos reservar la intervencion de forma segura. Intenta nuevamente.",
-      500,
-      true
-    );
-  }
-
-  if (!reservation?.ok) {
-    const code = cleanText(reservation?.code || "INTERVENTION_RESERVE_REJECTED", 80);
-    return usageError(
-      code,
-      usageMessageForCode(code),
-      statusForUsageCode(code),
-      isRetryableUsageCode(code)
-    );
-  }
-
-  if (reservation?.duplicate && reservation?.responseText) {
-    return {
-      ok: true,
-      serviceClient,
-      user,
-      profile,
-      policy,
-      appointment,
-      appointmentId,
-      sessionRecordId,
-      interventionId,
-      sessionRecord,
-      cachedResponse: {
-        text: cleanText(reservation.responseText, 3200),
-        source: cleanText(reservation.source || "gemini", 80) || "gemini"
-      }
-    };
-  }
-
   console.info("[usage] validation ok", {
     userId: user.id,
     caseId,
-    appointmentId,
-    sessionRecordId: sessionRecordId || null,
-    interventionId,
     role: profile.role,
-    bypass: policy.hasBypass
+    bypassAllUsageValidation: true
   });
 
   return {
@@ -536,76 +397,18 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
     serviceClient,
     user,
     profile,
-    policy,
-    appointment,
-    appointmentId,
-    sessionRecordId,
-    interventionId,
-    sessionRecord,
-    reservedIntervention: true
+    policy: getSimulationUsagePolicy({ role: profile.role }),
+    reservedIntervention: false,
+    bypassAllUsageValidation: true
   };
 }
 
 async function completeReservedIntervention(validation, responseText, responseSource = "gemini") {
-  if (!validation?.reservedIntervention || !validation.serviceClient) return { ok: true };
-  const cleanResponse = cleanText(responseText, 3200);
-  if (!cleanResponse) {
-    await releaseReservedIntervention(validation);
-    return usageError("EMPTY_PATIENT_RESPONSE", "La respuesta del paciente llego vacia. Intenta nuevamente.", 502, true);
-  }
-
-  const { data, error } = await validation.serviceClient.rpc("complete_simulation_intervention", {
-    p_appointment_id: validation.appointmentId,
-    p_intervention_id: validation.interventionId,
-    p_user_id: validation.user.id,
-    p_response_text: cleanResponse,
-    p_response_source: cleanText(responseSource, 80) || "gemini"
-  });
-
-  if (error) {
-    console.warn("[usage] intervention completion failed", {
-      appointmentId: validation.appointmentId,
-      interventionId: validation.interventionId,
-      message: error.message,
-      code: error.code || null
-    });
-    return usageError(
-      "INTERVENTION_COMPLETE_FAILED",
-      "No pudimos confirmar el turno de forma segura. Intenta nuevamente.",
-      500,
-      true
-    );
-  }
-
-  if (!data?.ok) {
-    const code = cleanText(data?.code || "INTERVENTION_COMPLETE_REJECTED", 80);
-    return usageError(
-      code,
-      usageMessageForCode(code),
-      statusForUsageCode(code),
-      isRetryableUsageCode(code)
-    );
-  }
-
-  return { ok: true, data };
+  return { ok: true };
 }
 
 async function releaseReservedIntervention(validation) {
-  if (!validation?.reservedIntervention || !validation.serviceClient) return;
-  const { error } = await validation.serviceClient.rpc("fail_simulation_intervention", {
-    p_appointment_id: validation.appointmentId,
-    p_intervention_id: validation.interventionId,
-    p_user_id: validation.user.id
-  });
-
-  if (error) {
-    console.warn("[usage] intervention release failed", {
-      appointmentId: validation.appointmentId,
-      interventionId: validation.interventionId,
-      message: error.message,
-      code: error.code || null
-    });
-  }
+  return;
 }
 
 function sendStructuredUsageError(res, error) {
@@ -624,53 +427,10 @@ function usageError(code, message, statusCode = 409, retryable = false) {
   return { ok: false, code, message, statusCode, retryable };
 }
 
-function usageMessageForCode(code) {
-  const messages = {
-    APPOINTMENT_NOT_FOUND: "Agenda la sesion antes de iniciar la entrevista.",
-    APPOINTMENT_NOT_OWNED: "La cita no pertenece a tu usuario.",
-    APPOINTMENT_REQUIRED: "Agenda la sesion antes de iniciar la entrevista.",
-    CASE_MISMATCH: "La cita no corresponde al paciente seleccionado.",
-    CLOSURE_PENDING: "Esta sesion tiene cierre pendiente. Retoma la decision clinica antes de volver al chat.",
-    INTERVENTION_ALREADY_PROCESSING: "Ya hay una respuesta en proceso para esta intervencion. Espera unos segundos e intenta nuevamente.",
-    INTERVENTION_ALREADY_RESERVED: "Ya hay una respuesta en proceso para esta intervencion. Espera unos segundos e intenta nuevamente.",
-    SESSION_ALREADY_ACTIVE: "Ya hay una respuesta en proceso para esta sesion. Espera unos segundos e intenta nuevamente.",
-    SESSION_ALREADY_CLOSED: "Esta sesion ya fue cerrada o cancelada.",
-    SESSION_TIME_EXPIRED: "El tiempo de entrevista ha finalizado. Continua con el cierre y la retroalimentacion.",
-    TURN_LIMIT_REACHED: "Alcanzaste el maximo de intervenciones. Continua con el cierre."
-  };
-  return messages[code] || "No pudimos validar esta intervencion de forma segura.";
-}
-
-function statusForUsageCode(code) {
-  if (code === "TURN_LIMIT_REACHED") return 429;
-  if (code === "APPOINTMENT_NOT_OWNED") return 403;
-  if (code === "INTERVENTION_ALREADY_PROCESSING" || code === "INTERVENTION_ALREADY_RESERVED" || code === "SESSION_ALREADY_ACTIVE") return 409;
-  if (code === "APPOINTMENT_NOT_FOUND" || code === "APPOINTMENT_REQUIRED") return 409;
-  if (code === "INTERVENTION_RESERVE_FAILED" || code === "INTERVENTION_COMPLETE_FAILED") return 500;
-  return 409;
-}
-
-function isRetryableUsageCode(code) {
-  return [
-    "INTERVENTION_ALREADY_PROCESSING",
-    "INTERVENTION_ALREADY_RESERVED",
-    "SESSION_ALREADY_ACTIVE",
-    "INTERVENTION_RESERVE_FAILED",
-    "INTERVENTION_COMPLETE_FAILED"
-  ].includes(code);
-}
-
 function extractBearerToken(req) {
   const header = req.headers?.authorization || req.headers?.Authorization || "";
   const match = String(header).match(/^Bearer\s+(.+)$/i);
   return match ? match[1].trim() : "";
-}
-
-function sanitizeUuid(value) {
-  const text = String(value || "").trim();
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text)
-    ? text
-    : "";
 }
 
 function buildRetryRequestBody(requestBody) {
