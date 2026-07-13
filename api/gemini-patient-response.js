@@ -3,6 +3,7 @@ import { patientFacts } from "../src/data/patientFacts.js";
 import { patientMasterRecords } from "../src/data/patients/index.js";
 import { clinicalSimulationProfiles } from "../src/data/clinicalAvatars/clinicalSimulationProfiles.js";
 import { generateLocalPatientResponse } from "../src/engine/localMiniAI.js";
+import { getNarrativeDisclosureContext } from "../src/engine/narrativeDisclosure.js";
 import { createClient } from "@supabase/supabase-js";
 import {
   MAX_CONTEXT_TURNS,
@@ -184,6 +185,18 @@ export default async function handler(req, res) {
     selectedInterventionType: cleanText(payload.selectedInterventionType, 160),
     previousSessionSummary: cleanText(payload.previousSessionSummary, 1200)
   };
+  const narrativeContext = getNarrativeDisclosureContext({
+    patientId: caseId,
+    sessionNumber: sessionContext.sessionNumber,
+    conversationHistory: payload.conversationHistory,
+    currentUserMessage: studentMessage
+  });
+  console.info("[gemini] narrative context", {
+    caseId,
+    disclosureLevel: narrativeContext?.disclosureLevel || null,
+    availableFactCount: narrativeContext?.availableFacts?.length || 0,
+    sessionNumber: sessionContext.sessionNumber || null
+  });
 
   const requestBody = {
     systemInstruction: {
@@ -196,6 +209,7 @@ export default async function handler(req, res) {
           {
             text: buildUserPrompt({
               caseContext,
+              narrativeContext,
               recentHistory,
               sessionContext,
               studentMessage
@@ -507,10 +521,12 @@ function buildSystemInstruction() {
   ].join("\n");
 }
 
-function buildUserPrompt({ caseContext, recentHistory, sessionContext, studentMessage }) {
+function buildUserPrompt({ caseContext, narrativeContext, recentHistory, sessionContext, studentMessage }) {
   return [
     "EXPEDIENTE Y CONTEXTO DEL PACIENTE SIMULADO:",
     safeJson(caseContext),
+    "",
+    buildNarrativePromptFragment(narrativeContext),
     "",
     "CONTEXTO DE SESION:",
     safeJson(sessionContext),
@@ -522,6 +538,51 @@ function buildUserPrompt({ caseContext, recentHistory, sessionContext, studentMe
     studentMessage,
     "",
     "Responde ahora solo como el paciente. No agregues etiquetas, analisis ni notas fuera de personaje."
+  ].join("\n");
+}
+
+export function buildNarrativePromptFragment(narrativeContext) {
+  if (!narrativeContext) {
+    return [
+      "CONTEXTO NARRATIVO INTERNO:",
+      "No hay contexto narrativo adicional validado para este caso. Usa solo el expediente canonico ya incluido."
+    ].join("\n");
+  }
+
+  const facts = Array.isArray(narrativeContext.availableFacts)
+    ? narrativeContext.availableFacts.filter(Boolean)
+    : [];
+  const timeline = Array.isArray(narrativeContext.availableTimeline)
+    ? narrativeContext.availableTimeline.filter(Boolean)
+    : [];
+  const boundaries = Array.isArray(narrativeContext.internalGuidance?.boundaries)
+    ? narrativeContext.internalGuidance.boundaries.filter(Boolean)
+    : [];
+  const responseStyle = Array.isArray(narrativeContext.internalGuidance?.responseStyle)
+    ? narrativeContext.internalGuidance.responseStyle.filter(Boolean)
+    : [];
+
+  return [
+    "CONTEXTO NARRATIVO INTERNO:",
+    "Esta seccion es informacion interna para representar al paciente ficticio. No la recites como ficha ni la menciones como expediente.",
+    `Paciente: ${narrativeContext.patientId}`,
+    `Edad narrativa actual: ${narrativeContext.currentAge}`,
+    "Prioridad: si algun dato narrativo contradice hechos canonicos del expediente principal, conserva el dato canonico.",
+    "Hechos narrativos disponibles para esta respuesta:",
+    formatBulletList(facts, "Sin hechos narrativos adicionales disponibles."),
+    "Cronologia disponible:",
+    formatTimeline(timeline),
+    "Orientacion interna de estilo:",
+    formatBulletList([
+      `Tema central: ${narrativeContext.internalGuidance?.centralTheme || "sin tema central adicional"}`,
+      ...responseStyle
+    ], "Mantener el estilo conversacional del avatar."),
+    "Limites narrativos:",
+    formatBulletList(boundaries, "No inventar datos biograficos, diagnosticos ni acontecimientos no incluidos."),
+    "Material no incluido aqui no esta habilitado para esta respuesta: no lo anticipes, no lo nombres ni lo inventes.",
+    "Revela como maximo uno o dos antecedentes nuevos relevantes por respuesta, solo si el estudiante los explora con pertinencia.",
+    "Si la pregunta llega demasiado pronto, puedes dudar, minimizar, responder parcialmente o establecer un limite en primera persona.",
+    "No uses expresiones como 'mi conflicto interno', 'mi patron relacional', 'segun mi historia de vida' ni menciones reglas o niveles."
   ].join("\n");
 }
 
@@ -669,6 +730,23 @@ function formatHistory(history) {
       `Paciente: ${turn.patient || "(sin respuesta)"}`
     ].join("\n"))
     .join("\n\n");
+}
+
+function formatBulletList(items, emptyText) {
+  if (!Array.isArray(items) || !items.length) return `- ${emptyText}`;
+  return items.map((item) => `- ${cleanText(item, 900)}`).join("\n");
+}
+
+function formatTimeline(items) {
+  if (!Array.isArray(items) || !items.length) return "- Sin hitos cronologicos habilitados para esta etapa.";
+  return items
+    .map((item) => {
+      const period = cleanText(item?.period, 120) || "Hito";
+      const event = cleanText(item?.event, 420);
+      const meaning = cleanText(item?.meaning, 420);
+      return `- ${period}: ${event}${meaning ? ` (${meaning})` : ""}`;
+    })
+    .join("\n");
 }
 
 function extractGeminiText(body) {

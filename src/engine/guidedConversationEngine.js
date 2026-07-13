@@ -252,11 +252,11 @@ const residenceByCase = {
 };
 
 const occupationByCase = {
-  tomas: "Voy al colegio. Tengo 16, asi que la mayor parte de mi dia es eso, aunque despues paso harto tiempo en el computador.",
+  tomas: "Estoy cerrando cuarto medio. Tengo 18, asi que gran parte de mi dia sigue siendo colegio, casa y computador, pero tambien pensar que hare despues.",
   valentina: "Estudio en la universidad. Ultimamente siento que todo gira en torno a cumplir, estudiar y no atrasarme.",
   marcos: "Trabajo en una empresa, en un area mas bien administrativa/comercial. Ultimamente la pega me esta dejando sin energia.",
   elena: "Trabajo algunas horas y paso bastante tiempo pendiente de la casa y de mi familia.",
-  nicolas: "Voy al colegio. No trabajo. Me mandaron porque dicen que estoy mas callado y baje las notas.",
+  nicolas: "Estoy en cuarto medio. No trabajo. Me mandaron porque dicen que estoy mas callado, baje las notas y estoy trabado con lo que viene despues.",
   camila: "Trabajo. Ademas ayudo mucho a mi familia, y a veces siento que mi dia sigue aunque ya haya salido de la pega.",
   rodrigo: "Trabajo y soy papa. Despues de la separacion, gran parte de mi dia tambien se va en reorganizar tiempos familiares.",
   fernanda: "Estoy retomando mi trabajo despues de una licencia larga. Me importa hacerlo bien, pero me da miedo no rendir como antes.",

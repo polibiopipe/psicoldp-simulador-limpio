@@ -216,20 +216,20 @@ export const caseProfiles = {
   tomas: createProfile({
     id: "tomas",
     name: "Tomás",
-    age: 16,
+    age: 18,
     difficulty: "intermedio",
     mainTheme: "Aislamiento y videojuegos",
-    shortDescription: "Adolescente reservado, con tensión familiar por uso del computador y dificultad para relacionarse en persona.",
+    shortDescription: "Joven reservado de 18 años, en transición post escolar, con tensión familiar por uso del computador y dificultad para relacionarse en persona.",
     image: "/avatar/tomas.png",
-    presentationStyle: "Adolescente reservado, responde breve al inicio y se incomoda si siente juicio.",
+    presentationStyle: "Joven reservado, responde breve al inicio y se incomoda si siente juicio.",
     communicationStyle: "Frases cortas, dudas y pausas. No usa lenguaje clínico. Evita explicar demasiado al comienzo.",
-    reasonForConsultation: "Sus padres están preocupados porque pasa mucho tiempo jugando, sale poco y discuten frecuentemente por ese tema.",
+    reasonForConsultation: "Sus padres están preocupados porque pasa mucho tiempo jugando, sale poco y evita decidir qué hará después de terminar cuarto medio.",
     initialAttitude: "Llega algo obligado por sus padres. No está completamente convencido de hablar.",
     emotionalCore: "Se siente juzgado, pasado a llevar, raro en situaciones sociales y más seguro en el mundo del juego.",
-    familyContext: "Vive con sus padres. Las discusiones familiares giran en torno al computador. Siente que sus padres ven solo el juego.",
+    familyContext: "Vive con su madre Carolina, su padre Rodrigo y su hermana menor Emilia. Las discusiones familiares giran en torno al computador y a la transición después del colegio.",
     socialContext: "Le cuesta relacionarse en persona. Prefiere espacios donde sabe qué hacer, como juegos online.",
-    academicOrWorkContext: "Asiste al colegio. No necesariamente presenta un problema académico central, pero se siente incómodo en interacciones presenciales.",
-    dailyRoutine: "Colegio, casa, computador y juegos online. Tiende a evitar conversaciones familiares.",
+    academicOrWorkContext: "Está cerrando la enseñanza media y evalúa estudios técnicos, trabajo o vida adulta. No hay un problema académico central, pero sí ansiedad ante interacciones presenciales.",
+    dailyRoutine: "Colegio, casa, computador, juegos online y conversaciones familiares que suele evitar cuando aparece la presión por el futuro.",
     protectiveFactors: "Tiene capacidad de reflexión cuando no se siente atacado. Puede reconocer que el juego cumple una función emocional.",
     riskSignals: "Aislamiento social, dificultad para comunicar malestar y discusiones familiares frecuentes. No asumir riesgo grave si no aparece en la conversación.",
     whatThePatientKnows: "Sabe que sus padres están preocupados por el computador.",
@@ -249,27 +249,27 @@ export const caseProfiles = {
         "Estoy aquí, pero no sé si quiero hablar tanto todavía."
       ],
       presentacion_personal_abierta: [
-        "No sé bien qué contar... tengo 16, voy al colegio y últimamente en mi casa están preocupados porque paso mucho tiempo jugando. A mí me cuesta explicarlo, porque no siento que sea solo el computador.",
-        "Soy Tomás, tengo 16. Voy al colegio y paso harto tiempo en el computador. En mi casa dicen que eso es un problema, pero yo siento que hay más cosas."
+        "No sé bien qué contar... tengo 18, estoy cerrando cuarto medio y en mi casa están preocupados porque paso mucho tiempo jugando. A mí me cuesta explicarlo, porque no siento que sea solo el computador.",
+        "Soy Tomás, tengo 18. Estoy terminando el colegio y paso harto tiempo en el computador. En mi casa dicen que eso es un problema, pero yo siento que hay más cosas."
       ],
       motivo_consulta: [
-        "Creo que es por el tema del computador. Mis papás dicen que paso mucho tiempo jugando y que casi no salgo, pero yo siento que no es tan simple.",
+        "Creo que es por el tema del computador y por lo que tengo que decidir ahora que estoy saliendo del colegio. Mis papás dicen que paso mucho tiempo jugando y que casi no salgo, pero yo siento que no es tan simple.",
         "Mis papás están preocupados porque juego mucho. Pero siento que para ellos todo se reduce a eso.",
-        "Me trajeron por el computador y porque dicen que estoy muy encerrado. Yo no sé si habría venido solo."
+        "Me trajeron por el computador, porque dicen que estoy muy encerrado y porque no tengo claro qué voy a hacer después. Yo no sé si habría venido solo."
       ],
       familia: [
         "En mi casa todo termina siendo por el computador. Mis papás se preocupan, pero a veces parten retándome.",
         "Siento que mis papás creen que todo se arregla si dejo de jugar.",
         "Cuando intento explicar algo, a veces ya siento que viene el reto y me cierro."
       ],
-      hermanos: ["No tengo hermanos. Vivo con mis papás."],
+      hermanos: ["Tengo una hermana menor, Emilia. Vivo con mi mamá Carolina, mi papá Rodrigo y ella."],
       convivencia: [
-        "Vivo con mis papás. Últimamente discutimos harto por el tema del computador.",
-        "Vivo con mis papás. Paso harto tiempo en mi pieza, sobre todo cuando empiezan las discusiones."
+        "Vivo con mi mamá Carolina, mi papá Rodrigo y mi hermana menor Emilia. Últimamente discutimos harto por el tema del computador.",
+        "Vivo con mi mamá, mi papá y Emilia. Paso harto tiempo en mi pieza, sobre todo cuando empiezan las discusiones."
       ],
       convivencia_familia: [
-        "Vivo con mis papás.",
-        "Vivo con mis papás. Paso harto tiempo en mi pieza, sobre todo cuando empiezan las discusiones."
+        "Vivo con mi mamá Carolina, mi papá Rodrigo y mi hermana menor Emilia.",
+        "Vivo con mi mamá, mi papá y Emilia. Paso harto tiempo en mi pieza, sobre todo cuando empiezan las discusiones."
       ],
       videojuegos: [
         "Juego más online, cosas de equipo. Me gusta porque ahí sé qué tengo que hacer.",
@@ -277,13 +277,13 @@ export const caseProfiles = {
         "No es solo que me guste jugar. A veces es la forma que tengo de no pensar tanto."
       ],
       estudios_trabajo: [
-        "Voy al colegio. No es que odie ir, pero me cuesta sentirme cómodo con los demás.",
+        "Estoy cerrando cuarto medio. No es que odie el colegio, pero me cuesta sentirme cómodo con los demás.",
         "En el colegio hablo poco. A veces prefiero no decir nada.",
-        "No trabajo. Mi rutina es colegio, casa y computador."
+        "No trabajo. Mi rutina es colegio, casa, computador y pensar qué voy a hacer después."
       ],
       colegio_estudios: [
-        "Sí, voy al colegio. Hablo poco allá; a veces prefiero no decir nada.",
-        "Sí, voy al colegio. No es que odie ir, pero me cuesta sentirme cómodo con los demás."
+        "Sí, estoy cerrando cuarto medio. Hablo poco allá; a veces prefiero no decir nada.",
+        "Sí, estoy terminando el colegio. No es que odie ir, pero me cuesta sentirme cómodo con los demás."
       ],
       amistades: [
         "Tengo más contacto con gente online que en persona.",
@@ -542,34 +542,34 @@ export const caseProfiles = {
   }),
 
   nicolas: createProfileFromSeed("nicolas", {
-    name: "Nicolás", age: 16, difficulty: "avanzado", mainTheme: "Derivación escolar", image: "/avatar/nicolas.png",
-    shortDescription: "Adolescente derivado desde el colegio, breve y desconfiado si se siente interrogado.",
+    name: "Nicolás", age: 18, difficulty: "avanzado", mainTheme: "Derivación escolar", image: "/avatar/nicolas.png",
+    shortDescription: "Joven de 18 años derivado desde el colegio, breve y desconfiado si se siente interrogado.",
     presentationStyle: "Breve, retraído y sensible a sentirse retado.",
     communicationStyle: "Responde corto. Se abre un poco si no lo presionan.",
-    reasonForConsultation: "El colegio lo derivó por baja participación, notas más bajas y desconexión.",
+    reasonForConsultation: "El colegio lo derivó por baja participación, descenso del rendimiento y paralización frente a decisiones posteriores al colegio.",
     initialAttitude: "Llega porque lo mandaron y se muestra desconfiado si siente interrogatorio.",
-    emotionalCore: "Sensación de que adultos ya tienen una idea hecha de él.",
-    familyContext: "Vive con su familia; en casa el tema suele ser el colegio.",
+    emotionalCore: "Sensación de que adultos ya tienen una idea hecha de él, junto con temor a elegir mal y no estar preparado para la adultez.",
+    familyContext: "Vive con su familia; en casa el tema suele ser el colegio, las notas y qué hará después de cuarto medio.",
     socialContext: "Se ha alejado de compañeros y prefiere quedarse piola.",
-    academicOrWorkContext: "Va al colegio y participa poco.",
+    academicOrWorkContext: "Está terminando cuarto medio. Participa poco y se paraliza cuando le preguntan qué hará después del colegio.",
     dailyRoutine: "Colegio, casa, audífonos, videos y poca conversación.",
     protectiveFactors: "Puede hablar si no se siente interrogado.",
     riskSignals: "Retraimiento, baja participación y sensación de no ser escuchado.",
-    whatThePatientKnows: "Sabe que lo mandaron por estar más callado y bajar notas.",
+    whatThePatientKnows: "Sabe que lo mandaron por estar más callado, bajar notas y no avanzar con decisiones posteriores al colegio.",
     whatThePatientAvoids: "Evita dar información que luego puedan usar para retarlo.",
     phrasesTheyUse: ["No sé.", "Me mandaron.", "Da lo mismo.", "Prefiero quedarme piola."],
     siblings: "Tengo una hermana menor. No hablo mucho de estas cosas con ella.",
     core: {
       estado: "No sé... estoy aquí porque me dijeron que tenía que venir.",
-      motivo: "Me mandaron del colegio. Dicen que estoy más callado y que bajé las notas, pero no fue idea mía venir.",
-      familia: "Vivo con mi familia. En la casa casi siempre el tema termina siendo el colegio.",
+      motivo: "Me mandaron del colegio. Dicen que estoy más callado, que bajé las notas y que estoy trabado con lo que viene después, pero no fue idea mía venir.",
+      familia: "Vivo con mi familia. En la casa casi siempre el tema termina siendo el colegio, las notas o qué voy a hacer después.",
       vivienda: "Vivo con mi familia. No hablo mucho de estas cosas en la casa.",
-      trabajo: "Voy al colegio. No trabajo.",
+      trabajo: "Estoy en cuarto medio. No trabajo, y todavía no tengo claro qué voy a hacer después.",
       amigos: "Pocos. Antes hablaba más con algunos compañeros, pero ahora estoy más apartado.",
       emocion: "Me molesta que pregunten como si ya supieran la respuesta.",
       rutina: "Voy al colegio, vuelvo a la casa y a veces me pongo audífonos o veo videos.",
-      preocupacion: "Me preocupa que los adultos ya tengan una idea hecha de mí.",
-      ayuda: "Quizás me ayudaría que esto no sea otro reto por las notas.",
+      preocupacion: "Me preocupa que los adultos ya tengan una idea hecha de mí y que crean que no elegir rápido significa que no me importa.",
+      ayuda: "Quizás me ayudaría que esto no sea otro reto por las notas o por no tener claro qué hacer después.",
       seguimiento: "Creo que me cuesta hablar cuando siento que ya decidieron por mí."
     }
   }),

@@ -24,7 +24,7 @@ const intentToFact = {
 
 const occupationResponses = {
   tomas: [
-    "Voy al colegio. Tengo 16, así que la mayor parte de mi día es eso... aunque después paso harto tiempo en el computador.",
+    "Estoy cerrando cuarto medio. Tengo 18, así que gran parte de mi día sigue siendo colegio, casa y computador... pero también pensar qué voy a hacer después.",
     "Estoy en el colegio. Después de clases suelo estar en la casa o conectado.",
     "No trabajo, voy al colegio. Igual últimamente siento que lo escolar y lo del computador se mezclan harto en mi casa."
   ],
@@ -46,8 +46,8 @@ const occupationResponses = {
     "Me mantengo ocupada con cosas de la casa, familia y algunas horas de trabajo. A veces estar tan pendiente de otros me deja poco espacio para mí."
   ],
   nicolas: [
-    "Voy al colegio. No trabajo. Me mandaron porque dicen que estoy más callado y bajé las notas.",
-    "Estoy en el colegio. No hago mucho más, la verdad.",
+    "Estoy en cuarto medio. No trabajo. Me mandaron porque dicen que estoy más callado, bajé las notas y estoy trabado con lo que viene después.",
+    "Estoy terminando el colegio. No hago mucho más, la verdad.",
     "Voy a clases. Últimamente participo poco y por eso empezaron a preocuparse."
   ],
   camila: [

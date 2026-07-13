@@ -1,18 +1,18 @@
 export const patientFacts = {
   tomas: {
     name: "Tomás",
-    age: 16,
-    school: "Sí, voy al colegio. Últimamente me cuesta más participar, sobre todo cuando hay trabajos en grupo.",
-    academic: "Estoy en el colegio. No me va pésimo, pero participar me cuesta harto.",
-    works: "No, no trabajo. Ahora mi rutina es colegio, casa y computador.",
-    family: "Sí, vivo con mis papás. Últimamente discutimos harto por el computador.",
+    age: 18,
+    school: "Sí, estoy cerrando cuarto medio. Últimamente me cuesta más participar, sobre todo cuando hay trabajos en grupo.",
+    academic: "Estoy terminando la enseñanza media. No me va pésimo, pero participar y pensar qué haré después me cuesta harto.",
+    works: "No, no trabajo. Ahora mi rutina es colegio, casa, computador y pensar qué voy a hacer después de salir.",
+    family: "Sí, vivo con mi mamá Carolina, mi papá Rodrigo y mi hermana menor Emilia. Últimamente discutimos harto por el computador.",
     social: "Algunos, pero más online. En el colegio me cuesta más acercarme.",
     videogames: "Sí, juego bastante. No lo siento solo como jugar; a veces es la forma que tengo de desconectarme.",
     habits: "Duermo más o menos. A veces me quedo jugando o viendo videos hasta tarde.",
     preferences: "Me gustan los juegos online y estar tranquilo en mi pieza. Ahí siento que sé mejor qué hacer.",
-    motive: "Creo que es por el tema del computador. Mis papás dicen que paso mucho tiempo jugando y que casi no salgo, pero yo siento que no es tan simple.",
-    concern: "Me preocupa que todos crean que el problema soy yo o el computador, porque en persona también me cuesta saber qué decir.",
-    expectation: "No sé bien qué espero. Quizás que no partan retándome y que entiendan un poco más."
+    motive: "Creo que es por el tema del computador y porque mis papás están encima de qué voy a hacer después del colegio. Ellos dicen que paso mucho tiempo jugando y que casi no salgo, pero yo siento que no es tan simple.",
+    concern: "Me preocupa que todos crean que el problema soy yo o el computador, porque en persona también me cuesta saber qué decir y no tengo tan claro qué haré después.",
+    expectation: "No sé bien qué espero. Quizás que no partan retándome y que entiendan un poco más antes de decirme qué tengo que hacer."
   },
   valentina: {
     name: "Valentina",
@@ -61,18 +61,18 @@ export const patientFacts = {
   },
   nicolas: {
     name: "Nicolás",
-    age: 16,
-    school: "Sí, voy al colegio. Aunque no me gusta mucho hablar allá.",
-    academic: "Estoy en el colegio. Bajé un poco las notas y dicen que participo menos.",
-    works: "No, no trabajo. Estoy en el colegio.",
-    family: "Vivo con mi familia. En la casa casi siempre el tema termina siendo el colegio.",
+    age: 18,
+    school: "Sí, estoy en cuarto medio. Aunque no me gusta mucho hablar allá.",
+    academic: "Estoy cerrando la etapa escolar. Bajé un poco las notas, dicen que participo menos y todos preguntan qué voy a hacer después.",
+    works: "No, no trabajo. Estoy terminando el colegio y no tengo claro qué viene después.",
+    family: "Vivo con mi familia. En la casa casi siempre el tema termina siendo el colegio, las notas o qué voy a elegir después.",
     social: "Pocos. Antes hablaba más con algunos compañeros, pero ahora estoy más apartado.",
     videogames: "A veces juego o veo videos. Me sirve para distraerme y no tener que explicar tanto.",
     habits: "Más o menos. A veces me pongo audífonos o veo videos para no hablar con nadie.",
     preferences: "Me gusta estar tranquilo y que no me pregunten todo como si fuera interrogatorio.",
-    motive: "Me mandaron del colegio. Dicen que estoy más callado y que bajé las notas, pero no fue idea mía venir.",
-    concern: "Me preocupa que los adultos ya tengan una idea hecha de mí.",
-    expectation: "No sé. Quizás que esto no sea otro reto por las notas."
+    motive: "Me mandaron del colegio. Dicen que estoy más callado, que bajé las notas y que estoy trabado con lo que viene después, pero no fue idea mía venir.",
+    concern: "Me preocupa que los adultos ya tengan una idea hecha de mí y que crean que si no elijo rápido es porque no me importa.",
+    expectation: "No sé. Quizás que esto no sea otro reto por las notas o por no tener claro qué hacer después del colegio."
   },
   camila: {
     name: "Camila",

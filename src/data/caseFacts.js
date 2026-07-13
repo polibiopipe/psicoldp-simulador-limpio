@@ -1,15 +1,15 @@
 export const caseFacts = {
   tomas: {
     name: "Tomás",
-    age: 16,
-    studies: "sí, colegio",
+    age: 18,
+    studies: "sí, cerrando cuarto medio",
     works: "no",
-    livesWith: "sus papás y una hermana menor",
-    family: "sus padres están preocupados por el computador y porque casi no sale",
+    livesWith: "su mamá Carolina, su papá Rodrigo y su hermana menor Emilia",
+    family: "Carolina y Rodrigo están preocupados por el computador, el aislamiento y las decisiones posteriores al colegio",
     friends: "pocos presenciales, más contactos online",
     videogames: "juega frecuentemente",
-    referral: "preocupación familiar por aislamiento y videojuegos",
-    mainConcern: "tensión familiar y dificultad para relacionarse presencialmente"
+    referral: "preocupación familiar por aislamiento, videojuegos y transición posterior al colegio",
+    mainConcern: "tensión familiar, dificultad para relacionarse presencialmente y temor a decidir qué hará después del colegio"
   },
   valentina: {
     name: "Valentina",
@@ -49,14 +49,14 @@ export const caseFacts = {
   },
   nicolas: {
     name: "Nicolás",
-    age: 16,
-    studies: "sí, colegio",
+    age: 18,
+    studies: "sí, cuarto medio",
     works: "no",
     livesWith: "su familia",
-    family: "en casa suelen preguntar por notas y colegio",
+    family: "en casa suelen preguntar por notas, colegio y decisiones posteriores al egreso",
     friends: "se ha desconectado de sus compañeros",
     videogames: "a veces juega o ve videos para distraerse",
-    referral: "derivación escolar por baja participación y cambios en rendimiento",
-    mainConcern: "sentirse etiquetado y poco escuchado"
+    referral: "derivación escolar por baja participación, cambios en rendimiento y paralización ante decisiones posteriores al colegio",
+    mainConcern: "sentirse etiquetado, poco escuchado y no preparado para elegir qué hará después del colegio"
   }
 };

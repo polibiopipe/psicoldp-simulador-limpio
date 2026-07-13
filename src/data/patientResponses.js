@@ -13,10 +13,10 @@ const kits = {
     saludo: ["Hola.", "Hola... sí.", "Ya, hola.", "Hola, gracias.", "Hola... estoy conectado."],
     cortesia: ["Gracias... no sé muy bien cómo funciona esto, pero está bien.", "Hola. Igual me cuesta un poco hablar, pero puedo intentarlo.", "Ya... sí, está bien."],
     presentacion: [
-      "No sé bien qué contar... tengo 16, voy al colegio y últimamente en mi casa están preocupados porque paso mucho tiempo jugando. A mí me cuesta explicarlo, porque no siento que sea solo el computador.",
-      "Soy Tomás, tengo 16. Voy al colegio y paso harto tiempo en el computador. En mi casa dicen que eso es un problema, pero yo siento que hay más cosas.",
-      "No sé bien cómo partir... tengo 16, voy al colegio y últimamente me cuesta estar mucho con gente. Juego bastante, pero no es solo por jugar.",
-      "Me llamo Tomás. Estoy acá porque mis papás están preocupados por mí, sobre todo por el computador y porque casi no salgo."
+      "No sé bien qué contar... tengo 18, estoy cerrando cuarto medio y últimamente en mi casa están preocupados porque paso mucho tiempo jugando. A mí me cuesta explicarlo, porque no siento que sea solo el computador.",
+      "Soy Tomás, tengo 18. Estoy terminando el colegio y paso harto tiempo en el computador. En mi casa dicen que eso es un problema, pero yo siento que hay más cosas.",
+      "No sé bien cómo partir... tengo 18, estoy cerrando una etapa del colegio y últimamente me cuesta estar mucho con gente. Juego bastante, pero no es solo por jugar.",
+      "Me llamo Tomás. Estoy acá porque mis papás están preocupados por mí, sobre todo por el computador, porque casi no salgo y por lo que voy a hacer después."
     ],
     rol: ["No mucho... supongo que eres quien va a hablar conmigo, pero no sé bien cómo funciona esto."],
     motivo: [
@@ -142,11 +142,11 @@ const kits = {
   nicolas: {
     saludo: ["Hola.", "Ya... hola.", "Hola.", "Sí.", "Hola, supongo."],
     cortesia: ["Ya... hola.", "Está bien.", "Gracias, supongo.", "No sé qué decir, pero hola."],
-    presentacion: ["No sé qué contar. Tengo 16, voy al colegio y me mandaron porque dicen que estoy más callado y bajé las notas.", "Soy Nicolás. Tengo 16 y no pedí venir, pero el colegio dijo que tenía que hablar.", "No sé... voy al colegio y últimamente todos dicen que estoy raro o más callado."],
+    presentacion: ["No sé qué contar. Tengo 18, estoy en cuarto medio y me mandaron porque dicen que estoy más callado, bajé las notas y no avanzo con lo que viene después.", "Soy Nicolás. Tengo 18 y no pedí venir, pero el colegio dijo que tenía que hablar.", "No sé... estoy terminando el colegio y últimamente todos dicen que estoy raro o más callado."],
     rol: ["No sé. Me dijeron que tenía que hablar contigo."],
-    motivo: ["Me mandaron del colegio. Dicen que estoy más callado y que bajé las notas, pero no fue idea mía venir.", "Estoy acá porque el colegio dijo que tenía que venir. Dicen que participo poco.", "No sé. Los adultos creen que algo me pasa porque bajé las notas."],
+    motivo: ["Me mandaron del colegio. Dicen que estoy más callado, que bajé las notas y que no estoy decidiendo qué hacer después, pero no fue idea mía venir.", "Estoy acá porque el colegio dijo que tenía que venir. Dicen que participo poco y que estoy como paralizado con lo que sigue.", "No sé. Los adultos creen que algo me pasa porque bajé las notas y porque no tengo claro qué viene después."],
     emocion: ["No sé... cansado, supongo.", "Me molesta que pregunten como si ya supieran la respuesta.", "Prefiero quedarme callado para no meterme en problemas.", "Siento que da lo mismo lo que diga."],
-    contexto: ["En el colegio prefiero hablar poco.", "En mi casa casi siempre terminan preguntando por notas.", "Con compañeros estoy más distante.", "Me pongo audífonos y así no tengo que explicar tanto."],
+    contexto: ["En el colegio prefiero hablar poco.", "En mi casa casi siempre terminan preguntando por notas o por qué voy a hacer después.", "Con compañeros estoy más distante.", "Me pongo audífonos y así no tengo que explicar tanto."],
     validacion: ["Puede ser. Al menos no suena como reto.", "Ya... eso es distinto a que me digan flojo.", "Sí, quizás. No me gusta que decidan por mí.", "Gracias, supongo. Es raro que no partan retándome."],
     juicio: ["Eso dicen todos, que soy flojo o que no pongo de mi parte.", "Si va a ser otro reto, mejor no digo nada.", "Ya, entonces para qué preguntar.", "Me pasa que los adultos creen que ya entendieron todo."],
     consejo: ["Ya... pero no es tan simple.", "Eso me lo han dicho muchas veces.", "No sé si sirve decirme lo que tengo que hacer.", "Si pudiera hacerlo así no más, ya lo habría hecho."],
@@ -159,7 +159,7 @@ const kits = {
       colegio: ["En el colegio prefiero hablar poco. Siento que si digo algo, después lo miran como problema.", "No es que no entienda nada; es que me cuesta participar.", "Cuando todos miran, prefiero quedarme piola."],
       notas: ["Bajé las notas, sí. Pero siento que todos se quedaron solo con eso.", "No sé si bajé tanto, pero ahora todo gira alrededor de eso.", "Cuando preguntan por notas siento que ya viene el reto."],
       silencio: ["Me quedo callado porque es más fácil. Si hablo, siento que después lo pueden usar para retarme.", "Callarme me evita problemas.", "A veces quiero decir algo, pero después pienso que no vale la pena."],
-      familia: ["En mi casa el tema termina siendo el colegio.", "Mi mamá se preocupa, pero igual todo suena a reto.", "No sé cómo hablar sin que pregunten por notas."],
+      familia: ["En mi casa el tema termina siendo el colegio y qué voy a hacer después.", "Mi mamá se preocupa, pero igual todo suena a reto.", "No sé cómo hablar sin que pregunten por notas o por decisiones."],
       social: ["Con compañeros me fui alejando. No pasó una cosa grande, simplemente dejé de hablar.", "No sé si tengo ganas de acercarme.", "Prefiero estar aparte para que no me molesten."]
     }
   },
