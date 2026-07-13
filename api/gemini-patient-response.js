@@ -3,10 +3,17 @@ import { patientFacts } from "../src/data/patientFacts.js";
 import { patientMasterRecords } from "../src/data/patients/index.js";
 import { clinicalSimulationProfiles } from "../src/data/clinicalAvatars/clinicalSimulationProfiles.js";
 import { generateLocalPatientResponse } from "../src/engine/localMiniAI.js";
+import { getNarrativeDisclosureContext } from "../src/engine/narrativeDisclosure.js";
+import { createClient } from "@supabase/supabase-js";
+import {
+  MAX_CONTEXT_TURNS,
+  getSimulationUsagePolicy
+} from "../src/engine/simulationUsagePolicy.js";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
-const MAX_HISTORY_TURNS = 8;
+const MAX_HISTORY_TURNS = MAX_CONTEXT_TURNS;
+const MAX_REQUEST_BODY_CHARS = 24000;
 const INVALID_FINAL_WORDS = new Set([
   "a",
   "al",
@@ -68,7 +75,17 @@ export default async function handler(req, res) {
   let payload;
   try {
     payload = parseRequestBody(req);
-  } catch {
+  } catch (error) {
+    if (error?.code === "REQUEST_BODY_TOO_LARGE") {
+      sendJson(res, 413, {
+        ok: false,
+        code: "REQUEST_BODY_TOO_LARGE",
+        errorType: "REQUEST_BODY_TOO_LARGE",
+        message: "La solicitud es demasiado extensa para procesarse con seguridad.",
+        retryable: false
+      });
+      return;
+    }
     sendJson(res, 400, { error: "Invalid JSON payload" });
     return;
   }
@@ -80,21 +97,86 @@ export default async function handler(req, res) {
     return;
   }
 
+  const usageValidation = await validateUsageBeforeGemini({ req, payload, caseId });
+  if (!usageValidation.ok) {
+    sendJson(res, usageValidation.statusCode || 409, {
+      ok: false,
+      code: usageValidation.code,
+      errorType: usageValidation.code,
+      message: usageValidation.message,
+      fallbackReason: usageValidation.code,
+      retryable: Boolean(usageValidation.retryable)
+    });
+    return;
+  }
+
+  if (usageValidation.cachedResponse?.text) {
+    sendJson(res, 200, {
+      text: usageValidation.cachedResponse.text,
+      responseText: usageValidation.cachedResponse.text,
+      source: usageValidation.cachedResponse.source || "gemini",
+      provider: usageValidation.cachedResponse.source || "gemini",
+      model,
+      textLength: usageValidation.cachedResponse.text.length,
+      cached: true
+    });
+    console.info("[gemini] response source", {
+      caseId,
+      source: usageValidation.cachedResponse.source || "gemini",
+      cached: true,
+      textLength: usageValidation.cachedResponse.text.length
+    });
+    return;
+  }
+
   const localFallback = (fallbackReason) => localFallbackResponse({
     payload,
     caseId,
     studentMessage,
     fallbackReason
   });
+  const sendLocalFallback = async (fallbackReason) => {
+    const fallback = localFallback(fallbackReason);
+    if (fallback?.text) {
+      const completion = await completeReservedIntervention(usageValidation, fallback.text, "local");
+      if (!completion.ok) {
+        sendStructuredUsageError(res, completion);
+        return;
+      }
+    } else {
+      await releaseReservedIntervention(usageValidation);
+      sendStructuredUsageError(
+        res,
+        usageError(
+          "PATIENT_RESPONSE_UNAVAILABLE",
+          "No pudimos obtener una respuesta segura del paciente. Intenta reenviar la intervencion.",
+          502,
+          true
+        )
+      );
+      return;
+    }
+    sendJson(res, 200, fallback);
+  };
 
   if (!apiKey) {
-    sendJson(res, 200, localFallback("GEMINI_API_KEY missing in Vercel environment"));
+    await sendLocalFallback("GEMINI_API_KEY missing in Vercel environment");
     return;
   }
 
   const caseContext = buildCaseContext({
     caseId,
     clientCaseData: payload.caseData
+  });
+  console.info("[gemini] request context", {
+    caseId,
+    caseName: caseContext?.minimumClinicalProfile?.name || caseContext?.visibleCase?.name || "unknown",
+    profileLoaded: Boolean(
+      caseContext?.masterRecord?.identity ||
+      caseContext?.clinicalProfile?.identity ||
+      caseContext?.visibleCase?.name
+    ),
+    sessionNumber: toSafeNumber(payload.sessionNumber) || null
   });
   const recentHistory = normalizeHistory(payload.conversationHistory);
   const sessionContext = {
@@ -103,6 +185,18 @@ export default async function handler(req, res) {
     selectedInterventionType: cleanText(payload.selectedInterventionType, 160),
     previousSessionSummary: cleanText(payload.previousSessionSummary, 1200)
   };
+  const narrativeContext = getNarrativeDisclosureContext({
+    patientId: caseId,
+    sessionNumber: sessionContext.sessionNumber,
+    conversationHistory: payload.conversationHistory,
+    currentUserMessage: studentMessage
+  });
+  console.info("[gemini] narrative context", {
+    caseId,
+    disclosureLevel: narrativeContext?.disclosureLevel || null,
+    availableFactCount: narrativeContext?.availableFacts?.length || 0,
+    sessionNumber: sessionContext.sessionNumber || null
+  });
 
   const requestBody = {
     systemInstruction: {
@@ -115,6 +209,7 @@ export default async function handler(req, res) {
           {
             text: buildUserPrompt({
               caseContext,
+              narrativeContext,
               recentHistory,
               sessionContext,
               studentMessage
@@ -140,7 +235,7 @@ export default async function handler(req, res) {
       caseId,
       message: safeErrorMessage(error)
     });
-    sendJson(res, 200, localFallback("Gemini network error"));
+    await sendLocalFallback("Gemini network error");
     return;
   }
 
@@ -153,14 +248,14 @@ export default async function handler(req, res) {
       status: providerResponse.status,
       message: providerReason
     });
-    sendJson(res, 200, localFallback(cleanText(`Gemini provider error: ${providerReason}`, 220)));
+    await sendLocalFallback(cleanText(`Gemini provider error: ${providerReason}`, 220));
     return;
   }
 
   const finishReason = extractGeminiFinishReason(providerBody);
   const responseText = sanitizePatientResponse(extractGeminiText(providerBody));
   if (!responseText) {
-    sendJson(res, 200, localFallback("Gemini returned empty text"));
+    await sendLocalFallback("Gemini returned empty text");
     return;
   }
 
@@ -182,7 +277,7 @@ export default async function handler(req, res) {
         caseId,
         message: safeErrorMessage(retryError)
       });
-      sendJson(res, 200, localFallback("incomplete gemini response"));
+      await sendLocalFallback("incomplete gemini response");
       return;
     }
 
@@ -196,13 +291,18 @@ export default async function handler(req, res) {
         status: retryProviderResponse.status,
         message: retryReason
       });
-      sendJson(res, 200, localFallback("incomplete gemini response"));
+      await sendLocalFallback("incomplete gemini response");
       return;
     }
 
     const retryFinishReason = extractGeminiFinishReason(retryProviderBody);
     const retryResponseText = sanitizePatientResponse(extractGeminiText(retryProviderBody));
     if (retryResponseText && !isIncompleteGeminiResponse(retryResponseText, retryFinishReason)) {
+      const completion = await completeReservedIntervention(usageValidation, retryResponseText, "gemini");
+      if (!completion.ok) {
+        sendStructuredUsageError(res, completion);
+        return;
+      }
       sendJson(res, 200, {
         text: retryResponseText,
         responseText: retryResponseText,
@@ -213,6 +313,12 @@ export default async function handler(req, res) {
         textLength: retryResponseText.length,
         retry: true
       });
+      console.info("[gemini] response source", {
+        caseId,
+        source: "gemini",
+        retry: true,
+        textLength: retryResponseText.length
+      });
       return;
     }
 
@@ -222,10 +328,15 @@ export default async function handler(req, res) {
       finishReason: retryFinishReason || "unknown",
       textLength: retryResponseText.length
     });
-    sendJson(res, 200, localFallback("incomplete gemini response"));
+    await sendLocalFallback("incomplete gemini response");
     return;
   }
 
+  const completion = await completeReservedIntervention(usageValidation, responseText, "gemini");
+  if (!completion.ok) {
+    sendStructuredUsageError(res, completion);
+    return;
+  }
   sendJson(res, 200, {
     text: responseText,
     responseText,
@@ -233,6 +344,12 @@ export default async function handler(req, res) {
     provider: "gemini",
     model,
     finishReason,
+    textLength: responseText.length
+  });
+  console.info("[gemini] response source", {
+    caseId,
+    source: "gemini",
+    retry: false,
     textLength: responseText.length
   });
 }
@@ -246,6 +363,88 @@ function fetchGeminiCompletion({ apiKey, model, requestBody }) {
       body: JSON.stringify(requestBody)
     }
   );
+}
+
+async function validateUsageBeforeGemini({ req, payload, caseId }) {
+  const accessToken = extractBearerToken(req);
+  if (!accessToken) {
+    return usageError("AUTH_REQUIRED", "Debes iniciar sesion para usar una entrevista simulada.", 401);
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL || "";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!supabaseUrl || !serviceRoleKey) {
+    return usageError("SERVER_USAGE_CONFIG_MISSING", "Falta configuracion segura para validar el uso de sesiones.", 500);
+  }
+
+  const serviceClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false }
+  });
+  const { data: userData, error: userError } = await serviceClient.auth.getUser(accessToken);
+  const user = userData?.user || null;
+  if (userError || !user) {
+    return usageError("AUTH_INVALID", "No pudimos validar tu sesion. Vuelve a iniciar sesion.", 401);
+  }
+
+  const { data: profile, error: profileError } = await serviceClient
+    .from("user_profiles")
+    .select("id,email,approved,role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    return usageError("PROFILE_LOOKUP_FAILED", "No pudimos verificar tu perfil de acceso.", 500);
+  }
+  if (!profile?.approved) {
+    return usageError("ACCESS_NOT_APPROVED", "Tu acceso aun no esta aprobado para iniciar sesiones.", 403);
+  }
+
+  console.info("[usage] validation ok", {
+    userId: user.id,
+    caseId,
+    role: profile.role,
+    bypassAllUsageValidation: true
+  });
+
+  return {
+    ok: true,
+    serviceClient,
+    user,
+    profile,
+    policy: getSimulationUsagePolicy({ role: profile.role }),
+    reservedIntervention: false,
+    bypassAllUsageValidation: true
+  };
+}
+
+async function completeReservedIntervention(validation, responseText, responseSource = "gemini") {
+  return { ok: true };
+}
+
+async function releaseReservedIntervention(validation) {
+  return;
+}
+
+function sendStructuredUsageError(res, error) {
+  sendJson(res, error.statusCode || 409, {
+    ok: false,
+    code: error.code,
+    errorType: error.code,
+    message: error.message,
+    fallbackReason: error.code,
+    retryable: Boolean(error.retryable)
+  });
+}
+
+function usageError(code, message, statusCode = 409, retryable = false) {
+  console.warn("[usage] validation failed", { code, statusCode, retryable });
+  return { ok: false, code, message, statusCode, retryable };
+}
+
+function extractBearerToken(req) {
+  const header = req.headers?.authorization || req.headers?.Authorization || "";
+  const match = String(header).match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : "";
 }
 
 function buildRetryRequestBody(requestBody) {
@@ -322,10 +521,12 @@ function buildSystemInstruction() {
   ].join("\n");
 }
 
-function buildUserPrompt({ caseContext, recentHistory, sessionContext, studentMessage }) {
+function buildUserPrompt({ caseContext, narrativeContext, recentHistory, sessionContext, studentMessage }) {
   return [
     "EXPEDIENTE Y CONTEXTO DEL PACIENTE SIMULADO:",
     safeJson(caseContext),
+    "",
+    buildNarrativePromptFragment(narrativeContext),
     "",
     "CONTEXTO DE SESION:",
     safeJson(sessionContext),
@@ -340,14 +541,68 @@ function buildUserPrompt({ caseContext, recentHistory, sessionContext, studentMe
   ].join("\n");
 }
 
+export function buildNarrativePromptFragment(narrativeContext) {
+  if (!narrativeContext) {
+    return [
+      "CONTEXTO NARRATIVO INTERNO:",
+      "No hay contexto narrativo adicional validado para este caso. Usa solo el expediente canonico ya incluido."
+    ].join("\n");
+  }
+
+  const facts = Array.isArray(narrativeContext.availableFacts)
+    ? narrativeContext.availableFacts.filter(Boolean)
+    : [];
+  const timeline = Array.isArray(narrativeContext.availableTimeline)
+    ? narrativeContext.availableTimeline.filter(Boolean)
+    : [];
+  const boundaries = Array.isArray(narrativeContext.internalGuidance?.boundaries)
+    ? narrativeContext.internalGuidance.boundaries.filter(Boolean)
+    : [];
+  const responseStyle = Array.isArray(narrativeContext.internalGuidance?.responseStyle)
+    ? narrativeContext.internalGuidance.responseStyle.filter(Boolean)
+    : [];
+
+  return [
+    "CONTEXTO NARRATIVO INTERNO:",
+    "Esta seccion es informacion interna para representar al paciente ficticio. No la recites como ficha ni la menciones como expediente.",
+    `Paciente: ${narrativeContext.patientId}`,
+    `Edad narrativa actual: ${narrativeContext.currentAge}`,
+    "Prioridad: si algun dato narrativo contradice hechos canonicos del expediente principal, conserva el dato canonico.",
+    "Hechos narrativos disponibles para esta respuesta:",
+    formatBulletList(facts, "Sin hechos narrativos adicionales disponibles."),
+    "Cronologia disponible:",
+    formatTimeline(timeline),
+    "Orientacion interna de estilo:",
+    formatBulletList([
+      `Tema central: ${narrativeContext.internalGuidance?.centralTheme || "sin tema central adicional"}`,
+      ...responseStyle
+    ], "Mantener el estilo conversacional del avatar."),
+    "Limites narrativos:",
+    formatBulletList(boundaries, "No inventar datos biograficos, diagnosticos ni acontecimientos no incluidos."),
+    "Material no incluido aqui no esta habilitado para esta respuesta: no lo anticipes, no lo nombres ni lo inventes.",
+    "Revela como maximo uno o dos antecedentes nuevos relevantes por respuesta, solo si el estudiante los explora con pertinencia.",
+    "Si la pregunta llega demasiado pronto, puedes dudar, minimizar, responder parcialmente o establecer un limite en primera persona.",
+    "No uses expresiones como 'mi conflicto interno', 'mi patron relacional', 'segun mi historia de vida' ni menciones reglas o niveles."
+  ].join("\n");
+}
+
 function buildCaseContext({ caseId, clientCaseData }) {
   const catalogCase = cases.find((item) => item.id === caseId) || null;
   const facts = patientFacts[caseId] || {};
   const masterRecord = patientMasterRecords[caseId] || null;
   const simulationProfile = clinicalSimulationProfiles[caseId] || null;
+  const minimumClinicalProfile = buildMinimumClinicalProfile({
+    caseId,
+    catalogCase,
+    facts,
+    masterRecord,
+    simulationProfile,
+    clientCaseData
+  });
 
   return trimContext({
     caseId,
+    minimumClinicalProfile,
     visibleCase: pickDefined({
       name: catalogCase?.name || clientCaseData?.name,
       age: catalogCase?.age || clientCaseData?.age,
@@ -392,6 +647,55 @@ function buildCaseContext({ caseId, clientCaseData }) {
   });
 }
 
+function buildMinimumClinicalProfile({
+  caseId,
+  catalogCase,
+  facts,
+  masterRecord,
+  simulationProfile,
+  clientCaseData
+}) {
+  const identity = masterRecord?.identity || {};
+  const consultation = masterRecord?.consultation || {};
+  const personality = masterRecord?.personality || {};
+  const emotionalState = masterRecord?.emotionalState || {};
+  const sensitiveInfo = masterRecord?.sensitiveInfo || {};
+
+  return pickDefined({
+    id: caseId,
+    name: identity.name || facts.name || catalogCase?.name || clientCaseData?.name,
+    age: identity.age || facts.age || catalogCase?.age || clientCaseData?.age,
+    briefReason: consultation.manifestMotive || facts.motive || catalogCase?.motive || clientCaseData?.motive,
+    presentingProblem: consultation.whyNow || facts.concern || catalogCase?.motive || clientCaseData?.motive,
+    background: catalogCase?.background || clientCaseData?.background,
+    emotionalTone: emotionalState.currentlyFeels || facts.currentEmotion || facts.concern,
+    communicationStyle:
+      personality.responseStyle ||
+      catalogCase?.communicationStyle ||
+      clientCaseData?.communicationStyle ||
+      simulationProfile?.clinicalFrame?.style,
+    relationalStyle:
+      personality.temperament ||
+      simulationProfile?.clinicalFrame?.relationalStyle ||
+      "apertura gradual segun confianza y pertinencia de la entrevista",
+    openingLineBySession: pickDefined({
+      session1: catalogCase?.openingLine || facts.motive || consultation.whyNow,
+      session2: "Puede retomar algo trabajado antes si el estudiante lo menciona o si existe resumen previo."
+    }),
+    therapeuticBoundaries:
+      catalogCase?.sensitiveTopics ||
+      clientCaseData?.sensitiveTopics ||
+      simulationProfile?.disclosureRules?.boundaries,
+    riskNotes: sensitiveInfo.riskResponse || masterRecord?.risk?.summary || "Explorar riesgo si corresponde, sin dramatizar ni inventar.",
+    whatThePatientKnows: consultation.beliefAboutProblem || facts.concreteConcern || facts.concern,
+    whatThePatientAvoids: personality.avoids || simulationProfile?.disclosureRules?.avoidAtStart,
+    progressionHints:
+      simulationProfile?.disclosureRules ||
+      masterRecord?.disclosureRules ||
+      "Revelar informacion de forma progresiva segun alianza, respeto y pertinencia."
+  });
+}
+
 function normalizeHistory(history) {
   if (!Array.isArray(history)) return [];
   return history
@@ -426,6 +730,23 @@ function formatHistory(history) {
       `Paciente: ${turn.patient || "(sin respuesta)"}`
     ].join("\n"))
     .join("\n\n");
+}
+
+function formatBulletList(items, emptyText) {
+  if (!Array.isArray(items) || !items.length) return `- ${emptyText}`;
+  return items.map((item) => `- ${cleanText(item, 900)}`).join("\n");
+}
+
+function formatTimeline(items) {
+  if (!Array.isArray(items) || !items.length) return "- Sin hitos cronologicos habilitados para esta etapa.";
+  return items
+    .map((item) => {
+      const period = cleanText(item?.period, 120) || "Hito";
+      const event = cleanText(item?.event, 420);
+      const meaning = cleanText(item?.meaning, 420);
+      return `- ${period}: ${event}${meaning ? ` (${meaning})` : ""}`;
+    })
+    .join("\n");
 }
 
 function extractGeminiText(body) {
@@ -509,7 +830,20 @@ function trimContext(value) {
 
 function parseRequestBody(req) {
   if (!req.body) return {};
-  if (typeof req.body === "string") return JSON.parse(req.body || "{}");
+  if (typeof req.body === "string") {
+    if (req.body.length > MAX_REQUEST_BODY_CHARS) {
+      const error = new Error("Request body too large");
+      error.code = "REQUEST_BODY_TOO_LARGE";
+      throw error;
+    }
+    return JSON.parse(req.body || "{}");
+  }
+  const serialized = JSON.stringify(req.body);
+  if (serialized.length > MAX_REQUEST_BODY_CHARS) {
+    const error = new Error("Request body too large");
+    error.code = "REQUEST_BODY_TOO_LARGE";
+    throw error;
+  }
   return req.body;
 }
 

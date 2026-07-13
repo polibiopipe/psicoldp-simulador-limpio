@@ -14,6 +14,20 @@ import {
   saveSessionHistory
 } from "./engine/sessionHistory.js";
 import {
+  buildAppointmentRecord,
+  ensureAppointmentForSession,
+  findActiveAppointmentForCase,
+  getSimulationAppointments,
+  saveSimulationAppointment
+} from "./engine/simulationAppointments.js";
+import {
+  SESSION_DURATION_MINUTES,
+  MAX_STUDENT_TURNS,
+  getRemainingSessionTime,
+  getRemainingTurns,
+  getZonedDateKey
+} from "./engine/simulationUsagePolicy.js";
+import {
   SESSION_COUNT_LIMITS,
   buildInitialPreSessionPlan,
   normalizePreSessionPlan
@@ -72,11 +86,19 @@ export default function App() {
     profile: null,
     error: null
   });
+  const [connectionNotice, setConnectionNotice] = useState("");
   const [saveStatus, setSaveStatus] = useState(null);
+  const [closureSaveState, setClosureSaveState] = useState("idle");
+  const [pendingResultsExit, setPendingResultsExit] = useState(null);
   const [agendaFocusCaseId, setAgendaFocusCaseId] = useState("");
+  const [agendaScheduleRequest, setAgendaScheduleRequest] = useState(null);
   const [sessionRecords, setSessionRecords] = useState([]);
+  const [appointmentRecords, setAppointmentRecords] = useState([]);
   const [activeSessionRecordId, setActiveSessionRecordId] = useState("");
+  const [activeAppointmentId, setActiveAppointmentId] = useState("");
   const activeSessionRecordIdRef = useRef("");
+  const activeAppointmentIdRef = useRef("");
+  const approvalStateRef = useRef(approvalState);
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
   const report = useMemo(() => buildEducationalReport(history, selectedCase), [history, selectedCase]);
@@ -94,11 +116,50 @@ export default function App() {
     setActiveSessionRecordId(nextId);
   }
 
+  function updateActiveAppointmentId(nextId = "") {
+    activeAppointmentIdRef.current = nextId;
+    setActiveAppointmentId(nextId);
+  }
+
   function getOrCreateActiveSessionRecordId() {
     if (activeSessionRecordIdRef.current) return activeSessionRecordIdRef.current;
     const nextId = crypto.randomUUID();
     updateActiveSessionRecordId(nextId);
     return nextId;
+  }
+
+  useEffect(() => {
+    approvalStateRef.current = approvalState;
+  }, [approvalState]);
+
+  async function verifyApprovalForUser(user, { preserveActiveAccess = true } = {}) {
+    if (!user) return;
+    const hadApprovedAccess = preserveActiveAccess && approvalStateRef.current.status === "approved";
+    if (!hadApprovedAccess) {
+      setAuthLoading(true);
+      setApprovalState({ status: "checking", profile: null, error: null });
+    }
+
+    const nextApprovalState = await getOrCreateUserApproval(user);
+    const shouldPreserveActiveAccess =
+      hadApprovedAccess &&
+      (
+        nextApprovalState.status === "transient_error" ||
+        (nextApprovalState.status === "error" && !["not_found", "configuration"].includes(nextApprovalState.errorType))
+      );
+
+    if (shouldPreserveActiveAccess) {
+      setConnectionNotice(
+        nextApprovalState.error ||
+          "Sin conexión. Conservaremos tu sesión mientras recuperamos el acceso."
+      );
+      setAuthLoading(false);
+      return;
+    }
+
+    setConnectionNotice("");
+    setApprovalState(nextApprovalState);
+    setAuthLoading(false);
   }
 
   useEffect(() => {
@@ -121,12 +182,8 @@ export default function App() {
         return;
       }
 
-      setAuthLoading(true);
-      setApprovalState({ status: "checking", profile: null, error: null });
-      const nextApprovalState = await getOrCreateUserApproval(nextSession.user);
+      await verifyApprovalForUser(nextSession.user, { preserveActiveAccess: true });
       if (!isMounted || requestId !== approvalRequestId) return;
-      setApprovalState(nextApprovalState);
-      setAuthLoading(false);
     }
 
     supabase.auth.getSession().then(({ data, error }) => {
@@ -152,15 +209,31 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!isSupabaseConfigured || !authSession?.user) return undefined;
+    function handleOnline() {
+      void verifyApprovalForUser(authSession.user, { preserveActiveAccess: true });
+    }
+    globalThis.addEventListener?.("online", handleOnline);
+    return () => {
+      globalThis.removeEventListener?.("online", handleOnline);
+    };
+  }, [authSession?.user?.id]);
+
+  useEffect(() => {
     if (approvalState.status !== "approved" || !authSession?.user) {
       setSessionRecords([]);
+      setAppointmentRecords([]);
       return;
     }
 
     let cancelled = false;
-    getSessionHistoryForUser(authSession).then((records) => {
+    Promise.all([
+      getSessionHistoryForUser(authSession),
+      getSimulationAppointments(authSession)
+    ]).then(([records, appointments]) => {
       if (cancelled) return;
       setSessionRecords(records);
+      setAppointmentRecords(appointments);
     });
 
     return () => {
@@ -171,6 +244,8 @@ export default function App() {
   function resetConversation(nextScreen = screens.brief) {
     setHistory(sessionNumber > 1 ? [createSessionPrelude(selectedCase, sessionNumber, sessionSummary, sessionTotal)] : []);
     updateActiveSessionRecordId("");
+    updateActiveAppointmentId("");
+    setClosureSaveState("idle");
     setScreen(nextScreen);
   }
 
@@ -205,6 +280,8 @@ export default function App() {
     setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: nextCase, sessionNumber: 1, basePlan }));
     setHistory([]);
     updateActiveSessionRecordId("");
+    updateActiveAppointmentId("");
+    setClosureSaveState("idle");
     setScreen(screens.brief);
   }
 
@@ -245,6 +322,11 @@ export default function App() {
     setPreSessionPlan(nextPlan);
     setSaveStatus(null);
     updateActiveSessionRecordId(nextScreen === screens.simulation && resumeRecord ? resumeRecord.id : "");
+    updateActiveAppointmentId(
+      nextScreen === screens.simulation
+        ? findActiveAppointmentForCase(appointmentRecords, caseId, safeSession)?.id || ""
+        : ""
+    );
     setHistory(resolveInitialHistoryForSession({
       nextScreen,
       safeSession,
@@ -283,6 +365,7 @@ export default function App() {
     setSessionSummary(summary);
     setPreSessionPlan(normalizedPlan);
     updateActiveSessionRecordId(resumeRecord?.id || "");
+    updateActiveAppointmentId(findActiveAppointmentForCase(appointmentRecords, selectedCase.id, session)?.id || "");
     setHistory(
       resumeRecord?.conversationHistory?.length
         ? resumeRecord.conversationHistory
@@ -291,6 +374,7 @@ export default function App() {
           : []
     );
     setSaveStatus(null);
+    setClosureSaveState("idle");
     setScreen(screens.simulation);
   }
 
@@ -329,9 +413,19 @@ export default function App() {
     setPreSessionPlan(nextPlan);
     setHistory(resumeRecord.conversationHistory || []);
     updateActiveSessionRecordId(resumeRecord.id);
+    updateActiveAppointmentId(
+      resumeRecord.appointmentId ||
+      findActiveAppointmentForCase(appointmentRecords, caseId, resumeSession)?.id ||
+      ""
+    );
     setSaveStatus(null);
-    setScreen(screens.simulation);
     setSessionRecords((current) => mergeSessionRecordList(current, resumeRecord));
+    setClosureSaveState(resumeRecord.status === "closure_pending" ? "pending" : "idle");
+    if (resumeRecord.status === "closure_pending") {
+      setScreen(screens.results);
+      return;
+    }
+    setScreen(screens.simulation);
   }
 
   function beginSessionFromPreparation(session, preparationState = {}) {
@@ -388,6 +482,7 @@ export default function App() {
     );
     setHistory([createSessionPrelude(selectedCase, nextSession, summary, processTotal)]);
     updateActiveSessionRecordId("");
+    updateActiveAppointmentId("");
     setScreen(screens.simulation);
   }
 
@@ -403,56 +498,44 @@ export default function App() {
       : null;
     setHistory([]);
     updateActiveSessionRecordId("");
+    updateActiveAppointmentId("");
     setSessionNumber(1);
     setSessionSummary(null);
     setSessionSummaries(summaries);
     setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: selectedCase, sessionNumber: 1, basePlan }));
     setSaveStatus(null);
+    setClosureSaveState("idle");
     setScreen(screens.home);
   }
 
   async function handleAsk(question, selectedInterventionType = "", conversationContext = {}) {
-    const turnId = crypto.randomUUID();
+    const turnId = conversationContext.interventionId || crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const sessionRecordId = getOrCreateActiveSessionRecordId();
-    const pendingEntry = {
-      id: turnId,
-      question,
-      answer: "",
-      responseId: "pending-patient-response",
-      analysis: null,
-      patientState: null,
-      responseCategory: "pending",
-      interventionType: selectedInterventionType,
-      guidedIntervention: null,
-      conversationStage: conversationContext.conversationStage
-        ? {
-            sessionNumber,
-            stageName: conversationContext.conversationStage.stageName,
-            stageLabel: conversationContext.conversationStage.stageLabel
-          }
-        : null,
-      createdAt,
-      isPendingResponse: true
-    };
-    const pendingHistory = [...history, pendingEntry];
-    await persistSessionProgress(pendingHistory, { recordId: sessionRecordId });
-
+    const appointment = await ensureActiveAppointmentForCurrentSession();
     const response = await createPatientResponse({
       caseItem: selectedCase,
       difficulty,
       question,
       history,
       sessionNumber,
+      authSession,
+      sessionRecordId,
+      appointmentId: appointment?.id || "",
+      interventionId: turnId,
       selectedInterventionType,
       previousSessionSummary: sessionSummary,
       conversationStage: conversationContext.conversationStage || null
     });
+    const responseText = String(response?.text || "").trim();
+    if (!responseText) {
+      throw new Error("La respuesta del paciente llegó vacía. Intenta reenviar la intervención.");
+    }
 
     const nextEntry = {
         id: turnId,
         question,
-        answer: response.text,
+        answer: responseText,
         responseId: response.responseId,
         analysis: response.analysis,
         patientState: response.patientState,
@@ -470,12 +553,75 @@ export default function App() {
       };
     const nextHistory = [...history, nextEntry];
     setHistory(nextHistory);
-    void persistSessionProgress(nextHistory, { recordId: sessionRecordId });
+    void persistSessionProgress(nextHistory, { recordId: sessionRecordId, appointment });
+    void refreshAppointments();
 
-    return response.text;
+    return responseText;
   }
 
-  async function persistSessionProgress(nextHistory, { recordId = "" } = {}) {
+  async function refreshAppointments() {
+    const appointments = await getSimulationAppointments(authSession);
+    setAppointmentRecords(appointments);
+    return appointments;
+  }
+
+  async function ensureActiveAppointmentForCurrentSession() {
+    const existing =
+      (activeAppointmentIdRef.current &&
+        appointmentRecords.find((appointment) => appointment.id === activeAppointmentIdRef.current)) ||
+      findActiveAppointmentForCase(appointmentRecords, selectedCase.id, sessionNumber);
+
+    if (existing) {
+      updateActiveAppointmentId(existing.id);
+      return existing;
+    }
+
+    const today = getZonedDateKey(new Date());
+    const result = await ensureAppointmentForSession({
+      authSession,
+      appointments: appointmentRecords,
+      caseItem: selectedCase,
+      sessionNumber,
+      scheduledDate: today,
+      scheduledTime: "09:00",
+      durationMinutes: SESSION_DURATION_MINUTES
+    });
+
+    if (result?.appointment?.id) {
+      updateActiveAppointmentId(result.appointment.id);
+      setAppointmentRecords((current) => mergeAppointmentRecordList(current, result.appointment));
+      return result.appointment;
+    }
+
+    const refreshed = await refreshAppointments();
+    const recovered = findActiveAppointmentForCase(refreshed, selectedCase.id, sessionNumber);
+    if (recovered) {
+      updateActiveAppointmentId(recovered.id);
+      return recovered;
+    }
+
+    throw new Error("No se pudo preparar la cita de esta sesion. Revisa la agenda antes de iniciar.");
+  }
+
+  async function updateAppointmentStatusForClosure(status) {
+    const appointment =
+      (activeAppointmentIdRef.current &&
+        appointmentRecords.find((item) => item.id === activeAppointmentIdRef.current)) ||
+      findActiveAppointmentForCase(appointmentRecords, selectedCase.id, sessionNumber);
+    if (!appointment) return;
+
+    const now = new Date().toISOString();
+    const nextAppointment = {
+      ...appointment,
+      status: status === "closure_pending" ? "closure_pending" : "completed",
+      completedAt: status === "closure_pending" ? appointment.completedAt || "" : now,
+      updatedAt: now
+    };
+    await saveSimulationAppointment(authSession, nextAppointment);
+    setAppointmentRecords((current) => mergeAppointmentRecordList(current, nextAppointment));
+  }
+
+  async function persistSessionProgress(nextHistory, { recordId = "", appointment = null } = {}) {
     const nextRecordId = recordId || getOrCreateActiveSessionRecordId();
     const liveReport = buildEducationalReport(nextHistory, selectedCase);
     const sessionRecord = buildSessionHistoryRecord({
@@ -485,6 +631,9 @@ export default function App() {
       report: liveReport,
       sessionNumber,
       preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
+      appointmentId: appointment?.id || activeAppointmentIdRef.current || "",
+      startedAt: appointment?.startedAt || "",
+      endsAt: appointment?.endsAt || "",
       status: "in_progress"
     });
 
@@ -498,13 +647,15 @@ export default function App() {
 
   async function finishSession() {
     setSaveStatus(null);
+    setClosureSaveState("open");
     setScreen(screens.results);
   }
 
   async function saveCompletedSession({
     clinicalDecision = null,
     clinicalPlanEvaluation = null,
-    clinicalArtifacts = null
+    clinicalArtifacts = null,
+    status = "completed"
   } = {}) {
     setSaveStatus({
       type: "saving",
@@ -517,18 +668,24 @@ export default function App() {
       report,
       sessionNumber,
       preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
+      appointmentId: activeAppointmentIdRef.current || "",
+      startedAt: findActiveAppointmentForCase(appointmentRecords, selectedCase.id, sessionNumber)?.startedAt || "",
+      endsAt: findActiveAppointmentForCase(appointmentRecords, selectedCase.id, sessionNumber)?.endsAt || "",
       clinicalArtifacts,
       clinicalDecision,
       clinicalPlanEvaluation,
-      status: "completed"
+      status
     });
     const saveResult = await saveSessionHistory(sessionRecord);
     setSessionRecords((current) => mergeSessionRecordList(current, sessionRecord));
+    await updateAppointmentStatusForClosure(status);
     updateActiveSessionRecordId("");
+    updateActiveAppointmentId("");
+    setClosureSaveState(status === "closure_pending" ? "pending" : "saved");
     if (saveResult.cloudSaved) {
       setSaveStatus({
         type: "success",
-        message: "Sesion guardada correctamente."
+        message: status === "closure_pending" ? "Cierre pendiente guardado." : "Sesion guardada correctamente."
       });
     } else if (saveResult.error) {
       setSaveStatus({
@@ -547,27 +704,29 @@ export default function App() {
     return saveResult;
   }
 
+  async function saveClosurePendingSession() {
+    return saveCompletedSession({ status: "closure_pending" });
+  }
+
   async function handleSignOut() {
     if (supabase) {
       await supabase.auth.signOut();
     }
     setHistory([]);
     updateActiveSessionRecordId("");
+    updateActiveAppointmentId("");
     setSessionNumber(1);
     setSessionSummary(null);
     setAuthSession(null);
     setApprovalState({ status: "signed_out", profile: null, error: null });
+    setConnectionNotice("");
     setAuthLoading(false);
     setScreen(screens.home);
   }
 
   async function refreshApproval() {
     if (!authSession?.user) return;
-    setAuthLoading(true);
-    setApprovalState({ status: "checking", profile: null, error: null });
-    const nextApprovalState = await getOrCreateUserApproval(authSession.user);
-    setApprovalState(nextApprovalState);
-    setAuthLoading(false);
+    await verifyApprovalForUser(authSession.user, { preserveActiveAccess: true });
   }
 
   function openTrustCenter() {
@@ -578,12 +737,37 @@ export default function App() {
     setScreen(screens.home);
   }
 
-  function openClinicalAgenda(caseId = "") {
+  function openClinicalAgenda(caseId = "", options = {}) {
     setAgendaFocusCaseId(typeof caseId === "string" ? caseId : "");
+    setAgendaScheduleRequest(
+      options?.scheduleSessionNumber
+        ? {
+            caseId: typeof caseId === "string" ? caseId : "",
+            sessionNumber: Number(options.scheduleSessionNumber) || 1
+          }
+        : null
+    );
     setScreen(screens.clinicalAgenda);
   }
 
   function navigateWorkspace(targetScreen) {
+    requestExitFromResults(targetScreen);
+  }
+
+  function requestExitFromResults(destination = screens.home, exitAction = null) {
+    if (shouldWarnBeforeLeavingResults()) {
+      setPendingResultsExit({ targetScreen: destination, exitAction });
+      return false;
+    }
+    if (typeof exitAction === "function") {
+      exitAction();
+      return true;
+    }
+    performWorkspaceNavigation(destination);
+    return true;
+  }
+
+  function performWorkspaceNavigation(targetScreen) {
     if (targetScreen === "progress") {
       setScreen(screens.savedSessions);
       return;
@@ -603,6 +787,26 @@ export default function App() {
       }
       setScreen(targetScreen);
     }
+  }
+
+  function shouldWarnBeforeLeavingResults() {
+    return screen === screens.results && history.length > 0 && closureSaveState !== "saved";
+  }
+
+  async function leaveResultsWithPendingClosure() {
+    const exitRequest = pendingResultsExit;
+    const targetScreen = exitRequest?.targetScreen || screens.home;
+    await saveClosurePendingSession();
+    setPendingResultsExit(null);
+    if (typeof exitRequest?.exitAction === "function") {
+      exitRequest.exitAction();
+      return;
+    }
+    performWorkspaceNavigation(targetScreen);
+  }
+
+  function cancelResultsExit() {
+    setPendingResultsExit(null);
   }
 
   if (authLoading) {
@@ -662,6 +866,11 @@ export default function App() {
   return (
     <main className={`app-shell authenticated-shell ${screen === screens.simulation ? "simulation-mode" : ""}`}>
       <EthicalNotice compact={screen !== screens.home} />
+      {connectionNotice && (
+        <div className="connection-status-banner" role="status">
+          {connectionNotice}
+        </div>
+      )}
       <AuthenticatedLayout
         currentScreen={screen}
         userEmail={userEmail}
@@ -674,6 +883,7 @@ export default function App() {
       {screen === screens.home && (
         <ClinicalDashboard
           cases={cases}
+          appointments={appointmentRecords}
           sessionRecords={sessionRecords}
           userEmail={userEmail}
           onOpenCases={() => setScreen(screens.select)}
@@ -695,10 +905,14 @@ export default function App() {
       {screen === screens.clinicalAgenda && (
         <ClinicalAgenda
           cases={cases}
+          authSession={authSession}
+          appointments={appointmentRecords}
           initialCaseId={agendaFocusCaseId}
+          initialScheduleRequest={agendaScheduleRequest}
           onBackHome={goHome}
           onPrepareCase={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.brief)}
           onStartSession={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.simulation)}
+          onAppointmentsChange={setAppointmentRecords}
         />
       )}
 
@@ -740,6 +954,10 @@ export default function App() {
           totalSessions={sessionTotal}
           sessionSummary={sessionSummary}
           history={history}
+          sessionUsage={buildSessionUsage({
+            appointment: appointmentRecords.find((appointment) => appointment.id === activeAppointmentId),
+            history
+          })}
           onAsk={handleAsk}
           onFinish={finishSession}
           onRestart={() => resetConversation(screens.simulation)}
@@ -754,7 +972,7 @@ export default function App() {
             <div className={`save-status ${saveStatus.type}`}>
               {saveStatus.message}
               {saveStatus.type === "success" && (
-                <button className="secondary-action" type="button" onClick={() => setScreen(screens.savedSessions)}>
+                <button className="secondary-action" type="button" onClick={() => requestExitFromResults(screens.savedSessions)}>
                   Ver Mis sesiones
                 </button>
               )}
@@ -766,8 +984,10 @@ export default function App() {
             caseItem={selectedCase}
             history={history}
             sessionNumber={sessionNumber}
-            onRestart={() => resetConversation(screens.simulation)}
-            onSelectCase={() => setScreen(screens.select)}
+            onRestart={() =>
+              requestExitFromResults(screens.simulation, () => resetConversation(screens.simulation))
+            }
+            onSelectCase={() => requestExitFromResults(screens.select)}
           />
           <SessionClosure
             caseItem={selectedCase}
@@ -778,13 +998,40 @@ export default function App() {
             previousSessionSummaries={sessionSummaries}
             preSessionPlan={normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber })}
             onContinueSession={advanceToNextSession}
+            onScheduleNextSession={(targetSession) => openClinicalAgenda(selectedCase.id, { scheduleSessionNumber: targetSession })}
             onBackHome={goHome}
+            onRequestExit={requestExitFromResults}
             onSaveSessionRecord={saveCompletedSession}
           />
         </section>
       )}
 
       </AuthenticatedLayout>
+      {pendingResultsExit && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="confirmation-modal closure-pending-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="closure-pending-title"
+          >
+            <span className="eyebrow">Cierre pendiente</span>
+            <h2 id="closure-pending-title">Falta registrar la decisión clínica</h2>
+            <p>
+              Puedes volver y completar la decisión, o dejar el cierre pendiente para
+              retomarlo después.
+            </p>
+            <div className="modal-actions">
+              <button className="primary-action" type="button" onClick={cancelResultsExit}>
+                Volver y registrar decisión
+              </button>
+              <button className="secondary-action" type="button" onClick={leaveResultsWithPendingClosure}>
+                Salir y dejar pendiente
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -810,7 +1057,7 @@ function buildBasePlanFromSummary(summary) {
 function findResumableSessionRecord(records = [], caseId, sessionNumber) {
   return records
     .filter((record) =>
-      record?.status === "in_progress" &&
+      ["in_progress", "closure_pending"].includes(record?.status) &&
       record.caseId === caseId &&
       Number(record.sessionNumber) === Number(sessionNumber) &&
       Array.isArray(record.conversationHistory) &&
@@ -822,7 +1069,7 @@ function findResumableSessionRecord(records = [], caseId, sessionNumber) {
 function findLatestResumableSessionRecord(records = [], caseId) {
   return records
     .filter((record) =>
-      record?.status === "in_progress" &&
+      ["in_progress", "closure_pending"].includes(record?.status) &&
       record.caseId === caseId &&
       Array.isArray(record.conversationHistory) &&
       record.conversationHistory.length > 0
@@ -859,6 +1106,32 @@ function mergeSessionRecordList(records = [], nextRecord = null) {
   return Array.from(merged.values()).sort(
     (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
   );
+}
+
+function mergeAppointmentRecordList(records = [], nextRecord = null) {
+  if (!nextRecord?.id) return records;
+  const merged = new Map();
+  for (const record of [...records, nextRecord].filter(Boolean)) {
+    const current = merged.get(record.id);
+    const currentTime = current ? new Date(current.updatedAt || current.createdAt).getTime() : 0;
+    const nextTime = new Date(record.updatedAt || record.createdAt).getTime();
+    if (!current || nextTime >= currentTime) merged.set(record.id, record);
+  }
+  return Array.from(merged.values()).sort(
+    (a, b) => new Date(a.scheduledFor || a.createdAt).getTime() - new Date(b.scheduledFor || b.createdAt).getTime()
+  );
+}
+
+function buildSessionUsage({ appointment = null, history = [] } = {}) {
+  return {
+    appointmentId: appointment?.id || "",
+    status: appointment?.status || "",
+    startedAt: appointment?.startedAt || "",
+    durationMinutes: appointment?.durationMinutes || SESSION_DURATION_MINUTES,
+    remainingMs: getRemainingSessionTime(appointment, new Date()),
+    remainingTurns: getRemainingTurns(history),
+    usedTurns: Math.max(0, MAX_STUDENT_TURNS - getRemainingTurns(history))
+  };
 }
 
 function createSessionPrelude(caseItem, sessionNumber, summary, totalSessions = SESSION_COUNT_LIMITS.defaultValue) {

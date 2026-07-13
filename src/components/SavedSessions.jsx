@@ -11,6 +11,9 @@ export function SavedSessions({ authSession, onBackHome }) {
   const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteRequest, setDeleteRequest] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteNotice, setDeleteNotice] = useState("");
   const selectedSession = useMemo(
     () => sessions.find((session) => session.id === selectedId) || null,
     [sessions, selectedId]
@@ -37,6 +40,35 @@ export function SavedSessions({ authSession, onBackHome }) {
     await clearAllSessionHistory(authSession);
     setSessions([]);
     setSelectedId("");
+  }
+
+  function requestDeleteSession(session) {
+    setDeleteNotice("");
+    setDeleteRequest({ type: "single", session });
+  }
+
+  function requestDeleteAll() {
+    setDeleteNotice("");
+    setDeleteRequest({ type: "all", count: sessions.length });
+  }
+
+  function cancelDeleteRequest() {
+    if (isDeleting) return;
+    setDeleteRequest(null);
+  }
+
+  async function confirmDeleteRequest() {
+    if (!deleteRequest || isDeleting) return;
+    setIsDeleting(true);
+    if (deleteRequest.type === "single") {
+      await removeSession(deleteRequest.session.id);
+      setDeleteNotice("Sesion eliminada correctamente.");
+    } else {
+      await removeAllSessions();
+      setDeleteNotice("Todas las sesiones fueron eliminadas.");
+    }
+    setIsDeleting(false);
+    setDeleteRequest(null);
   }
 
   return (
@@ -75,7 +107,8 @@ export function SavedSessions({ authSession, onBackHome }) {
         <>
           <div className="saved-sessions-toolbar">
             <span>{sessions.length} sesion(es) guardada(s)</span>
-            <button className="danger-action" type="button" onClick={removeAllSessions}>
+            {deleteNotice && <strong className="delete-notice">{deleteNotice}</strong>}
+            <button className="danger-action" type="button" onClick={requestDeleteAll}>
               <Trash2 aria-hidden="true" />
               Eliminar todo
             </button>
@@ -95,12 +128,13 @@ export function SavedSessions({ authSession, onBackHome }) {
                   <div className="saved-session-meta">
                     <span>{formatDate(session.createdAt)}</span>
                     <span>{session.conversationHistory?.length || 0} turnos</span>
-                    <span>Puntaje {session.feedback?.generalScore ?? session.patientOpenness?.final ?? "N/O"}/100</span>
+                    <span>{getSessionStatusLabel(session.status)}</span>
+                    <span>Nivel {getSessionFeedback(session).levelLabel}</span>
                     {getClinicalPlanEvaluation(session) && (
                       <span>{getClinicalPlanEvaluation(session).decisionLabel}</span>
                     )}
                   </div>
-                  <p>{session.summary?.brief || session.summary?.closure}</p>
+                  <p>{getSessionFeedback(session).briefSummary || session.summary?.brief || session.summary?.closure}</p>
                   <div className="saved-session-actions">
                     <button
                       className="secondary-action"
@@ -113,7 +147,7 @@ export function SavedSessions({ authSession, onBackHome }) {
                     <button
                       className="danger-action"
                       type="button"
-                      onClick={() => removeSession(session.id)}
+                      onClick={() => requestDeleteSession(session)}
                     >
                       <Trash2 aria-hidden="true" />
                       Eliminar
@@ -128,11 +162,33 @@ export function SavedSessions({ authSession, onBackHome }) {
                 <>
                   <span className="eyebrow">Detalle local</span>
                   <h2>{selectedSession.caseName} - Sesion {selectedSession.sessionNumber}</h2>
-                  <p>{selectedSession.summary?.closure}</p>
+                  <p>{getSessionFeedback(selectedSession).briefSummary || selectedSession.summary?.closure}</p>
                   <p>
-                    Puntaje formativo:{" "}
-                    <strong>{selectedSession.feedback?.generalScore ?? selectedSession.patientOpenness?.final ?? "N/O"}/100</strong>
+                    Nivel formativo: <strong>{getSessionFeedback(selectedSession).levelLabel}</strong>
                   </p>
+
+                  <section>
+                    <h3>Fortalezas observadas</h3>
+                    <ul>
+                      {getSessionFeedback(selectedSession).strengths.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3>Aspecto a mejorar</h3>
+                    <ul>
+                      {getSessionFeedback(selectedSession).improvements.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3>Proximo paso sugerido</h3>
+                    <p>{getSessionFeedback(selectedSession).nextStep}</p>
+                  </section>
 
                   {getPreSessionEvaluation(selectedSession) && (
                     <section>
@@ -177,32 +233,25 @@ export function SavedSessions({ authSession, onBackHome }) {
                     </section>
                   )}
 
-                  <section>
-                    <h3>Aspectos logrados</h3>
-                    <ul>
-                      {(selectedSession.feedback?.strengths || []).slice(0, 4).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </section>
-
-                  <section>
-                    <h3>Aspectos por mejorar</h3>
-                    <ul>
-                      {(selectedSession.feedback?.improvements || selectedSession.feedback?.nextSuggestions || []).slice(0, 4).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </section>
-
-                  <section>
-                    <h3>Sugerencias</h3>
-                    <ul>
-                      {(selectedSession.feedback?.nextSuggestions || []).slice(0, 4).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </section>
+                  <details className="history-details feedback-detail-toggle">
+                    <summary>Ver detalle formativo</summary>
+                    <section>
+                      <h3>Criterios formativos</h3>
+                      <ul>
+                        {getSessionFeedback(selectedSession).formativeCriteria.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </section>
+                    <section>
+                      <h3>Referencias usadas</h3>
+                      <ul>
+                        {getSessionFeedback(selectedSession).referencesUsed.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  </details>
 
                   {selectedSession.feedback?.objectiveEvaluation?.length > 0 && (
                     <section>
@@ -252,6 +301,45 @@ export function SavedSessions({ authSession, onBackHome }) {
               )}
             </aside>
           </div>
+          {deleteRequest && (
+            <div className="modal-backdrop" role="presentation">
+              <section
+                className="confirmation-modal delete-session-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="delete-session-title"
+              >
+                <span className="eyebrow">Confirmar eliminacion</span>
+                <h2 id="delete-session-title">
+                  {deleteRequest.type === "single" ? "Eliminar sesion guardada" : "Eliminar todas las sesiones"}
+                </h2>
+                {deleteRequest.type === "single" ? (
+                  <p>
+                    Se eliminara el registro de {deleteRequest.session.caseName}, sesion {deleteRequest.session.sessionNumber},
+                    guardado el {formatDate(deleteRequest.session.createdAt)}.
+                  </p>
+                ) : (
+                  <p>
+                    Se eliminaran {deleteRequest.count} sesiones guardadas. Esta accion quitara los registros
+                    visibles del historial de este usuario.
+                  </p>
+                )}
+                <div className="modal-actions">
+                  <button className="secondary-action" type="button" onClick={cancelDeleteRequest} disabled={isDeleting}>
+                    Cancelar
+                  </button>
+                  <button className="danger-action" type="button" onClick={confirmDeleteRequest} disabled={isDeleting}>
+                    <Trash2 aria-hidden="true" />
+                    {isDeleting
+                      ? "Eliminando..."
+                      : deleteRequest.type === "single"
+                        ? "Eliminar sesion"
+                        : "Eliminar todas"}
+                  </button>
+                </div>
+              </section>
+            </div>
+          )}
         </>
       )}
     </section>
@@ -291,4 +379,51 @@ function getClinicalArtifactsEvaluation(session) {
     session?.summary?.clinicalArtifactsEvaluation ||
     null
   );
+}
+
+function getSessionFeedback(session) {
+  const feedback = session?.feedback?.sessionFeedback;
+  if (feedback) {
+    return {
+      levelLabel: feedback.levelLabel || "En desarrollo",
+      briefSummary: feedback.briefSummary || session?.summary?.brief || "",
+      strengths: ensureList(feedback.strengths, ["Se sostuvo una entrevista formativa."]),
+      improvements: ensureList(feedback.improvements, ["Profundizar el foco clinico en la siguiente revision."]),
+      nextStep: feedback.nextStep || "Revisar el motivo de consulta y definir un siguiente paso formativo.",
+      formativeCriteria: ensureList(feedback.formativeCriteria, ["Alianza", "Motivo de consulta", "Cierre"]),
+      referencesUsed: ensureList(feedback.referencesUsed, ["Apuntes formativos UNIACC"])
+    };
+  }
+
+  return {
+    levelLabel: resolveSavedLevel(session?.feedback?.generalScore ?? session?.patientOpenness?.final),
+    briefSummary: session?.summary?.brief || session?.summary?.closure || "Sesion guardada para revision formativa.",
+    strengths: ensureList((session?.feedback?.strengths || []).slice(0, 3), ["Se sostuvo una entrevista formativa."]),
+    improvements: ensureList(
+      (session?.feedback?.improvements || session?.feedback?.nextSuggestions || []).slice(0, 2),
+      ["Profundizar el foco clinico en la siguiente revision."]
+    ),
+    nextStep: (session?.feedback?.nextSuggestions || [])[0] || "Definir continuidad, cierre o derivacion segun lo observado.",
+    formativeCriteria: ["Alianza", "Motivo de consulta", "Decision clinica"],
+    referencesUsed: ["Apuntes formativos UNIACC"]
+  };
+}
+
+function ensureList(value, fallback) {
+  return Array.isArray(value) && value.length ? value : fallback;
+}
+
+function resolveSavedLevel(score) {
+  const numericScore = Number(score);
+  if (!Number.isFinite(numericScore)) return "En desarrollo";
+  if (numericScore >= 85) return "Destacado";
+  if (numericScore >= 65) return "Logrado";
+  if (numericScore >= 40) return "En desarrollo";
+  return "Inicial";
+}
+
+function getSessionStatusLabel(status) {
+  if (status === "closure_pending") return "Cierre pendiente";
+  if (status === "in_progress") return "Sesion por retomar";
+  return "Sesion completada";
 }

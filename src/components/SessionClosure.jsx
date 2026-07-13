@@ -9,7 +9,6 @@ import {
   TrendingUp
 } from "lucide-react";
 import {
-  closureExamples,
   getNextSessionAgreement,
   getNextSessionNumber,
   getSessionClosureTitle,
@@ -18,7 +17,6 @@ import {
 import {
   buildProcessSummary,
   buildSessionSummary,
-  formatProcessSummary,
   formatSessionAgreement,
   saveSessionSummary
 } from "../engine/sessionMemory.js";
@@ -36,8 +34,8 @@ import {
   evaluateClinicalArtifacts,
   normalizeClinicalArtifacts
 } from "../engine/clinicalArtifacts.js";
+import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 import { clinicalInstrumentOptions } from "../data/clinicalWorkflow.js";
-import { NextSessionModal } from "./NextSessionModal.jsx";
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
 
 export function SessionClosure({
@@ -49,13 +47,14 @@ export function SessionClosure({
   previousSessionSummaries = [],
   preSessionPlan = null,
   onContinueSession,
+  onScheduleNextSession,
   onBackHome,
+  onRequestExit,
   onSaveSessionRecord
 }) {
-  const [modalOpen, setModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [processCopied, setProcessCopied] = useState(false);
   const [hasSavedSessionRecord, setHasSavedSessionRecord] = useState(false);
+  const [hasSavedContinuityAgreement, setHasSavedContinuityAgreement] = useState(false);
   const [clinicalArtifacts, setClinicalArtifacts] = useState(() => buildInitialClinicalArtifacts());
   const sessionPlan = useMemo(() => getClinicalSessionPlan(caseItem), [caseItem.id]);
   const [clinicalDecision, setClinicalDecision] = useState(() =>
@@ -102,6 +101,19 @@ export function SessionClosure({
     () => evaluateClinicalArtifacts({ artifacts: normalizedClinicalArtifacts, report, history }),
     [normalizedClinicalArtifacts, report, history]
   );
+  const sessionFeedback = useMemo(
+    () =>
+      buildSessionFeedback({
+        sessionNumber,
+        selectedCase: caseItem,
+        conversation: history,
+        clinicalDecision: normalizedClinicalDecision,
+        studentPlan: preSessionPlan,
+        selectedApproach: report.therapeuticApproach,
+        report
+      }),
+    [sessionNumber, caseItem, history, normalizedClinicalDecision, preSessionPlan, report]
+  );
   const agreement = useMemo(
     () =>
       buildContinuityAgreement({
@@ -116,8 +128,15 @@ export function SessionClosure({
     normalizedClinicalDecision.action === "continue_session" &&
     Boolean(nextSessionNumber) &&
     normalizedClinicalDecision.proposedSessions > sessionNumber;
-  const isFinalSession = !canContinueInSimulator;
   const reachedSessionLimit = !nextSessionNumber;
+  const closureAction = getClosureActionConfig({
+    canContinueInSimulator,
+    normalizedClinicalDecision,
+    nextSessionNumber,
+    nextSessionStage,
+    plannedSessionTotal,
+    reachedSessionLimit
+  });
   const summary = useMemo(
     () =>
       buildSessionSummary({
@@ -157,6 +176,7 @@ export function SessionClosure({
     setClinicalDecision(buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan }));
     setClinicalArtifacts(buildInitialClinicalArtifacts());
     setHasSavedSessionRecord(false);
+    setHasSavedContinuityAgreement(false);
   }, [caseItem.id, sessionNumber, sessionPlan, preSessionPlanKey]);
 
   function updateDecision(patch) {
@@ -164,6 +184,19 @@ export function SessionClosure({
       ...current,
       ...patch
     }));
+  }
+
+  function selectClinicalAction(action) {
+    const nextPatch = { action };
+    if (action === "continue_session") {
+      nextPatch.proposedSessions = Math.max(
+        Number(clinicalDecision.proposedSessions) || sessionNumber + 1,
+        sessionNumber + 1
+      );
+    } else {
+      nextPatch.proposedSessions = sessionNumber;
+    }
+    updateDecision(nextPatch);
   }
 
   function updateArtifacts(patch) {
@@ -197,8 +230,26 @@ export function SessionClosure({
     if (canContinueInSimulator) onContinueSession(summary);
   }
 
+  async function scheduleNextSession() {
+    await saveCurrentSummary({ includeHistory: true });
+    if (canContinueInSimulator) onScheduleNextSession?.(nextSessionNumber);
+  }
+
+  async function saveContinuityAgreement() {
+    await saveCurrentSummary({ includeHistory: true });
+    setHasSavedContinuityAgreement(true);
+  }
+
   async function backHomeAfterSave() {
     await saveCurrentSummary({ includeHistory: true });
+    onBackHome();
+  }
+
+  function requestBackHomeWithoutDecision() {
+    if (onRequestExit) {
+      onRequestExit("home");
+      return;
+    }
     onBackHome();
   }
 
@@ -210,17 +261,6 @@ export function SessionClosure({
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setCopied(false);
-    }
-  }
-
-  async function copyProcessSummary() {
-    await saveCurrentSummary();
-    try {
-      await navigator.clipboard.writeText(formatProcessSummary(processSummary));
-      setProcessCopied(true);
-      window.setTimeout(() => setProcessCopied(false), 1800);
-    } catch {
-      setProcessCopied(false);
     }
   }
 
@@ -307,49 +347,66 @@ export function SessionClosure({
       )}
 
       <div className="closure-panels">
-        <section className="session-summary-card closure-panel closure-panel-wide">
-          <span className="eyebrow">Resumen narrativo</span>
-          <h2>Sesión {summary.sessionNumber} con {summary.patientName}</h2>
-          <p>{summary.resumenConversacion}</p>
-        </section>
+        <section className="session-summary-card closure-panel closure-panel-wide session-feedback-compact">
+          <span className="eyebrow">Retroalimentacion breve</span>
+          <div className="feedback-brief-header">
+            <div>
+              <h2>{sessionFeedback.levelLabel}</h2>
+              <p>{sessionFeedback.levelDescription}</p>
+            </div>
+            <strong>Sesion {summary.sessionNumber}</strong>
+          </div>
 
-        <section className="closure-card closure-panel">
-          <h2>Aspectos logrados</h2>
-          <ul>
-            {report.strengths.slice(0, 3).map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
+          <div className="feedback-sections feedback-brief-grid">
+            <article className="feedback-block">
+              <h3>Sintesis breve</h3>
+              <p>{sessionFeedback.briefSummary}</p>
+            </article>
+            <article className="feedback-block">
+              <h3>Fortalezas observadas</h3>
+              <ul>
+                {sessionFeedback.strengths.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+            <article className="feedback-block">
+              <h3>Aspecto a mejorar</h3>
+              <ul>
+                {sessionFeedback.improvements.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+            <article className="feedback-block">
+              <h3>Proximo paso sugerido</h3>
+              <p>{sessionFeedback.nextStep}</p>
+            </article>
+          </div>
 
-        <section className="closure-card closure-panel">
-          <h2>Aspectos por mejorar</h2>
-          <ul>
-            {report.improvements.slice(0, 3).map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="closure-card closure-panel">
-          <h2>Temas pendientes</h2>
-          <ul>
-            {summary.temasPendientes.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="closure-card closure-panel">
-          <h2>Ejemplos de cierre formativo</h2>
-          <ul>
-            {closureExamples.slice(0, 3).map((example) => (
-              <li key={example}>"{example}"</li>
-            ))}
-          </ul>
+          <details className="history-details feedback-detail-toggle">
+            <summary>Ver detalle formativo</summary>
+            <div className="session-summary-grid">
+              <div>
+                <h3>Criterios</h3>
+                <ul>
+                  {sessionFeedback.formativeCriteria.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3>Referencias formativas</h3>
+                <ul>
+                  {sessionFeedback.referencesUsed.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </details>
         </section>
       </div>
-
       <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
         <span className="eyebrow">Formulacion y registro</span>
         <h2>Hipotesis, instrumentos y nota clinica</h2>
@@ -527,7 +584,7 @@ export function SessionClosure({
                 name="clinical-decision-action"
                 value={option.value}
                 checked={normalizedClinicalDecision.action === option.value}
-                onChange={() => updateDecision({ action: option.value })}
+                onChange={() => selectClinicalAction(option.value)}
               />
               <span>
                 <strong>{option.label}</strong>
@@ -536,6 +593,12 @@ export function SessionClosure({
             </label>
           ))}
         </div>
+
+        {normalizedClinicalDecision.action === "continue_session" && (
+          <div className="session-note" role="status">
+            Primero se registrara la continuidad. La sesion siguiente podra iniciarse despues como accion opcional.
+          </div>
+        )}
 
         <div className="clinical-plan-form">
           <label>
@@ -625,18 +688,12 @@ export function SessionClosure({
 
       <div className="continuity-callout">
         <div>
-          <h2>{canContinueInSimulator ? "Continuar segun tu decision" : "Guardar decision y cerrar"}</h2>
-          {canContinueInSimulator ? (
-            <p>
-              Puedes avanzar a {nextSessionStage.title.toLowerCase()} porque propusiste continuidad
-              dentro de las {plannedSessionTotal} sesiones propuestas.
-            </p>
-          ) : (
-            <p>
-              La sesion quedara guardada con tu decision de {formatClinicalDecision(normalizedClinicalDecision).toLowerCase()}.
-              {reachedSessionLimit ? " Ya llegaste a la ultima sesion del proceso que propusiste." : ""}
-            </p>
-          )} 
+          <h2>{canContinueInSimulator && hasSavedContinuityAgreement ? "Continuidad registrada" : closureAction.title}</h2>
+          <p>
+            {canContinueInSimulator && hasSavedContinuityAgreement
+              ? `La continuidad dentro del simulador quedo registrada. Agenda la sesion ${nextSessionNumber} para sostener el proceso sin iniciar otra entrevista ahora.`
+              : closureAction.description}
+          </p>
         </div>
         <PedagogicalGuide
           guideId="cierre_seguimiento"
@@ -645,73 +702,40 @@ export function SessionClosure({
           className="clinical-inline-guide"
         />
         <div className="closure-actions">
-          {canContinueInSimulator ? (
-            <button className="primary-action" type="button" onClick={() => setModalOpen(true)}>
-              Continuar a sesion {nextSessionNumber}
-              <ArrowRight aria-hidden="true" />
+          {canContinueInSimulator && !hasSavedContinuityAgreement ? (
+            <button className="primary-action" type="button" onClick={saveContinuityAgreement}>
+              {closureAction.primaryLabel}
+              <CheckCircle2 aria-hidden="true" />
             </button>
-          ) : (
-            <button className="primary-action" type="button" onClick={backHomeAfterSave}>
-              <Home aria-hidden="true" />
-              Guardar y volver al inicio
-            </button>
-          )}
-          <button className="secondary-action" type="button" onClick={copyProcessSummary}>
-            <Clipboard aria-hidden="true" />
-            {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
-          </button>
-          <button className="secondary-action" type="button" onClick={copyCurrentSummary}>
-            <Clipboard aria-hidden="true" />
-            {copied ? "Resumen copiado" : "Copiar resumen"}
-          </button>
-          <button className="secondary-action" type="button" onClick={backHomeAfterSave}>
-            <Home aria-hidden="true" />
-            Volver al inicio
-          </button>
-        </div>
-      </div>
-
-      <div className="continuity-callout" hidden>
-        <div>
-          <h2>{canContinueInSimulator ? "Continuar segun tu decision" : "Guardar decision y cerrar"}</h2>
-          {isFinalSession ? (
-            <p>
-              Has completado las sesiones simuladas de tu plan. Puedes copiar una sintesis del
-              proceso formativo o volver al inicio para trabajar otro caso.
-            </p>
-          ) : (
-            <p>
-              Puedes continuar con {nextSessionStage.title.toLowerCase()} para retomar
-              los temas abiertos y trabajar el foco: {nextSessionStage.focus}
-            </p>
-          )}
-        </div>
-        <div className="closure-actions">
-          {isFinalSession ? (
+          ) : null}
+          {canContinueInSimulator && hasSavedContinuityAgreement ? (
             <>
-              <button className="primary-action" type="button" onClick={backHomeAfterSave}>
-                <Home aria-hidden="true" />
-                Finalizar proceso formativo
+              <button className="primary-action" type="button" onClick={scheduleNextSession}>
+                <ArrowRight aria-hidden="true" />
+                Agendar sesion {nextSessionNumber}
               </button>
-              <button className="secondary-action" type="button" onClick={copyProcessSummary}>
-                <Clipboard aria-hidden="true" />
-                {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
+              <button className="secondary-action" type="button" onClick={backHomeAfterSave}>
+                <Home aria-hidden="true" />
+                Volver al inicio
               </button>
             </>
-          ) : (
-            <button className="primary-action" type="button" onClick={() => setModalOpen(true)}>
-              Continuar a sesión {nextSessionNumber}
-              <ArrowRight aria-hidden="true" />
+          ) : null}
+          {!canContinueInSimulator ? (
+            <button className="primary-action" type="button" onClick={backHomeAfterSave}>
+              <Home aria-hidden="true" />
+              {closureAction.primaryLabel}
             </button>
-          )}
+          ) : null}
           <button className="secondary-action" type="button" onClick={copyCurrentSummary}>
             <Clipboard aria-hidden="true" />
             {copied ? "Resumen copiado" : "Copiar resumen"}
           </button>
-          <button className="secondary-action" type="button" onClick={backHomeAfterSave}>
+          {!(canContinueInSimulator && hasSavedContinuityAgreement) && (
+          <button className="secondary-action" type="button" onClick={requestBackHomeWithoutDecision}>
             <Home aria-hidden="true" />
             Volver al inicio
           </button>
+          )}
         </div>
       </div>
 
@@ -759,17 +783,73 @@ export function SessionClosure({
         </section>
       )}
 
-      <NextSessionModal
-        open={modalOpen}
-        summary={summary}
-        patientAgreement={agreement}
-        nextSessionNumber={nextSessionNumber}
-        nextSessionStage={nextSessionStage}
-        onClose={() => setModalOpen(false)}
-        onContinueSession={continueToNextSession}
-        onSaveSummary={() => saveCurrentSummary({ includeHistory: true })}
-        onBackHome={backHomeAfterSave}
-      />
     </section>
   );
+}
+
+function getClosureActionConfig({
+  canContinueInSimulator,
+  normalizedClinicalDecision,
+  nextSessionNumber,
+  nextSessionStage,
+  plannedSessionTotal,
+  reachedSessionLimit
+}) {
+  if (canContinueInSimulator) {
+    return {
+      title: "Registrar continuidad",
+      description: `Registra primero la continuidad dentro del simulador. Luego podras iniciar ${nextSessionStage?.title?.toLowerCase() || "la proxima sesion simulada"} si quieres continuar ahora.`,
+      primaryLabel: "Registrar continuidad"
+    };
+  }
+
+  const suffix = reachedSessionLimit ? " Ya llegaste a la ultima sesion del proceso que propusiste." : "";
+  const configs = {
+    close_process: {
+      title: "Cerrar proceso simulado",
+      description: `La sesion quedara guardada como cierre del proceso simulado.${suffix}`,
+      primaryLabel: "Cerrar proceso y volver al inicio"
+    },
+    refer: {
+      title: "Registrar derivacion",
+      description: "La sesion quedara guardada con una decision de derivacion. Revisa que la justificacion indique el motivo y el dispositivo sugerido.",
+      primaryLabel: "Registrar derivacion y finalizar sesion"
+    },
+    risk_protocol: {
+      title: "Registrar protocolo de riesgo",
+      description: "La prioridad formativa es dejar registrada la decision de seguridad, supervisar el caso y no avanzar automaticamente a otra sesion.",
+      primaryLabel: "Registrar protocolo de riesgo"
+    },
+    request_supervision: {
+      title: "Registrar solicitud de supervision",
+      description: "La sesion quedara guardada para revision docente o supervision antes de tomar una nueva decision clinica.",
+      primaryLabel: "Registrar solicitud de supervision"
+    },
+    apply_instruments: {
+      title: "Registrar evaluacion complementaria",
+      description: "La sesion quedara guardada indicando que se requieren instrumentos o evaluacion complementaria antes de continuar.",
+      primaryLabel: "Registrar evaluacion complementaria"
+    },
+    initial_feedback: {
+      title: "Guardar devolucion inicial",
+      description: "La sesion quedara guardada con una decision de devolucion inicial, sin forzar avance automatico a una nueva sesion.",
+      primaryLabel: "Guardar devolucion inicial"
+    },
+    follow_up: {
+      title: "Guardar recomendacion de seguimiento",
+      description: "La sesion quedara guardada con recomendacion de seguimiento y monitoreo segun lo observado.",
+      primaryLabel: "Guardar recomendacion de seguimiento"
+    },
+    beyond_simulator: {
+      title: "Registrar continuidad extendida",
+      description: "La sesion quedara guardada indicando que el caso requiere continuidad mas alla del ciclo disponible en el simulador.",
+      primaryLabel: "Registrar continuidad extendida"
+    }
+  };
+
+  return configs[normalizedClinicalDecision.action] || {
+    title: "Guardar decision y cerrar",
+    description: `La sesion quedara guardada con tu decision de ${formatClinicalDecision(normalizedClinicalDecision).toLowerCase()}.${suffix}`,
+    primaryLabel: "Guardar decision y volver al inicio"
+  };
 }

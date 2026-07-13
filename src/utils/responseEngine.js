@@ -1,4 +1,5 @@
 import { generateLocalPatientResponse } from "../engine/localMiniAI.js";
+import { MAX_CONTEXT_TURNS } from "../engine/simulationUsagePolicy.js";
 
 const INVALID_FINAL_WORDS = new Set([
   "a",
@@ -36,6 +37,10 @@ export async function createPatientResponse({
   question,
   history,
   sessionNumber = 1,
+  authSession = null,
+  sessionRecordId = "",
+  appointmentId = "",
+  interventionId = "",
   selectedInterventionType = "",
   previousSessionSummary = null,
   conversationStage = null
@@ -46,10 +51,26 @@ export async function createPatientResponse({
     question,
     history,
     sessionNumber,
+    authSession,
+    sessionRecordId,
+    appointmentId,
+    interventionId,
     selectedInterventionType,
     previousSessionSummary,
     conversationStage
   });
+
+  if (geminiResponse?.recoverableError) {
+    const error = new Error(
+      geminiResponse.userMessage ||
+        geminiResponse.fallbackReason ||
+        "No pudimos obtener la respuesta del paciente. Tu intervención está guardada."
+    );
+    error.code = "PATIENT_RESPONSE_RETRYABLE";
+    error.errorType = geminiResponse.errorType || "unknown";
+    error.retryAvailable = geminiResponse.retryAvailable !== false;
+    throw error;
+  }
 
   if (geminiResponse?.text) {
     const localMetadata = createLocalPatientResponse({
@@ -179,6 +200,10 @@ async function requestGeminiPatientResponse({
   question,
   history,
   sessionNumber,
+  authSession,
+  sessionRecordId,
+  appointmentId,
+  interventionId,
   selectedInterventionType,
   previousSessionSummary,
   conversationStage
@@ -189,12 +214,18 @@ async function requestGeminiPatientResponse({
   const timeout = globalThis.setTimeout(() => controller.abort(), 18000);
 
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (authSession?.access_token) headers.Authorization = `Bearer ${authSession.access_token}`;
+
     const response = await fetch("/api/gemini-patient-response", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       signal: controller.signal,
       body: JSON.stringify({
         caseId: caseItem.id,
+        sessionRecordId,
+        appointmentId,
+        interventionId,
         caseData: buildCasePayload(caseItem),
         studentMessage: question,
         conversationHistory: buildConversationPayload(history),
@@ -209,6 +240,17 @@ async function requestGeminiPatientResponse({
 
     const data = await readResponseJson(response);
     if (!response.ok) {
+      if (data?.code || data?.errorType) {
+        return {
+          source: "error",
+          text: "",
+          fallbackReason: data?.message || data?.fallbackReason || data?.code || `Function HTTP ${response.status}`,
+          userMessage: data?.message || "",
+          errorType: data?.code || data?.errorType || "server_validation",
+          recoverableError: true,
+          retryAvailable: data?.retryable !== false
+        };
+      }
       return {
         source: "local",
         text: "",
@@ -250,9 +292,11 @@ async function requestGeminiPatientResponse({
       ? "Function request timed out"
       : error?.message || "Function request failed";
     return {
-      source: "local",
+      source: "error",
       text: "",
-      fallbackReason
+      fallbackReason,
+      errorType: error?.name === "AbortError" ? "timeout" : "network",
+      recoverableError: true
     };
   } finally {
     globalThis.clearTimeout(timeout);
@@ -325,7 +369,7 @@ function buildCasePayload(caseItem) {
 function buildConversationPayload(history = []) {
   return history
     .filter((entry) => entry && !entry.isSessionPrelude)
-    .slice(-8)
+    .slice(-MAX_CONTEXT_TURNS)
     .map((entry) => ({
       question: entry.question || "",
       answer: entry.answer || "",

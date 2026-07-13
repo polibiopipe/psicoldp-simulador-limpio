@@ -61,7 +61,7 @@ export const tomasFamily = {
     },
     {
       name: "Vale",
-      age: 16,
+      age: null,
       context: "companera de juego online",
       meaning: "La admira porque juega bien y no lo trata como raro."
     },

@@ -29,13 +29,13 @@ const forbiddenClinicalTerms = [
   "presento",
   "experimento",
   "estado actual",
-  "exploraciÃ³n emocional",
+  "exploración emocional",
   "exploracion emocional",
   "motivo de consulta",
   "seguimiento contextual",
-  "categorÃ­a",
+  "categoría",
   "categoria",
-  "intervenciÃ³n",
+  "intervención",
   "intervencion"
 ];
 
@@ -74,11 +74,11 @@ function cleanTechnicalLanguage(response) {
 
 function enforceFirstPerson(response, caseId) {
   let cleaned = response;
-  const patientName = caseId === "tomas" ? "TomÃ¡s|Tomas" : "";
+  const patientName = caseId === "tomas" ? "Tomás|Tomas" : "";
 
   cleaned = cleaned
     .replace(/\bdiria que se siente juzgado\b/gi, "diría que me siento juzgado")
-    .replace(/\bdirÃ­a que se siente juzgado\b/gi, "diría que me siento juzgado")
+    .replace(/\bdiría que se siente juzgado\b/gi, "diría que me siento juzgado")
     .replace(/\bse siente juzgado\b/gi, "me siento juzgado")
     .replace(/\bse siente pasado a llevar\b/gi, "me siento pasado a llevar")
     .replace(/\bel paciente siente\b/gi, "yo siento")
@@ -105,19 +105,19 @@ function enforceFirstPersonAliases(response, caseId) {
     .replace(/\bel paciente piensa\b/gi, "yo pienso");
 
   const namesByCase = {
-    tomas: ["Tomas", "Tomás", "TomÃ¡s", "TomÃƒÂ¡s"],
+    tomas: ["Tomas", "Tomás", "Tomás", "Tomás"],
     valentina: ["Valentina"],
     marcos: ["Marcos"],
     camila: ["Camila"],
     daniela: ["Daniela"],
     elena: ["Elena"],
-    nicolas: ["Nicolas", "Nicolás", "NicolÃ¡s", "NicolÃƒÂ¡s"],
-    sofia: ["Sofia", "Sofía", "SofÃ­a", "SofÃƒÂ­a"],
+    nicolas: ["Nicolas", "Nicolás", "Nicolás", "Nicolás"],
+    sofia: ["Sofia", "Sofía", "Sofía", "Sofía"],
     claudio: ["Claudio"],
     rodrigo: ["Rodrigo"],
     fernanda: ["Fernanda"],
-    hector: ["Hector", "Héctor", "HÃ©ctor", "HÃƒÂ©ctor"],
-    andres: ["Andres", "Andrés", "AndrÃ©s", "AndrÃƒÂ©s"],
+    hector: ["Hector", "Héctor", "Héctor", "Héctor"],
+    andres: ["Andres", "Andrés", "Andrés", "Andrés"],
     patricia: ["Patricia"],
     miguel: ["Miguel"]
   };

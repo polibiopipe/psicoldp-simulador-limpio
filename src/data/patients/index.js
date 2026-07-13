@@ -23,13 +23,13 @@ const priorityPatientRecords = {
     identity: {
       gender: "masculino",
       city: "Santiago",
-      education: "Ensenanza media en curso",
-      occupation: "Estudiante escolar",
+      education: "Cuarto medio en cierre / transicion post escolar",
+      occupation: "Estudiante cerrando ensenanza media",
       civilStatus: "No tengo pareja.",
-      livesWith: "Vivo con mis papas.",
+      livesWith: "Vivo con mi mama Carolina, mi papa Rodrigo y mi hermana menor Emilia.",
       socioeconomicLevel: "medio",
       beliefsRelevant: "No se consignan creencias religiosas relevantes.",
-      dailyRoutine: "Voy al colegio, vuelvo a la casa y casi siempre termino en mi pieza usando el computador.",
+      dailyRoutine: "Voy al colegio, vuelvo a la casa y casi siempre termino en mi pieza usando el computador o evitando hablar de que hare despues.",
       supportNetwork: "Tengo mas contacto con gente online que con amigos cercanos en persona."
     },
     biography: {
@@ -38,10 +38,10 @@ const priorityPatientRecords = {
       school: "En el colegio cumple, pero participa poco y evita exponerse en grupos.",
       adolescence: "Durante la adolescencia aumento el tiempo en computador y disminuyo la vida social presencial.",
       significantRelationships: "Sus vinculos mas fluidos aparecen en juegos online, donde sabe como participar.",
-      studies: "Sigue en el colegio. No hay un problema academico central, pero si incomodidad social.",
+      studies: "Esta cerrando cuarto medio. No hay un problema academico central, pero si incomodidad social y ansiedad frente a decisiones post escolares.",
       work: "No trabaja.",
       losses: "No se registran perdidas significativas en el expediente inicial.",
-      majorChanges: "Aumento de discusiones familiares por el computador durante el ultimo ano.",
+      majorChanges: "Aumento de discusiones familiares por el computador y por la transicion despues del colegio durante el ultimo ano.",
       criticalEvents: "Derivacion impulsada por los padres por preocupacion y peleas recurrentes.",
       currentSituation: "Llega con resistencia moderada, sintiendose juzgado por el uso del computador."
     },
@@ -49,13 +49,13 @@ const priorityPatientRecords = {
       { period: "infancia", event: "Preferencia por espacios tranquilos y actividades previsibles." },
       { period: "2023", event: "Comienza a pasar mas tiempo online y a evitar conversaciones familiares." },
       { period: "2025", event: "Aumentan discusiones familiares por computador y salidas sociales." },
-      { period: "2026", event: "Sus padres insisten en consultar." }
+      { period: "2026", event: "Sus padres insisten en consultar tras una discusion por el computador y por lo que hara despues del colegio." }
     ],
     family: {
-      composition: "Vivo con mi mama Marcela y mi papa Rodrigo. No tengo hermanos.",
+      composition: "Vivo con mi mama Carolina, mi papa Rodrigo y mi hermana menor Emilia.",
       mother: {
         role: "madre",
-        name: "Marcela",
+        name: "Carolina",
         age: 43,
         occupation: "administrativa",
         personality: "preocupada, insistente y directa cuando se angustia",
@@ -73,7 +73,18 @@ const priorityPatientRecords = {
         conflicts: "tiende a pedir soluciones rapidas",
         closeness: "media-baja"
       },
-      siblings: [],
+      siblings: [
+        {
+          role: "hermana menor",
+          name: "Emilia",
+          age: null,
+          occupation: "estudiante",
+          personality: "curiosa, observa las discusiones familiares y a veces intenta acercarse",
+          relationship: "Tomás la quiere, pero le da culpa contestarle mal cuando esta encerrado",
+          conflicts: "no es el foco del conflicto, aunque queda expuesta a la tension familiar",
+          closeness: "media"
+        }
+      ],
       partner: null,
       children: [],
       friends: [

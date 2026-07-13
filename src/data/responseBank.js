@@ -30,9 +30,9 @@ const basicResponseBank = {
       apertura_alta: ["Me llamo Tomás."]
     },
     edad: {
-      apertura_baja: ["Tengo 16."],
-      apertura_media: ["Tengo 16."],
-      apertura_alta: ["Tengo 16."]
+      apertura_baja: ["Tengo 18."],
+      apertura_media: ["Tengo 18."],
+      apertura_alta: ["Tengo 18."]
     },
     presentacion_inicial: {
       apertura_baja: ["Ya."],
@@ -210,9 +210,9 @@ const basicResponseBank = {
       apertura_alta: ["Nicolás."]
     },
     edad: {
-      apertura_baja: ["Tengo 16."],
-      apertura_media: ["Tengo 16."],
-      apertura_alta: ["Tengo 16."]
+      apertura_baja: ["Tengo 18."],
+      apertura_media: ["Tengo 18."],
+      apertura_alta: ["Tengo 18."]
     },
     presentacion_inicial: {
       apertura_baja: ["Ya."],
