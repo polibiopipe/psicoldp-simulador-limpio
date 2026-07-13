@@ -2,10 +2,10 @@ export const responseProfiles = {
   tomas: {
     narrative: {
       name: "Tomás",
-      age: "16 años",
+      age: "18 años",
       presentingConcern: "mis papás exageran",
-      hiddenConcern: "teme no encajar fuera del mundo online y quedar expuesto en interacciones presenciales",
-      context: "Vive con sus padres y una hermana menor. En el colegio pasa desapercibido y se siente más competente en espacios online.",
+      hiddenConcern: "teme no encajar fuera del mundo online, fracasar en espacios presenciales y no saber cuánto vale sin el computador",
+      context: "Vive con su madre Carolina, su padre Rodrigo y su hermana menor Emilia. Está cerrando la enseñanza media y se siente más competente en espacios online.",
       speechStyle: "Frases breves, pausas, humor defensivo leve y explicaciones que aparecen solo si no se siente juzgado.",
       avoids: ["ser llamado adicto", "hablar de vergüenza social", "sentir que debe prometer cambios inmediatos"],
       opensWith: ["validación del rol emocional de los videojuegos", "preguntas abiertas sobre familia/colegio", "ritmo sin presión"],
@@ -65,8 +65,8 @@ export const responseProfiles = {
     ],
     contextual: {
       family: [
-        "Con mi mamá se puede hablar un poco, pero se asusta rápido. Mi papá va directo a que tengo que salir más, y ahí yo dejo de escuchar.",
-        "En la casa el computador se volvió el tema de pelea. A veces ni hemos hablado de cómo me siento, solo de cuántas horas juego.",
+        "Con mi mamá Carolina se puede hablar un poco, pero se asusta rápido. Mi papá Rodrigo va directo a que tengo que salir más, y ahí yo dejo de escuchar.",
+        "En la casa el computador y lo que voy a hacer después del colegio se volvieron los temas de pelea. A veces ni hemos hablado de cómo me siento, solo de cuántas horas juego.",
         "Mi hermana chica mira todo y eso igual me da vergüenza. Siento que quedo como el problema de la casa.",
         "Cuando intento explicar, me interrumpen con soluciones. Entonces mejor digo 'ya' y me voy."
       ],
@@ -558,10 +558,10 @@ export const responseProfiles = {
   nicolas: {
     narrative: {
       name: "Nicolás",
-      age: "16 años",
+      age: "18 años",
       presentingConcern: "me mandaron, yo no pedí venir",
-      hiddenConcern: "siente que los adultos no lo ven realmente y solo observan rendimiento/conducta",
-      context: "Derivado por el colegio. Baja participación, rendimiento cambiante y distancia con compañeros.",
+      hiddenConcern: "siente que los adultos no lo ven realmente y teme elegir mal, decepcionar y no estar preparado para la adultez",
+      context: "Derivado por el colegio en cuarto medio. Baja participación, rendimiento cambiante, distancia con compañeros y paralización frente a decisiones posteriores al colegio.",
       speechStyle: "Breve, seco, con silencios; se abre con lenguaje cercano y cero sermón.",
       avoids: ["ser sermoneado", "hablar de notas como culpa", "sentirse observado por adultos"],
       opensWith: ["reconocer que no pidió venir", "preguntas abiertas simples", "ritmo lento y lenguaje directo"],

@@ -1,8 +1,8 @@
 export const patientProfiles = {
   tomas: {
-    identity: "Tomás, adolescente de 16 años",
-    explicitReason: "sus papás dicen que pasa demasiado tiempo jugando y casi no sale",
-    hiddenConcern: "miedo a no encajar fuera del mundo online",
+    identity: "Tomás, joven de 18 años cerrando la enseñanza media",
+    explicitReason: "sus papás dicen que pasa demasiado tiempo jugando, casi no sale y evita decidir qué hará después del colegio",
+    hiddenConcern: "miedo a no encajar ni saber cuánto vale fuera del mundo online",
     communicationStyle: "breve, cauteloso y defensivo si siente juicio",
     closesWith: ["críticas al computador", "sermones", "preguntas que suenan a reto"],
     opensWith: ["validar que los videojuegos cumplen una función", "preguntas concretas sin moralizar"],
@@ -48,9 +48,9 @@ export const patientProfiles = {
     initialOpenness: 46
   },
   nicolas: {
-    identity: "Nicolás, adolescente de 16 años derivado por el colegio",
-    explicitReason: "lo mandaron por baja participación y cambios en rendimiento",
-    hiddenConcern: "sensación de no ser visto realmente por adultos",
+    identity: "Nicolás, joven de 18 años derivado por el colegio",
+    explicitReason: "lo mandaron por baja participación, cambios en rendimiento y paralización frente a decisiones posteriores al colegio",
+    hiddenConcern: "temor a elegir mal, decepcionar a su familia y no sentirse preparado para la adultez",
     communicationStyle: "breve, desconfiado, se cierra si lo interrogan o sermonean",
     closesWith: ["sermones", "preguntas tipo control escolar", "juicios sobre flojera"],
     opensWith: ["lenguaje cercano", "ritmo pausado", "reconocer que no pidió venir"],

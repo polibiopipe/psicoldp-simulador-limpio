@@ -14,9 +14,9 @@ const response = (id, text, options = {}) => ({
 
 const clinicalBasicsByCase = {
   tomas: {
-    livesWith: "Vivo con mis papas.",
-    familyComposition: "Vivo con mis papas. En la casa el tema del computador aparece harto.",
-    relationshipStatus: "No, no tengo pareja. Tengo 16 y ese no es un tema central para mi.",
+    livesWith: "Vivo con mi mama Carolina, mi papa Rodrigo y mi hermana menor Emilia.",
+    familyComposition: "Vivo con mi mama Carolina, mi papa Rodrigo y mi hermana menor Emilia. En la casa el tema del computador y de lo que hare despues del colegio aparece harto.",
+    relationshipStatus: "No, no tengo pareja. Tengo 18 y ese no es un tema central para mi.",
     support: "Cuento mas con gente online que con gente del colegio. En persona me cuesta mas.",
     risk: "No, no he pensado en hacerme dano. Me pasa mas que me encierro o evito hablar.",
     substances: "No, no consumo alcohol ni otras sustancias. No es un tema para mi."
