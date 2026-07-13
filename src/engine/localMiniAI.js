@@ -1,4 +1,5 @@
 import { patientFacts } from "../data/patientFacts.js";
+import { patientProfiles } from "../data/patientProfiles.js";
 import { forceCompositeOpenQuestionResponse, isCompositeOpenQuestionMessage, isIncompleteCompositeResponse } from "./compositeResponses.js";
 import { detectIntent } from "./intentDetector.js";
 import { generateGuidedPatientResponse } from "./guidedConversationEngine.js";
@@ -10,6 +11,7 @@ import { applyActivePatientInteraction } from "./activePatientInteraction.js";
 import { getClinicalAvatar } from "../data/clinicalAvatars/index.js";
 import { generateClinicalAvatarResponse } from "./clinicalAvatarEngine.js";
 import { CLINICAL_ENGINE_CASE_IDS, generateClinicalSimulationResponse } from "./clinicalSimulationEngine.js";
+import { buildLocalNarrativeResponse } from "./localNarrativeResponder.js";
 
 export function generateLocalPatientResponse({
   caseId,
@@ -34,10 +36,48 @@ export function generateLocalPatientResponse({
     : null;
 
   if (clinicalSimulationResult) {
+    const localNarrativeResponse = shouldUseLocalNarrativeAfterClinical(clinicalSimulationResult)
+      ? buildLocalNarrativeResponse({
+          patientId: caseId,
+          sessionNumber,
+          conversationHistory: history,
+          currentUserMessage: studentMessage,
+          canonicalFacts: patientFacts[caseId],
+          patientProfile: patientProfiles[caseId]
+        })
+      : null;
+
+    if (localNarrativeResponse) {
+      return buildLocalNarrativeLocalResult({
+        caseId,
+        studentMessage,
+        result: localNarrativeResponse,
+        workingMemory
+      });
+    }
+
     return buildClinicalSimulationLocalResult({
       caseId,
       studentMessage,
       result: clinicalSimulationResult,
+      workingMemory
+    });
+  }
+
+  const localNarrativeResponse = buildLocalNarrativeResponse({
+    patientId: caseId,
+    sessionNumber,
+    conversationHistory: history,
+    currentUserMessage: studentMessage,
+    canonicalFacts: patientFacts[caseId],
+    patientProfile: patientProfiles[caseId]
+  });
+
+  if (localNarrativeResponse) {
+    return buildLocalNarrativeLocalResult({
+      caseId,
+      studentMessage,
+      result: localNarrativeResponse,
       workingMemory
     });
   }
@@ -327,6 +367,111 @@ export function generateLocalPatientResponse({
   };
 }
 
+function shouldUseLocalNarrativeAfterClinical(result) {
+  if (!result) return true;
+  return result.detectedAct === "pregunta_confusa";
+}
+
+function buildLocalNarrativeLocalResult({ caseId, studentMessage, result, workingMemory }) {
+  const categories = categoriesForLocalNarrative(result.resolvedIntent, result.intent);
+  const intentResult = {
+    intent: result.resolvedIntent,
+    confidence: 0.93,
+    normalizedText: String(studentMessage || "").trim(),
+    contextualTopic: result.intent,
+    profileTopic: result.intent,
+    explicitReferenceDetected: ["meaning", "history", "impact", "fear", "ambivalence"].includes(result.intent),
+    ambiguityDetected: false,
+    detectedEmotionInLastPatientMessage: null,
+    reformulationDetected: false,
+    supportiveStatementDetected: false,
+    hardConcreteIntent: result.resolvedIntent,
+    matches: {
+      [result.resolvedIntent]: true,
+      [result.intent]: true
+    },
+    categories,
+    revealedTopics: [`local_narrative:${result.intent}:${result.disclosureLevel}`],
+    clinicalTaskKind: null,
+    clinicalTaskDetails: null,
+    practicalAct: null
+  };
+
+  const memoryUpdate = updatePatientMemory({
+    memory: workingMemory,
+    intent: result.resolvedIntent,
+    intentResult,
+    responseId: result.responseId,
+    responseText: result.responseText,
+    studentMessage
+  });
+
+  const debug = {
+    studentMessage,
+    normalizedMessage: intentResult.normalizedText,
+    selectedCaseId: caseId,
+    detectedIntent: result.resolvedIntent,
+    detectedQuestionType: result.intent,
+    resolvedIntent: result.resolvedIntent,
+    detectedTopic: result.intent,
+    caseId,
+    responseType: result.responseType,
+    selectedResponseType: result.responseType,
+    opennessLevel: memoryUpdate.opennessLevel,
+    evasiveCount: workingMemory.evasiveCount || 0,
+    lastPatientMessage: workingMemory.lastPatientMessage,
+    recentTurns: workingMemory.recentTurns,
+    lastSubstantiveTopic: workingMemory.lastSubstantiveTopic,
+    reformulationDetected: false,
+    detectedEmotionInLastPatientMessage: null,
+    lastTopic: result.intent,
+    selectedResponseId: result.responseId,
+    selectedResponse: result.responseText,
+    finalResponse: result.responseText,
+    ambiguityDetected: false,
+    closureDetected: false,
+    explicitReferenceDetected: intentResult.explicitReferenceDetected,
+    profileTopic: result.intent,
+    clinicalAvatarUsed: false,
+    clinicalAvatar: null,
+    clinicalSimulation: null,
+    localNarrative: {
+      used: true,
+      intent: result.intent,
+      disclosureLevel: result.disclosureLevel,
+      availableFactCount: result.narrative?.availableFactCount || 0,
+      lockedLevels: result.narrative?.lockedLevels || []
+    },
+    profileResponseUsed: false,
+    usedCaseFacts: true,
+    usedResponseIds: memoryUpdate.usedResponseIds,
+    usedIdeaSignatures: memoryUpdate.usedIdeaSignatures || workingMemory.usedIdeaSignatures,
+    memory: memoryUpdate,
+    fallbackUsed: false,
+    wasCompositeForced: false,
+    activeInteraction: null,
+    guided: null
+  };
+
+  if (isDevRuntime()) {
+    console.log("[LocalNarrativeResponder]", debug);
+  }
+
+  return {
+    responseText: result.responseText,
+    intent: result.resolvedIntent,
+    caseId,
+    confidence: 0.93,
+    memoryUpdate,
+    debug,
+    responseId: result.responseId,
+    fallbackUsed: false,
+    intentResult,
+    trustStage: getTrustStage(memoryUpdate.trustLevel),
+    guidedResult: null
+  };
+}
+
 function buildClinicalSimulationLocalResult({ caseId, studentMessage, result, workingMemory }) {
   const categories = categoriesForClinicalSimulation(result.detectedAct, result.clinicalTopic);
   const intentResult = {
@@ -439,6 +584,39 @@ function buildClinicalSimulationLocalResult({ caseId, studentMessage, result, wo
     intentResult,
     trustStage: getTrustStage(memoryUpdate.trustLevel),
     guidedResult: null
+  };
+}
+
+function categoriesForLocalNarrative(resolvedIntent, narrativeIntent) {
+  const openQuestion = [
+    "motivo_de_consulta",
+    "seguimiento_contextual",
+    "exploracion_emocional",
+    "rutina",
+    "ocupacion_actividad"
+  ].includes(resolvedIntent);
+
+  return {
+    framing: false,
+    openQuestion,
+    closedQuestion: ["edad", "familia"].includes(resolvedIntent),
+    validation: false,
+    judgment: false,
+    rushedAdvice: false,
+    emotionalExploration: ["exploracion_emocional"].includes(resolvedIntent)
+      || ["feelings", "fear", "meaning", "ambivalence"].includes(narrativeIntent),
+    familyExploration: narrativeIntent === "family",
+    contextExploration: ["family", "relationships", "routine", "education", "work", "impact", "history", "future"].includes(narrativeIntent),
+    closure: false,
+    goodClosure: false,
+    continuityAgreement: false,
+    paceRespect: false,
+    empathicSummary: false,
+    followUp: ["impact", "meaning", "history", "future", "ambivalence", "relationships"].includes(narrativeIntent),
+    preferencesExploration: narrativeIntent === "future",
+    concernExploration: ["reason", "recent_trigger", "fear"].includes(narrativeIntent),
+    supportExploration: narrativeIntent === "relationships",
+    taskProposal: false
   };
 }
 
