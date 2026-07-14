@@ -1,7 +1,9 @@
+import { getAvatarCanonicalBiography } from "./avatarCanonicalBiographies.js";
+
 export const caseFacts = {
   tomas: {
     name: "Tomás",
-    age: 16,
+    age: 18,
     studies: "sí, colegio",
     works: "no",
     livesWith: "sus papás y una hermana menor",
@@ -49,7 +51,7 @@ export const caseFacts = {
   },
   nicolas: {
     name: "Nicolás",
-    age: 16,
+    age: 18,
     studies: "sí, colegio",
     works: "no",
     livesWith: "su familia",
@@ -60,3 +62,22 @@ export const caseFacts = {
     mainConcern: "sentirse etiquetado y poco escuchado"
   }
 };
+
+for (const caseId of Object.keys(caseFacts)) {
+  const biography = getAvatarCanonicalBiography(caseId);
+  if (!biography) continue;
+
+  Object.assign(caseFacts[caseId], {
+    name: biography.identity.preferredName,
+    age: biography.identity.age,
+    studies: biography.education.program || biography.education.status,
+    works: /sin empleo formal/i.test(biography.employment.status || "")
+      ? "no formalmente"
+      : biography.employment.role,
+    livesWith: biography.identity.livingWith.join(", "),
+    family: biography.family.familyRole,
+    friends: biography.relationships.supportNetwork.join(", "),
+    referral: biography.consultation.whoSuggestedIt,
+    mainConcern: biography.consultation.concerns || biography.internalConflict
+  });
+}

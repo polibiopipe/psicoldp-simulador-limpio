@@ -118,7 +118,7 @@ const fallbackPlans = {
 
 const personalIntroPlans = {
   tomas: [
-    "No sé bien qué contar... tengo 16, voy al colegio y últimamente en mi casa están preocupados porque paso mucho tiempo jugando.",
+    "No sé bien qué contar... Tengo 18, voy al colegio y últimamente en mi casa están preocupados porque paso mucho tiempo jugando.",
     "A mí me cuesta explicarlo, porque no siento que sea solo el computador.",
     ""
   ],
@@ -139,7 +139,7 @@ const personalIntroPlans = {
   ],
   nicolas: [
     "No sé qué contar.",
-    "Tengo 16, voy al colegio y me mandaron porque dicen que estoy más callado y bajé las notas.",
+    "Tengo 18, voy al colegio y me mandaron porque dicen que estoy más callado y bajé las notas.",
     ""
   ]
 };

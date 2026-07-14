@@ -1,6 +1,8 @@
+import { getAvatarCanonicalBiography } from "./avatarCanonicalBiographies.js";
+
 export const patientProfiles = {
   tomas: {
-    identity: "Tomás, adolescente de 16 años",
+    identity: "Tomás, joven de 18 años",
     explicitReason: "sus papás dicen que pasa demasiado tiempo jugando y casi no sale",
     hiddenConcern: "miedo a no encajar fuera del mundo online",
     communicationStyle: "breve, cauteloso y defensivo si siente juicio",
@@ -48,7 +50,7 @@ export const patientProfiles = {
     initialOpenness: 46
   },
   nicolas: {
-    identity: "Nicolás, adolescente de 16 años derivado por el colegio",
+    identity: "Nicolás, joven de 18 años derivado por el colegio",
     explicitReason: "lo mandaron por baja participación y cambios en rendimiento",
     hiddenConcern: "sensación de no ser visto realmente por adultos",
     communicationStyle: "breve, desconfiado, se cierra si lo interrogan o sermonean",
@@ -180,3 +182,15 @@ export const patientProfiles = {
     initialOpenness: 37
   }
 };
+
+for (const caseId of Object.keys(patientProfiles)) {
+  const biography = getAvatarCanonicalBiography(caseId);
+  if (!biography) continue;
+
+  patientProfiles[caseId] = {
+    ...patientProfiles[caseId],
+    identity: `${biography.identity.preferredName}, ${biography.identity.age} años`,
+    explicitReason: biography.consultation.immediateReason || patientProfiles[caseId].explicitReason,
+    hiddenConcern: biography.disclosure.deep?.[0] || patientProfiles[caseId].hiddenConcern
+  };
+}

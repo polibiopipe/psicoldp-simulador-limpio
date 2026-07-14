@@ -13,9 +13,9 @@ const kits = {
     saludo: ["Hola.", "Hola... sí.", "Ya, hola.", "Hola, gracias.", "Hola... estoy conectado."],
     cortesia: ["Gracias... no sé muy bien cómo funciona esto, pero está bien.", "Hola. Igual me cuesta un poco hablar, pero puedo intentarlo.", "Ya... sí, está bien."],
     presentacion: [
-      "No sé bien qué contar... tengo 16, voy al colegio y últimamente en mi casa están preocupados porque paso mucho tiempo jugando. A mí me cuesta explicarlo, porque no siento que sea solo el computador.",
-      "Soy Tomás, tengo 16. Voy al colegio y paso harto tiempo en el computador. En mi casa dicen que eso es un problema, pero yo siento que hay más cosas.",
-      "No sé bien cómo partir... tengo 16, voy al colegio y últimamente me cuesta estar mucho con gente. Juego bastante, pero no es solo por jugar.",
+      "No sé bien qué contar... Tengo 18, voy al colegio y últimamente en mi casa están preocupados porque paso mucho tiempo jugando. A mí me cuesta explicarlo, porque no siento que sea solo el computador.",
+      "Soy Tomás, Tengo 18. Voy al colegio y paso harto tiempo en el computador. En mi casa dicen que eso es un problema, pero yo siento que hay más cosas.",
+      "No sé bien cómo partir... Tengo 18, voy al colegio y últimamente me cuesta estar mucho con gente. Juego bastante, pero no es solo por jugar.",
       "Me llamo Tomás. Estoy acá porque mis papás están preocupados por mí, sobre todo por el computador y porque casi no salgo."
     ],
     rol: ["No mucho... supongo que eres quien va a hablar conmigo, pero no sé bien cómo funciona esto."],
@@ -142,7 +142,7 @@ const kits = {
   nicolas: {
     saludo: ["Hola.", "Ya... hola.", "Hola.", "Sí.", "Hola, supongo."],
     cortesia: ["Ya... hola.", "Está bien.", "Gracias, supongo.", "No sé qué decir, pero hola."],
-    presentacion: ["No sé qué contar. Tengo 16, voy al colegio y me mandaron porque dicen que estoy más callado y bajé las notas.", "Soy Nicolás. Tengo 16 y no pedí venir, pero el colegio dijo que tenía que hablar.", "No sé... voy al colegio y últimamente todos dicen que estoy raro o más callado."],
+    presentacion: ["No sé qué contar. Tengo 18, voy al colegio y me mandaron porque dicen que estoy más callado y bajé las notas.", "Soy Nicolás. Tengo 18 y no pedí venir, pero el colegio dijo que tenía que hablar.", "No sé... voy al colegio y últimamente todos dicen que estoy raro o más callado."],
     rol: ["No sé. Me dijeron que tenía que hablar contigo."],
     motivo: ["Me mandaron del colegio. Dicen que estoy más callado y que bajé las notas, pero no fue idea mía venir.", "Estoy acá porque el colegio dijo que tenía que venir. Dicen que participo poco.", "No sé. Los adultos creen que algo me pasa porque bajé las notas."],
     emocion: ["No sé... cansado, supongo.", "Me molesta que pregunten como si ya supieran la respuesta.", "Prefiero quedarme callado para no meterme en problemas.", "Siento que da lo mismo lo que diga."],

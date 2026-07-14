@@ -1,4 +1,5 @@
 import { patientFacts } from "./patientFacts.js";
+import { getAvatarCanonicalBiography } from "./avatarCanonicalBiographies.js";
 
 const caseImages = {
   tomas: "/avatar/tomas.png",
@@ -149,7 +150,7 @@ const catalog = [
   {
     id: "tomas",
     name: "Tomás",
-    age: "16 años",
+    age: "18 años",
     shortTitle: "Aislamiento y videojuegos",
     difficulty: "Intermedio",
     accent: "#0F5C63",
@@ -217,7 +218,7 @@ const catalog = [
   {
     id: "nicolas",
     name: "Nicolás",
-    age: "16 años",
+    age: "18 años",
     shortTitle: "Derivación escolar",
     difficulty: "Avanzado",
     accent: "#0F5C63",
@@ -245,6 +246,7 @@ const catalog = [
 
 export const cases = catalog.map((caseItem) => ({
   ...caseItem,
+  ...canonicalVisibleCasePatch(caseItem),
   image: caseImages[caseItem.id],
   learningObjectives: learningObjectivesByCase[caseItem.id] || caseItem.objectives || [],
   objectives: learningObjectivesByCase[caseItem.id] || caseItem.objectives || [],
@@ -274,5 +276,29 @@ function advancedCase(id, name, age, shortTitle, difficulty, accent, motive, bac
       "Explora contexto sin apresurar conclusiones.",
       "Usa validación y seguimiento conversacional."
     ]
+  };
+}
+
+function canonicalVisibleCasePatch(caseItem) {
+  const biography = getAvatarCanonicalBiography(caseItem.id);
+  if (!biography) return {};
+
+  const visibleBackground = [
+    biography.education.program && !/^no cursa/i.test(biography.education.status || "")
+      ? biography.education.institution
+        ? `Estudia ${biography.education.program} en ${biography.education.institution}.`
+        : `Estudia ${biography.education.program}.`
+      : "",
+    biography.employment.employer
+      ? `Trabaja como ${biography.employment.role} en ${biography.employment.employer}.`
+      : "",
+    biography.identity.livingWith?.length ? `Vive con ${biography.identity.livingWith.slice(0, 3).join(", ")}.` : "",
+    biography.consultation.immediateReason
+  ].filter(Boolean).slice(0, 3);
+
+  return {
+    age: `${biography.identity.age} años`,
+    motive: biography.consultation.immediateReason || caseItem.motive,
+    background: visibleBackground.length ? visibleBackground : caseItem.background
   };
 }

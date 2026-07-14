@@ -252,7 +252,7 @@ const residenceByCase = {
 };
 
 const occupationByCase = {
-  tomas: "Voy al colegio. Tengo 16, asi que la mayor parte de mi dia es eso, aunque despues paso harto tiempo en el computador.",
+  tomas: "Voy al colegio. Tengo 18, asi que la mayor parte de mi dia es eso, aunque despues paso harto tiempo en el computador.",
   valentina: "Estudio en la universidad. Ultimamente siento que todo gira en torno a cumplir, estudiar y no atrasarme.",
   marcos: "Trabajo en una empresa, en un area mas bien administrativa/comercial. Ultimamente la pega me esta dejando sin energia.",
   elena: "Trabajo algunas horas y paso bastante tiempo pendiente de la casa y de mi familia.",

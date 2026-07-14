@@ -216,7 +216,7 @@ export const caseProfiles = {
   tomas: createProfile({
     id: "tomas",
     name: "Tomás",
-    age: 16,
+    age: 18,
     difficulty: "intermedio",
     mainTheme: "Aislamiento y videojuegos",
     shortDescription: "Adolescente reservado, con tensión familiar por uso del computador y dificultad para relacionarse en persona.",
@@ -249,8 +249,8 @@ export const caseProfiles = {
         "Estoy aquí, pero no sé si quiero hablar tanto todavía."
       ],
       presentacion_personal_abierta: [
-        "No sé bien qué contar... tengo 16, voy al colegio y últimamente en mi casa están preocupados porque paso mucho tiempo jugando. A mí me cuesta explicarlo, porque no siento que sea solo el computador.",
-        "Soy Tomás, tengo 16. Voy al colegio y paso harto tiempo en el computador. En mi casa dicen que eso es un problema, pero yo siento que hay más cosas."
+        "No sé bien qué contar... Tengo 18, voy al colegio y últimamente en mi casa están preocupados porque paso mucho tiempo jugando. A mí me cuesta explicarlo, porque no siento que sea solo el computador.",
+        "Soy Tomás, Tengo 18. Voy al colegio y paso harto tiempo en el computador. En mi casa dicen que eso es un problema, pero yo siento que hay más cosas."
       ],
       motivo_consulta: [
         "Creo que es por el tema del computador. Mis papás dicen que paso mucho tiempo jugando y que casi no salgo, pero yo siento que no es tan simple.",
@@ -542,7 +542,7 @@ export const caseProfiles = {
   }),
 
   nicolas: createProfileFromSeed("nicolas", {
-    name: "Nicolás", age: 16, difficulty: "avanzado", mainTheme: "Derivación escolar", image: "/avatar/nicolas.png",
+    name: "Nicolás", age: 18, difficulty: "avanzado", mainTheme: "Derivación escolar", image: "/avatar/nicolas.png",
     shortDescription: "Adolescente derivado desde el colegio, breve y desconfiado si se siente interrogado.",
     presentationStyle: "Breve, retraído y sensible a sentirse retado.",
     communicationStyle: "Responde corto. Se abre un poco si no lo presionan.",

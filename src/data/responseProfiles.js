@@ -2,7 +2,7 @@ export const responseProfiles = {
   tomas: {
     narrative: {
       name: "Tomás",
-      age: "16 años",
+      age: "18 años",
       presentingConcern: "mis papás exageran",
       hiddenConcern: "teme no encajar fuera del mundo online y quedar expuesto en interacciones presenciales",
       context: "Vive con sus padres y una hermana menor. En el colegio pasa desapercibido y se siente más competente en espacios online.",
@@ -558,7 +558,7 @@ export const responseProfiles = {
   nicolas: {
     narrative: {
       name: "Nicolás",
-      age: "16 años",
+      age: "18 años",
       presentingConcern: "me mandaron, yo no pedí venir",
       hiddenConcern: "siente que los adultos no lo ven realmente y solo observan rendimiento/conducta",
       context: "Derivado por el colegio. Baja participación, rendimiento cambiante y distancia con compañeros.",

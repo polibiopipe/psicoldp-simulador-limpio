@@ -10,6 +10,7 @@ import { applyActivePatientInteraction } from "./activePatientInteraction.js";
 import { getClinicalAvatar } from "../data/clinicalAvatars/index.js";
 import { generateClinicalAvatarResponse } from "./clinicalAvatarEngine.js";
 import { CLINICAL_ENGINE_CASE_IDS, generateClinicalSimulationResponse } from "./clinicalSimulationEngine.js";
+import { selectCanonicalDirectResponse } from "../data/avatarCanonicalBiographies.js";
 
 export function generateLocalPatientResponse({
   caseId,
@@ -23,6 +24,20 @@ export function generateLocalPatientResponse({
   memory
 }) {
   const workingMemory = buildPatientMemory({ caseId, history, difficulty, sessionNumber, memory });
+  const canonicalResponse = selectCanonicalDirectResponse({
+    patientId: caseId,
+    studentMessage
+  });
+
+  if (canonicalResponse) {
+    return buildCanonicalLocalResult({
+      caseId,
+      studentMessage,
+      canonicalResponse,
+      workingMemory
+    });
+  }
+
   const clinicalSimulationResult = CLINICAL_ENGINE_CASE_IDS.includes(caseId)
     ? generateClinicalSimulationResponse({
         caseId,
@@ -325,6 +340,103 @@ export function generateLocalPatientResponse({
     trustStage: getTrustStage(memoryUpdate.trustLevel),
     guidedResult
   };
+}
+
+function buildCanonicalLocalResult({ caseId, studentMessage, canonicalResponse, workingMemory }) {
+  const intent = `dato_canonico_${canonicalResponse.factKey}`;
+  const responseText = canonicalResponse.responseText;
+  const intentResult = {
+    intent,
+    confidence: 0.99,
+    normalizedText: normalizeForDebug(studentMessage),
+    contextualTopic: canonicalResponse.factKey,
+    profileTopic: canonicalResponse.factKey,
+    explicitReferenceDetected: false,
+    ambiguityDetected: false,
+    detectedEmotionInLastPatientMessage: null,
+    reformulationDetected: false,
+    supportiveStatementDetected: false,
+    hardConcreteIntent: intent,
+    matches: { [intent]: true, datos_biograficos_canonicos: true },
+    categories: {
+      framing: false,
+      openQuestion: false,
+      closedQuestion: true,
+      validation: false,
+      judgment: false,
+      rushedAdvice: false,
+      emotionalExploration: false,
+      familyExploration: ["household", "family", "siblings", "children", "relationship"].includes(canonicalResponse.factKey),
+      contextExploration: true,
+      closure: false,
+      goodClosure: false,
+      continuityAgreement: false,
+      paceRespect: false,
+      empathicSummary: false,
+      followUp: false,
+      preferencesExploration: canonicalResponse.factKey === "expectation",
+      concernExploration: canonicalResponse.factKey === "reason",
+      supportExploration: canonicalResponse.factKey === "friends"
+    }
+  };
+
+  const memoryUpdate = updatePatientMemory({
+    memory: workingMemory,
+    intent,
+    intentResult,
+    responseId: `canonical:${caseId}:${canonicalResponse.factKey}`,
+    responseText,
+    studentMessage
+  });
+
+  const debug = {
+    studentMessage,
+    normalizedMessage: intentResult.normalizedText,
+    selectedCaseId: caseId,
+    detectedIntent: intent,
+    detectedQuestionType: canonicalResponse.factKey,
+    resolvedIntent: "datos_biograficos_canonicos",
+    detectedTopic: canonicalResponse.factKey,
+    caseId,
+    responseType: "canonical_biography",
+    selectedResponseType: "canonical_biography",
+    opennessLevel: workingMemory.opennessLevel,
+    selectedResponseId: `canonical:${caseId}:${canonicalResponse.factKey}`,
+    selectedResponse: responseText,
+    finalResponse: responseText,
+    profileResponseUsed: false,
+    usedCaseFacts: true,
+    memory: memoryUpdate,
+    fallbackUsed: false,
+    canonicalBiographyUsed: true,
+    canonicalFactKey: canonicalResponse.factKey
+  };
+
+  if (isDevRuntime()) {
+    console.log("[LocalMiniAI:canonical]", debug);
+  }
+
+  return {
+    responseText,
+    intent,
+    caseId,
+    confidence: 0.99,
+    memoryUpdate,
+    debug,
+    responseId: `canonical:${caseId}:${canonicalResponse.factKey}`,
+    fallbackUsed: false,
+    intentResult,
+    trustStage: getTrustStage(memoryUpdate.trustLevel),
+    guidedResult: null
+  };
+}
+
+function normalizeForDebug(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 }
 
 function buildClinicalSimulationLocalResult({ caseId, studentMessage, result, workingMemory }) {

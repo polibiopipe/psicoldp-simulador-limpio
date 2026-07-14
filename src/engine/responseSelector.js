@@ -24,7 +24,7 @@ const intentToFact = {
 
 const occupationResponses = {
   tomas: [
-    "Voy al colegio. Tengo 16, así que la mayor parte de mi día es eso... aunque después paso harto tiempo en el computador.",
+    "Voy al colegio. Tengo 18, así que la mayor parte de mi día es eso... aunque después paso harto tiempo en el computador.",
     "Estoy en el colegio. Después de clases suelo estar en la casa o conectado.",
     "No trabajo, voy al colegio. Igual últimamente siento que lo escolar y lo del computador se mezclan harto en mi casa."
   ],

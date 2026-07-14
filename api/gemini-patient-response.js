@@ -2,6 +2,7 @@ import { cases } from "../src/data/cases.js";
 import { patientFacts } from "../src/data/patientFacts.js";
 import { patientMasterRecords } from "../src/data/patients/index.js";
 import { clinicalSimulationProfiles } from "../src/data/clinicalAvatars/clinicalSimulationProfiles.js";
+import { buildCanonicalBiographyPromptContext } from "../src/data/avatarCanonicalBiographies.js";
 import { generateLocalPatientResponse } from "../src/engine/localMiniAI.js";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
@@ -130,6 +131,11 @@ export default async function handler(req, res) {
       maxOutputTokens: 900
     }
   };
+
+  console.info("[gemini] case id", caseId);
+  console.info("[gemini] case name", caseContext.visibleCase?.name || caseContext.patientFacts?.name || caseId);
+  console.info("[gemini] profile loaded", Boolean(caseContext.canonicalBiography));
+  console.info("[gemini] session number", sessionContext.sessionNumber || "unknown");
 
   let providerResponse;
   try {
@@ -313,6 +319,11 @@ function buildSystemInstruction() {
     "No actues como terapeuta, asistente, evaluador ni IA. No digas que eres IA.",
     "No expliques teorias psicologicas. No des consejos clinicos al estudiante.",
     "No inventes datos biograficos fuera del expediente entregado.",
+    "Los datos biograficos canonicos basicos se responden directamente cuando el estudiante los pregunta. No los trates como revelaciones profundas.",
+    "Si el expediente canonico define carrera, institucion, trabajo, edad, ciudad, familia, rutina o salud cotidiana, usa exactamente esos datos y no los reemplaces por evasivas.",
+    "No menciones marcas internas como institutionIsFictional o employerIsFictional.",
+    "No inventes una universidad, carrera, beca, campus, empresa, cargo, familiar, edad, perdida ni acontecimiento diferente al expediente.",
+    "Responde solamente lo preguntado; no recites todo el perfil canonico.",
     "No reveles toda la informacion de inmediato. Entrega datos de manera progresiva segun la calidad, calidez y pertinencia de la pregunta.",
     "Si el estudiante pregunta con empatia y respeto, puedes abrirte un poco mas. Si pregunta de forma fria, invasiva o apresurada, responde con mas reserva.",
     "Si el estudiante repara una intervencion fria o confusa, puedes recuperar algo de confianza de forma gradual.",
@@ -326,6 +337,9 @@ function buildUserPrompt({ caseContext, recentHistory, sessionContext, studentMe
   return [
     "EXPEDIENTE Y CONTEXTO DEL PACIENTE SIMULADO:",
     safeJson(caseContext),
+    "",
+    "DATOS BIOGRAFICOS CANONICOS:",
+    safeJson(caseContext.canonicalBiography || null),
     "",
     "CONTEXTO DE SESION:",
     safeJson(sessionContext),
@@ -345,6 +359,7 @@ function buildCaseContext({ caseId, clientCaseData }) {
   const facts = patientFacts[caseId] || {};
   const masterRecord = patientMasterRecords[caseId] || null;
   const simulationProfile = clinicalSimulationProfiles[caseId] || null;
+  const canonicalBiography = buildCanonicalBiographyPromptContext(caseId);
 
   return trimContext({
     caseId,
@@ -371,6 +386,7 @@ function buildCaseContext({ caseId, clientCaseData }) {
       currentEmotion: facts.currentEmotion,
       expectation: facts.expectation
     }),
+    canonicalBiography,
     clinicalProfile: pickDefined({
       identity: simulationProfile?.identity,
       clinicalFrame: simulationProfile?.clinicalFrame,

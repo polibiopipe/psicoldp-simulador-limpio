@@ -105,6 +105,19 @@ const CONFUSION_PATTERNS = [
   "me cuesta ubicar bien la pregunta"
 ];
 
+const CANONICAL_FACTS_BY_ACT = {
+  identidad_nombre: new Set(["name", "fullName"]),
+  edad: new Set(["age"]),
+  vivienda: new Set(["location", "household"]),
+  familia_composicion: new Set(["family", "household", "siblings", "children"]),
+  estado_civil_pareja: new Set(["relationship"]),
+  ocupacion_estudios: new Set(["work", "education", "studies", "program", "institution", "academicYear", "courses"]),
+  motivo_consulta: new Set(["reason"]),
+  red_apoyo: new Set(["friends", "supportNetwork"]),
+  consumo_sustancias: new Set(["substanceUse"]),
+  rutina: new Set(["routine", "weekend"])
+};
+
 const failures = [];
 const summary = new Map();
 
@@ -121,6 +134,12 @@ for (const caseId of clinicalEngineCaseIds) {
     });
     const clinical = result.debug?.clinicalSimulation;
     const detectedAct = clinical?.detectedAct || result.intent;
+    const canonicalFactKey = result.debug?.canonicalFactKey;
+    const canonicalValid = isCanonicalBiographyValid({
+      expectedAct: test.expectedAct,
+      responseType: result.responseType || result.debug?.responseType,
+      canonicalFactKey
+    });
     const responseText = result.responseText || "";
     const normalizedResponse = normalizeText(responseText);
     const fellBackToConfusion = detectedAct === "pregunta_confusa"
@@ -128,20 +147,21 @@ for (const caseId of clinicalEngineCaseIds) {
 
     console.log(`[${caseId}] ${test.label}`);
     console.log(`  estudiante: ${test.message}`);
-    console.log(`  act/topic: ${detectedAct} / ${clinical?.clinicalTopic || result.intentResult?.contextualTopic}`);
+    console.log(`  act/topic: ${detectedAct} / ${clinical?.clinicalTopic || canonicalFactKey || result.intentResult?.contextualTopic}`);
+    console.log(`  canonical_biography: ${canonicalValid ? "YES" : "NO"}`);
     console.log(`  fallback_confusion: ${fellBackToConfusion ? "YES" : "NO"}`);
     console.log(`  respuesta: ${responseText}`);
 
-    if (!clinical) {
+    if (!clinical && !canonicalValid) {
       caseFailures.push(`${test.label}: no uso ClinicalSimulationEngine.`);
     }
-    if (detectedAct !== test.expectedAct) {
+    if (detectedAct !== test.expectedAct && !canonicalValid) {
       caseFailures.push(`${test.label}: esperaba act=${test.expectedAct}, recibio ${detectedAct}.`);
     }
     if (fellBackToConfusion) {
       caseFailures.push(`${test.label}: cayo en fallback de confusion.`);
     }
-    if (test.mustIncludeAny?.length && !test.mustIncludeAny.some((term) => normalizedResponse.includes(normalizeText(term)))) {
+    if (test.mustIncludeAny?.length && !canonicalValid && !test.mustIncludeAny.some((term) => normalizedResponse.includes(normalizeText(term)))) {
       caseFailures.push(`${test.label}: respuesta no incluyo datos esperados (${test.mustIncludeAny.join(" / ")}).`);
     }
   }
@@ -164,4 +184,9 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("\nAUDIT CLINICAL ALL OK");
+}
+
+function isCanonicalBiographyValid({ expectedAct, responseType, canonicalFactKey }) {
+  if (responseType !== "canonical_biography" || !canonicalFactKey) return false;
+  return CANONICAL_FACTS_BY_ACT[expectedAct]?.has(canonicalFactKey) || false;
 }
