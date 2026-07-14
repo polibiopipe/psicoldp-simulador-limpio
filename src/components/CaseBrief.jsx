@@ -113,6 +113,10 @@ export function CaseBrief({
   const proposedSessionCount =
     Number(preSessionPlan?.proposedSessionCount) || totalSessions || SESSION_COUNT_LIMITS.defaultValue;
   const planBelowCompletedSessions = Number(proposedSessionCount) < Number(completedSessionCount || 0);
+  const previousClinicalDecision = getClinicalDecisionFromSummary(sessionSummary);
+  const previousExternalReport = getExternalReportFromSummary(sessionSummary);
+  const previousReportIntegration = getReportIntegrationFromSummary(sessionSummary);
+  const previousPendingTopics = getPendingTopicsFromSummary(sessionSummary);
 
   useEffect(() => {
     setLanguagePreference(getClinicalTermPreference(caseItem.id));
@@ -629,6 +633,42 @@ export function CaseBrief({
             )}
           </section>
 
+          {sessionSummary && (
+            <section className="info-panel">
+              <div className="panel-heading">
+                <ClipboardCheck aria-hidden="true" />
+                <h2>Continuidad clinica disponible</h2>
+              </div>
+              <ul>
+                {previousClinicalDecision && (
+                  <li>
+                    Decision previa: {previousClinicalDecision.action || "registrada"}
+                    {previousClinicalDecision.justification ? ` - ${previousClinicalDecision.justification}` : ""}
+                  </li>
+                )}
+                {previousExternalReport && (
+                  <li>
+                    Informe externo recibido: {previousExternalReport.requestedInstrument?.name ||
+                      previousExternalReport.caseData?.instrument || "evaluacion complementaria simulada"}.
+                  </li>
+                )}
+                {previousReportIntegration && (
+                  <li>
+                    Integracion del informe: {previousReportIntegration.hypothesisImpact ||
+                      previousReportIntegration.nextDecision ||
+                      "pendiente de profundizar"}.
+                  </li>
+                )}
+                {previousPendingTopics.slice(0, 3).map((item) => (
+                  <li key={item}>Pendiente: {item}</li>
+                ))}
+                {!previousClinicalDecision && !previousExternalReport && previousPendingTopics.length === 0 && (
+                  <li>Hay memoria de sesion previa, sin decisiones o informes externos registrados.</li>
+                )}
+              </ul>
+            </section>
+          )}
+
           <section className="info-panel">
             <div className="panel-heading">
               <ClipboardList aria-hidden="true" />
@@ -768,4 +808,26 @@ export function CaseBrief({
 
 function getInterviewTypeLabel(value) {
   return interviewTypeOptions.find((option) => option.value === value)?.label || "Pendiente";
+}
+
+function getClinicalArtifactsFromSummary(summary) {
+  return summary?.clinicalArtifacts || summary?.sessionSummary?.clinicalArtifacts || null;
+}
+
+function getClinicalDecisionFromSummary(summary) {
+  return summary?.clinicalDecision || summary?.sessionSummary?.clinicalDecision || null;
+}
+
+function getExternalReportFromSummary(summary) {
+  return getClinicalArtifactsFromSummary(summary)?.complementaryEvaluation?.report || null;
+}
+
+function getReportIntegrationFromSummary(summary) {
+  const integration = getClinicalArtifactsFromSummary(summary)?.complementaryEvaluation?.integration;
+  if (!integration || !Object.values(integration).some(Boolean)) return null;
+  return integration;
+}
+
+function getPendingTopicsFromSummary(summary) {
+  return Array.isArray(summary?.temasPendientes) ? summary.temasPendientes : [];
 }

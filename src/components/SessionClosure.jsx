@@ -26,6 +26,8 @@ import {
   buildContinuityAgreement,
   buildInitialClinicalDecision,
   CLINICAL_DECISION_OPTIONS,
+  decisionAllowsComplementaryEvaluation,
+  decisionAllowsNextSession,
   evaluateClinicalPlanDecision,
   formatClinicalDecision,
   getClinicalSessionPlan,
@@ -36,6 +38,7 @@ import {
   evaluateClinicalArtifacts,
   normalizeClinicalArtifacts
 } from "../engine/clinicalArtifacts.js";
+import { buildSimulatedExternalReport } from "../engine/clinicalComplementaryEvaluation.js";
 import { clinicalInstrumentOptions } from "../data/clinicalWorkflow.js";
 import { NextSessionModal } from "./NextSessionModal.jsx";
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
@@ -99,8 +102,8 @@ export function SessionClosure({
     [clinicalArtifacts]
   );
   const clinicalArtifactsEvaluation = useMemo(
-    () => evaluateClinicalArtifacts({ artifacts: normalizedClinicalArtifacts, report, history }),
-    [normalizedClinicalArtifacts, report, history]
+    () => evaluateClinicalArtifacts({ artifacts: normalizedClinicalArtifacts, report, history, caseItem }),
+    [normalizedClinicalArtifacts, report, history, caseItem]
   );
   const agreement = useMemo(
     () =>
@@ -113,9 +116,15 @@ export function SessionClosure({
     [normalizedClinicalDecision, sessionPlan, fallbackAgreement, sessionNumber]
   );
   const canContinueInSimulator =
-    normalizedClinicalDecision.action === "continue_session" &&
+    decisionAllowsNextSession(normalizedClinicalDecision.action) &&
     Boolean(nextSessionNumber) &&
     normalizedClinicalDecision.proposedSessions > sessionNumber;
+  const canRequestComplementaryEvaluation = decisionAllowsComplementaryEvaluation(normalizedClinicalDecision.action);
+  const shouldShowInterventionDesign = normalizedClinicalDecision.action === "start_intervention_design";
+  const complementaryEvaluation = normalizedClinicalArtifacts.complementaryEvaluation;
+  const complementaryRequestEvaluation = clinicalArtifactsEvaluation.complementaryRequestEvaluation;
+  const externalReportIntegrationEvaluation = clinicalArtifactsEvaluation.externalReportIntegrationEvaluation;
+  const interventionDesignEvaluation = clinicalArtifactsEvaluation.interventionDesignEvaluation;
   const isFinalSession = !canContinueInSimulator;
   const reachedSessionLimit = !nextSessionNumber;
   const summary = useMemo(
@@ -180,6 +189,57 @@ export function SessionClosure({
     updateArtifacts({ selectedInstruments: Array.from(current) });
   }
 
+  function updateComplementaryEvaluation(patch) {
+    setClinicalArtifacts((current) => ({
+      ...current,
+      complementaryEvaluation: {
+        ...(current.complementaryEvaluation || {}),
+        ...patch
+      }
+    }));
+  }
+
+  function updateReportIntegration(patch) {
+    setClinicalArtifacts((current) => ({
+      ...current,
+      complementaryEvaluation: {
+        ...(current.complementaryEvaluation || {}),
+        integration: {
+          ...(current.complementaryEvaluation?.integration || {}),
+          ...patch
+        }
+      }
+    }));
+  }
+
+  function updateInterventionDesign(patch) {
+    setClinicalArtifacts((current) => ({
+      ...current,
+      interventionDesign: {
+        ...(current.interventionDesign || {}),
+        ...patch
+      }
+    }));
+  }
+
+  function requestExternalReport() {
+    if (!complementaryRequestEvaluation.canGenerateReport) {
+      updateComplementaryEvaluation({ status: "needs_revision" });
+      return;
+    }
+
+    const report = buildSimulatedExternalReport({
+      request: complementaryEvaluation,
+      caseItem,
+      history,
+      sessionNumber
+    });
+    updateComplementaryEvaluation({
+      status: report ? "received" : "needs_revision",
+      report
+    });
+  }
+
   async function saveCurrentSummary({ includeHistory = false } = {}) {
     saveSessionSummary(summary);
     if (includeHistory && !hasSavedSessionRecord && onSaveSessionRecord) {
@@ -232,6 +292,11 @@ export function SessionClosure({
         <p>
           Resumen formativo de la sesión simulada. Esta síntesis es ficticia y ayuda a
           ordenar qué se exploró y qué podría retomarse en el proceso.
+        </p>
+        <p>
+          Las cuatro sesiones son una ruta formativa base, no un cierre obligatorio.
+          Puedes continuar evaluando, solicitar informacion complementaria o iniciar
+          diseno de intervencion si la comprension clinica ya es suficiente.
         </p>
       </header>
 
@@ -442,6 +507,299 @@ export function SessionClosure({
           />
         </label>
 
+        <div className="clinical-plan-subpanel">
+          <span className="eyebrow">Evaluacion complementaria simulada</span>
+          <h3>Solicitar informe externo</h3>
+          <p>
+            El estudiante no aplica pruebas dentro del simulador. Solicita una evaluacion
+            complementaria, justifica su pertinencia y recibe un informe externo simulado
+            para integrarlo al caso.
+          </p>
+          {!canRequestComplementaryEvaluation && (
+            <div className="session-note">
+              Esta seccion queda disponible especialmente si decides continuar evaluando,
+              solicitar evaluacion complementaria o reformular hipotesis.
+            </div>
+          )}
+
+          <div className="clinical-plan-form">
+            <label>
+              <span>Prueba, area o instrumento solicitado</span>
+              <select
+                value={clinicalArtifacts.complementaryEvaluation?.instrumentId || ""}
+                onChange={(event) =>
+                  updateComplementaryEvaluation({
+                    instrumentId: event.target.value,
+                    status: "draft",
+                    report: null
+                  })
+                }
+              >
+                <option value="">Selecciona una opcion</option>
+                {clinicalInstrumentOptions.map((instrument) => (
+                  <option key={instrument.id} value={instrument.id}>
+                    {instrument.label} - {instrument.area}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span>Por que solicitas esta evaluacion complementaria?</span>
+              <textarea
+                value={clinicalArtifacts.complementaryEvaluation?.justification || ""}
+                onChange={(event) => updateComplementaryEvaluation({ justification: event.target.value })}
+                placeholder="Explica que dato clinico falta y por que no basta con concluir todavia."
+                rows={2}
+              />
+            </label>
+
+            <label>
+              <span>Que hipotesis quieres explorar o contrastar?</span>
+              <textarea
+                value={clinicalArtifacts.complementaryEvaluation?.hypothesis || ""}
+                onChange={(event) => updateComplementaryEvaluation({ hypothesis: event.target.value })}
+                placeholder="Ej.: distinguir si el malestar se explica mejor por ansiedad, sobrecarga o evitacion."
+                rows={2}
+              />
+            </label>
+
+            <label>
+              <span>Que informacion esperas obtener?</span>
+              <textarea
+                value={clinicalArtifacts.complementaryEvaluation?.expectedInformation || ""}
+                onChange={(event) => updateComplementaryEvaluation({ expectedInformation: event.target.value })}
+                placeholder="Nombra informacion especifica que ayudaria a decidir continuidad, derivacion o intervencion."
+                rows={2}
+              />
+            </label>
+
+            <label>
+              <span>Pertinencia por edad y caracteristicas del caso</span>
+              <textarea
+                value={clinicalArtifacts.complementaryEvaluation?.agePertinence || ""}
+                onChange={(event) => updateComplementaryEvaluation({ agePertinence: event.target.value })}
+                placeholder="Justifica por que esta evaluacion corresponde a este paciente y a este momento del proceso."
+                rows={2}
+              />
+            </label>
+
+            <label>
+              <span>Como integraras estos resultados al proceso?</span>
+              <textarea
+                value={clinicalArtifacts.complementaryEvaluation?.integrationPlan || ""}
+                onChange={(event) => updateComplementaryEvaluation({ integrationPlan: event.target.value })}
+                placeholder="Explica como evitaras usar el informe como conclusion automatica."
+                rows={2}
+              />
+            </label>
+          </div>
+
+          <div className={`clinical-plan-evaluation ${complementaryRequestEvaluation.level}`}>
+            <div>
+              <span>{complementaryRequestEvaluation.title}</span>
+              <strong>{complementaryRequestEvaluation.levelLabel}</strong>
+            </div>
+            <p>{complementaryRequestEvaluation.summary}</p>
+            {(complementaryRequestEvaluation.concerns.length > 0 ||
+              complementaryRequestEvaluation.recommendations.length > 0) && (
+              <ul>
+                {[...complementaryRequestEvaluation.concerns, ...complementaryRequestEvaluation.recommendations]
+                  .slice(0, 4)
+                  .map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="closure-actions">
+            <button className="primary-action" type="button" onClick={requestExternalReport}>
+              Solicitar informe externo simulado
+            </button>
+          </div>
+
+          {complementaryEvaluation.status === "needs_revision" && (
+            <div className="session-note low-turn-note">
+              Antes de entregar el informe, mejora la justificacion clinica, la hipotesis
+              y el plan de integracion.
+            </div>
+          )}
+
+          {complementaryEvaluation.report && (
+            <article className="session-summary-card closure-panel">
+              <span className="eyebrow">Informe externo recibido</span>
+              <h3>{complementaryEvaluation.report.title}</h3>
+              <p><strong>Motivo de derivacion:</strong> {complementaryEvaluation.report.referralReason}</p>
+              <p>
+                <strong>Prueba o area:</strong> {complementaryEvaluation.report.requestedInstrument.name}
+                {" "}({complementaryEvaluation.report.requestedInstrument.type})
+              </p>
+              <div className="session-summary-grid">
+                <div>
+                  <h4>Observaciones conductuales</h4>
+                  <ul>
+                    {complementaryEvaluation.report.behavioralObservations.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4>Resultados principales</h4>
+                  <ul>
+                    {complementaryEvaluation.report.mainResults.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4>Hipotesis complementarias</h4>
+                  <ul>
+                    {complementaryEvaluation.report.complementaryHypotheses.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4>Recomendaciones</h4>
+                  <ul>
+                    {complementaryEvaluation.report.recommendations.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <p><strong>Interpretacion clinica-formativa:</strong> {complementaryEvaluation.report.clinicalInterpretation}</p>
+              <p><strong>Limitaciones:</strong> {complementaryEvaluation.report.limitations.join(" ")}</p>
+              <p><strong>Nota etica:</strong> {complementaryEvaluation.report.ethicalNote}</p>
+            </article>
+          )}
+
+          {complementaryEvaluation.report && (
+            <div className="clinical-plan-form">
+              <label>
+                <span>Que informacion nueva aporta el informe?</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.newInformation || ""}
+                  onChange={(event) => updateReportIntegration({ newInformation: event.target.value })}
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Confirma, modifica o tensiona tu hipotesis?</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.hypothesisImpact || ""}
+                  onChange={(event) => updateReportIntegration({ hypothesisImpact: event.target.value })}
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Que integraras al diseno de intervencion?</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.interventionUse || ""}
+                  onChange={(event) => updateReportIntegration({ interventionUse: event.target.value })}
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Que riesgos o dilemas eticos aparecen?</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.ethicalRisks || ""}
+                  onChange={(event) => updateReportIntegration({ ethicalRisks: event.target.value })}
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Que limitaciones tiene este informe?</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.limitations || ""}
+                  onChange={(event) => updateReportIntegration({ limitations: event.target.value })}
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Decision clinica posterior al informe</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.nextDecision || ""}
+                  onChange={(event) => updateReportIntegration({ nextDecision: event.target.value })}
+                  placeholder="Continuar evaluacion, iniciar intervencion, reformular hipotesis, cerrar o derivar."
+                  rows={2}
+                />
+              </label>
+            </div>
+          )}
+
+          {externalReportIntegrationEvaluation && (
+            <div className={`clinical-plan-evaluation ${externalReportIntegrationEvaluation.level}`}>
+              <div>
+                <span>{externalReportIntegrationEvaluation.title}</span>
+                <strong>{externalReportIntegrationEvaluation.levelLabel}</strong>
+              </div>
+              <p>{externalReportIntegrationEvaluation.summary}</p>
+              <ul>
+                {(externalReportIntegrationEvaluation.gaps.length
+                  ? externalReportIntegrationEvaluation.gaps
+                  : externalReportIntegrationEvaluation.strengths
+                ).slice(0, 4).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {(shouldShowInterventionDesign || normalizedClinicalArtifacts.interventionDesign.caseUnderstanding) && (
+          <div className="clinical-plan-subpanel">
+            <span className="eyebrow">Diseno de intervencion aplicado al caso</span>
+            <h3>Construir propuesta clinica situada</h3>
+            <p>
+              Esta pauta no es generica: debe sostenerse en entrevistas realizadas,
+              decisiones previas, informes externos, contexto del paciente e hipotesis
+              clinicas.
+            </p>
+
+            <div className="clinical-plan-form">
+              {[
+                ["caseUnderstanding", "Comprension del caso"],
+                ["clinicalFormulation", "Formulacion clinica"],
+                ["objectives", "Objetivos de intervencion"],
+                ["treatmentPlan", "Plan de tratamiento o intervencion"],
+                ["strategies", "Estrategias clinicas"],
+                ["processEvaluation", "Evaluacion del proceso"],
+                ["ethics", "Consideraciones eticas"],
+                ["reflexivity", "Reflexividad del estudiante"],
+                ["contextualIntegration", "Integracion situada/contextual"],
+                ["continuityDecision", "Continuidad, cierre o derivacion"]
+              ].map(([key, label]) => (
+                <label key={key}>
+                  <span>{label}</span>
+                  <textarea
+                    value={clinicalArtifacts.interventionDesign?.[key] || ""}
+                    onChange={(event) => updateInterventionDesign({ [key]: event.target.value })}
+                    rows={2}
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className={`clinical-plan-evaluation ${interventionDesignEvaluation.level}`}>
+              <div>
+                <span>{interventionDesignEvaluation.title}</span>
+                <strong>{interventionDesignEvaluation.levelLabel}</strong>
+              </div>
+              <p>{interventionDesignEvaluation.summary}</p>
+              <ul>
+                {(interventionDesignEvaluation.gaps.length
+                  ? interventionDesignEvaluation.gaps
+                  : interventionDesignEvaluation.strengths
+                ).slice(0, 5).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
         <PedagogicalGuide
           guideId="nota_clinica"
           autoOpen={false}
@@ -573,6 +931,36 @@ export function SessionClosure({
           </label>
 
           <label>
+            <span>Que informacion clinica ya tienes?</span>
+            <textarea
+              value={clinicalDecision.knownInformation || ""}
+              onChange={(event) => updateDecision({ knownInformation: event.target.value })}
+              placeholder="Resume los datos relevantes obtenidos en entrevista, sin convertirlos aun en diagnostico cerrado."
+              rows={2}
+            />
+          </label>
+
+          <label>
+            <span>Que informacion consideras que falta?</span>
+            <textarea
+              value={clinicalDecision.missingInformation || ""}
+              onChange={(event) => updateDecision({ missingInformation: event.target.value })}
+              placeholder="Nombra antecedentes, riesgo, red de apoyo, contexto o hipotesis que aun requieren exploracion."
+              rows={2}
+            />
+          </label>
+
+          <label>
+            <span>Que riesgos, dilemas eticos o aspectos contextuales debes considerar?</span>
+            <textarea
+              value={clinicalDecision.ethicalConsiderations || ""}
+              onChange={(event) => updateDecision({ ethicalConsiderations: event.target.value })}
+              placeholder="Ej.: confidencialidad, riesgo, pertinencia de derivacion, contexto familiar o limites del simulador."
+              rows={2}
+            />
+          </label>
+
+          <label>
             <span>Objetivos del proceso propuesto o siguiente paso</span>
             <textarea
               value={clinicalDecision.nextSessionObjectives}
@@ -625,7 +1013,7 @@ export function SessionClosure({
 
       <div className="continuity-callout">
         <div>
-          <h2>{canContinueInSimulator ? "Continuar segun tu decision" : "Guardar decision y cerrar"}</h2>
+          <h2>{canContinueInSimulator ? "Continuar segun tu decision" : "Guardar decision clinica"}</h2>
           {canContinueInSimulator ? (
             <p>
               Puedes avanzar a {nextSessionStage.title.toLowerCase()} porque propusiste continuidad

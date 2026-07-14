@@ -27,6 +27,9 @@ export function buildPatientProcessMemory({
     },
     hypotheses: extractClinicalHypotheses(report, clinicalArtifacts),
     instruments: clinicalArtifacts?.selectedInstruments || clinicalArtifacts?.instruments || [],
+    externalReports: extractExternalReports(clinicalArtifacts),
+    reportIntegrations: extractReportIntegrations(clinicalArtifacts),
+    interventionDesigns: extractInterventionDesigns(clinicalArtifacts),
     techniques: unique(clinicalSignals.map((signal) => signal.approach || signal.goodIntervention || signal.poorIntervention).filter(Boolean)),
     decisions: clinicalDecision ? [clinicalDecision] : [],
     notes: extractProcessNotes(meaningfulHistory),
@@ -45,6 +48,9 @@ export function mergeProcessMemories(summaries = []) {
     riskExplored: memories.some((memory) => memory.risk?.wasExplored),
     riskSignals: unique(memories.flatMap((memory) => memory.risk?.signals || [])),
     techniques: unique(memories.flatMap((memory) => memory.techniques || [])),
+    externalReports: memories.flatMap((memory) => memory.externalReports || []),
+    reportIntegrations: memories.flatMap((memory) => memory.reportIntegrations || []),
+    interventionDesigns: memories.flatMap((memory) => memory.interventionDesigns || []),
     rupturesAndRepairs: memories.flatMap((memory) => memory.rupturesAndRepairs || []),
     changesObserved: unique(memories.flatMap((memory) => memory.changesObserved || [])),
     processObjectives: unique(memories.flatMap((memory) => memory.processObjectives || []))
@@ -85,8 +91,34 @@ function extractClinicalHypotheses(report, clinicalArtifacts) {
   return unique([
     ...(report?.clinicalHypotheses || []),
     ...(clinicalArtifacts?.hypotheses || []),
-    ...(clinicalArtifacts?.clinicalHypotheses || [])
+    ...(clinicalArtifacts?.clinicalHypotheses || []),
+    clinicalArtifacts?.clinicalHypothesis,
+    clinicalArtifacts?.complementaryEvaluation?.hypothesis,
+    clinicalArtifacts?.interventionDesign?.clinicalFormulation
   ].filter(Boolean));
+}
+
+function extractExternalReports(clinicalArtifacts) {
+  const externalReport = clinicalArtifacts?.complementaryEvaluation?.report;
+  if (!externalReport) return [];
+  return [{
+    title: externalReport.title,
+    instrument: externalReport.requestedInstrument?.name || externalReport.caseData?.instrument || "",
+    area: externalReport.requestedInstrument?.area || externalReport.caseData?.area || "",
+    createdAt: externalReport.createdAt
+  }];
+}
+
+function extractReportIntegrations(clinicalArtifacts) {
+  const integration = clinicalArtifacts?.complementaryEvaluation?.integration;
+  if (!integration || !Object.values(integration).some(Boolean)) return [];
+  return [integration];
+}
+
+function extractInterventionDesigns(clinicalArtifacts) {
+  const design = clinicalArtifacts?.interventionDesign;
+  if (!design || !Object.values(design).some(Boolean)) return [];
+  return [design];
 }
 
 function extractProcessNotes(history) {
