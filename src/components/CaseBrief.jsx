@@ -90,7 +90,7 @@ export function CaseBrief({
   onSelectSession,
   onPreSessionPlanChange
 }) {
-  const [assistantVisible, setAssistantVisible] = useState(true);
+  const [assistantVisible, setAssistantVisible] = useState(false);
   const [showWeakPreparationWarning, setShowWeakPreparationWarning] = useState(false);
   const [selectedPrepStepId, setSelectedPrepStepId] = useState(null);
   const [draftStatus, setDraftStatus] = useState(null);

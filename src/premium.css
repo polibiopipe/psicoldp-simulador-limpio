@@ -8295,3 +8295,312 @@ body,
     opacity: 0.02;
   }
 }
+
+/* Interview preparation UX refinement */
+@media (min-width: 1024px) {
+  .preparation-brief-layout {
+    grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
+    gap: clamp(18px, 2vw, 26px);
+  }
+}
+
+.preparation-brief-layout .brief-sidebar-stack {
+  gap: 10px;
+}
+
+.preparation-brief-layout .patient-card {
+  border-radius: 18px;
+}
+
+.preparation-brief-layout .patient-card .patient-card-body,
+.preparation-brief-layout .patient-card .patient-card-content {
+  gap: 9px;
+}
+
+.prep-sidebar-card {
+  gap: 10px;
+  border-radius: 17px;
+  padding: 12px;
+}
+
+.prep-sidebar-card h2 {
+  margin: 2px 0;
+  font-size: clamp(1.2rem, 1.55vw, 1.45rem);
+}
+
+.prep-sidebar-card p {
+  font-size: 0.78rem;
+  line-height: 1.38;
+}
+
+.prep-progress-meter {
+  height: 7px;
+}
+
+.prep-sidebar-checklist {
+  display: none;
+}
+
+.prep-sidebar-card .prep-start-action {
+  min-height: 40px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+}
+
+.clinical-preparation-panel {
+  gap: 12px;
+  border-radius: 20px;
+  padding: clamp(14px, 1.7vw, 20px);
+}
+
+.clinical-prep-hero {
+  gap: 7px;
+  column-gap: 12px;
+}
+
+.clinical-prep-hero .panel-heading {
+  gap: 9px;
+}
+
+.clinical-prep-hero .panel-heading > svg {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  padding: 7px;
+}
+
+.clinical-prep-hero h2 {
+  font-size: clamp(1.18rem, 1.65vw, 1.52rem);
+  line-height: 1.18;
+}
+
+.clinical-prep-hero p {
+  max-width: 78ch;
+  font-size: 0.84rem;
+  line-height: 1.42;
+}
+
+.prep-context-guide {
+  align-self: start;
+}
+
+.clinical-preparation-panel .prep-context-guide .guide-trigger {
+  min-height: 32px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+
+.clinical-preparation-panel .prep-workflow-stepper {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(108px, 1fr));
+  gap: 6px;
+  align-items: stretch;
+}
+
+.clinical-preparation-panel .prep-step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 16px;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 7px;
+  min-height: 48px;
+  border-radius: 12px;
+  padding: 7px 8px;
+  box-shadow: 0 6px 14px rgba(15, 43, 70, 0.035);
+}
+
+.clinical-preparation-panel .prep-step:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(15, 43, 70, 0.07);
+}
+
+.clinical-preparation-panel .prep-step.is-active {
+  box-shadow:
+    0 10px 24px rgba(15, 43, 70, 0.075),
+    0 0 0 2px rgba(42, 154, 164, 0.12);
+}
+
+.clinical-preparation-panel .prep-step-index {
+  grid-row: 1 / span 2;
+  width: 22px;
+  height: 22px;
+  font-size: 0.64rem;
+}
+
+.clinical-preparation-panel .prep-step svg {
+  position: static;
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  width: 15px;
+  height: 15px;
+  justify-self: end;
+}
+
+.clinical-preparation-panel .prep-step strong {
+  overflow: hidden;
+  color: #10212b;
+  font-size: 0.74rem;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clinical-preparation-panel .prep-step em {
+  display: none;
+}
+
+.clinical-preparation-panel .prep-step small {
+  grid-column: 2;
+  color: #687b82;
+  font-size: 0.62rem;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.prep-assistant-card {
+  width: fit-content;
+  max-width: min(100%, 620px);
+  gap: 8px;
+  border-radius: 13px;
+  padding: 7px 9px;
+  box-shadow: none;
+}
+
+.prep-assistant-card.visible {
+  width: min(100%, 620px);
+}
+
+.prep-assistant-card.minimized {
+  grid-template-columns: auto auto;
+}
+
+.prep-assistant-orb {
+  width: 30px;
+  height: 30px;
+  border-radius: 11px;
+}
+
+.prep-assistant-orb span {
+  width: 14px;
+  height: 14px;
+}
+
+.prep-assistant-orb svg {
+  width: 14px;
+  height: 14px;
+}
+
+.prep-assistant-message > div {
+  gap: 8px;
+}
+
+.prep-assistant-message span {
+  font-size: 0.78rem;
+}
+
+.prep-assistant-message p {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.prep-assistant-message button,
+.prep-assistant-show {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+}
+
+.prep-step-panel {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  max-width: 920px;
+}
+
+.clinical-preparation-panel .clinical-prep-field {
+  gap: 8px;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 6px 16px rgba(15, 43, 70, 0.035);
+}
+
+.clinical-preparation-panel .clinical-prep-field > span {
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
+.clinical-prep-field small {
+  font-size: 0.78rem;
+  line-height: 1.38;
+}
+
+.clinical-preparation-panel .clinical-prep-field select,
+.clinical-preparation-panel .clinical-prep-field input,
+.clinical-preparation-panel .clinical-prep-field textarea {
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.prep-step-panel textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.prep-step-panel .clinical-language-field {
+  min-height: auto;
+}
+
+.clinical-language-controls {
+  gap: 8px;
+}
+
+.prep-help-note {
+  padding: 9px 11px;
+  font-size: 0.78rem;
+  line-height: 1.38;
+}
+
+.prep-example-list {
+  gap: 6px;
+}
+
+.prep-example-list span,
+.clinical-preparation-panel .clinical-area-grid label,
+.ethical-care-grid label {
+  font-size: 0.78rem;
+}
+
+.clinical-preparation-panel .clinical-area-grid label,
+.ethical-care-grid label {
+  min-height: 34px;
+  border-radius: 9px;
+  padding: 7px 8px;
+}
+
+.prep-priority-status {
+  border-radius: 12px;
+  padding: 9px 11px;
+}
+
+.prep-summary-card {
+  max-width: 920px;
+}
+
+@media (max-width: 1180px) {
+  .clinical-preparation-panel .prep-workflow-stepper {
+    grid-template-columns: repeat(4, minmax(126px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .clinical-preparation-panel .prep-workflow-stepper {
+    grid-template-columns: 1fr;
+  }
+
+  .clinical-preparation-panel .prep-step strong,
+  .clinical-preparation-panel .prep-step small {
+    white-space: normal;
+  }
+}

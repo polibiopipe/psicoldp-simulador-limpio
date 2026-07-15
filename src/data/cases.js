@@ -292,7 +292,7 @@ function canonicalVisibleCasePatch(caseItem) {
     biography.employment.employer
       ? `Trabaja como ${biography.employment.role} en ${biography.employment.employer}.`
       : "",
-    biography.identity.livingWith?.length ? `Vive con ${biography.identity.livingWith.slice(0, 3).join(", ")}.` : "",
+    formatLivingWithBackground(biography.identity.livingWith),
     biography.consultation.immediateReason
   ].filter(Boolean).slice(0, 3);
 
@@ -301,4 +301,15 @@ function canonicalVisibleCasePatch(caseItem) {
     motive: biography.consultation.immediateReason || caseItem.motive,
     background: visibleBackground.length ? visibleBackground : caseItem.background
   };
+}
+
+function formatLivingWithBackground(livingWith = []) {
+  const value = livingWith.slice(0, 3).join(", ").trim();
+  if (!value) return "";
+
+  if (/^vive\s+/i.test(value)) {
+    return `${value.charAt(0).toUpperCase()}${value.slice(1).replace(/\.$/, "")}.`;
+  }
+
+  return `Vive con ${value}.`;
 }
