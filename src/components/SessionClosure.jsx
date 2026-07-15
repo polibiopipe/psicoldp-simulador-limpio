@@ -41,8 +41,12 @@ import {
 import { buildSimulatedExternalReport } from "../engine/clinicalComplementaryEvaluation.js";
 import {
   buildClinicalDraftKey,
+  buildClinicalScrollKey,
   clearClinicalDraft,
+  clearClinicalScrollPosition,
   loadClinicalDraft,
+  loadClinicalScrollPosition,
+  saveClinicalScrollPosition,
   saveClinicalDraft
 } from "../engine/clinicalDraftAutosave.js";
 import { clinicalInstrumentOptions } from "../data/clinicalWorkflow.js";
@@ -71,6 +75,8 @@ export function SessionClosure({
   const [clinicalArtifacts, setClinicalArtifacts] = useState(() => buildInitialClinicalArtifacts());
   const [draftStatus, setDraftStatus] = useState(null);
   const restoredDraftRef = useRef(false);
+  const restoredScrollKeyRef = useRef("");
+  const scrollPersistenceDisabledRef = useRef(false);
   const hydratingDraftRef = useRef(true);
   const stableSessionRecordIdRef = useRef(sessionRecordId);
   const sessionPlan = useMemo(() => getClinicalSessionPlan(caseItem), [caseItem.id]);
@@ -96,6 +102,18 @@ export function SessionClosure({
         sessionId: stableSessionRecordIdRef.current,
         sessionNumber,
         step: "closure-artifacts"
+      }),
+    [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
+  );
+  const closureScrollKey = useMemo(
+    () =>
+      buildClinicalScrollKey({
+        userId,
+        userEmail,
+        caseId: caseItem.id,
+        sessionId: stableSessionRecordIdRef.current,
+        sessionNumber,
+        step: "closure"
       }),
     [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
   );
@@ -218,6 +236,8 @@ export function SessionClosure({
         ? { type: "restored", message: "Recuperamos tu borrador." }
         : null
     );
+    restoredScrollKeyRef.current = "";
+    scrollPersistenceDisabledRef.current = false;
   }, [caseItem.id, sessionNumber, sessionPlan, preSessionPlanKey, decisionDraftKey, artifactsDraftKey]);
 
   useEffect(() => {
@@ -273,6 +293,44 @@ export function SessionClosure({
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
   }, [hasSavedSessionRecord, clinicalDecision, clinicalArtifacts, sessionNumber, sessionPlan, preSessionPlan]);
+
+  useEffect(() => {
+    if (restoredScrollKeyRef.current === closureScrollKey) return undefined;
+    restoredScrollKeyRef.current = closureScrollKey;
+
+    const savedY = loadClinicalScrollPosition(closureScrollKey);
+    if (!savedY) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: savedY, behavior: "auto" });
+      });
+    }, 260);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [closureScrollKey, clinicalDecision, clinicalArtifacts]);
+
+  useEffect(() => {
+    let timeoutId = null;
+
+    function persistScrollPosition() {
+      timeoutId = null;
+      if (scrollPersistenceDisabledRef.current) return;
+      saveClinicalScrollPosition(closureScrollKey, getCurrentScrollY());
+    }
+
+    function handleScroll() {
+      if (timeoutId) return;
+      timeoutId = window.setTimeout(persistScrollPosition, 400);
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      persistScrollPosition();
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [closureScrollKey]);
 
   function updateDecision(patch) {
     setClinicalDecision((current) => ({
@@ -357,8 +415,10 @@ export function SessionClosure({
       setHasSavedSessionRecord(true);
     }
     if (includeHistory) {
+      scrollPersistenceDisabledRef.current = true;
       clearClinicalDraft(decisionDraftKey);
       clearClinicalDraft(artifactsDraftKey);
+      clearClinicalScrollPosition(closureScrollKey);
       setDraftStatus({ type: "saved", message: "Cambios guardados." });
     }
   }
@@ -1319,4 +1379,9 @@ function hasMeaningfulObjectText(value = null) {
 
 function hasText(value) {
   return String(value || "").trim().length > 0;
+}
+
+function getCurrentScrollY() {
+  if (typeof window === "undefined") return 0;
+  return window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
 }

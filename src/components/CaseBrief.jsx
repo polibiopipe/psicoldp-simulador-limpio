@@ -24,8 +24,12 @@ import {
 } from "../engine/clinicalLanguage.js";
 import {
   buildClinicalDraftKey,
+  buildClinicalScrollKey,
   clearClinicalDraft,
+  clearClinicalScrollPosition,
   loadClinicalDraft,
+  loadClinicalScrollPosition,
+  saveClinicalScrollPosition,
   saveClinicalDraft
 } from "../engine/clinicalDraftAutosave.js";
 
@@ -91,6 +95,8 @@ export function CaseBrief({
   const [selectedPrepStepId, setSelectedPrepStepId] = useState(null);
   const [draftStatus, setDraftStatus] = useState(null);
   const restoredDraftRef = useRef(false);
+  const restoredScrollKeyRef = useRef("");
+  const scrollPersistenceDisabledRef = useRef(false);
   const stableSessionRecordIdRef = useRef(sessionRecordId);
   const [languagePreference, setLanguagePreference] = useState(() => getClinicalTermPreference(caseItem.id));
   const termCopy = getClinicalTermCopy(languagePreference);
@@ -98,6 +104,18 @@ export function CaseBrief({
   const preparationDraftKey = useMemo(
     () =>
       buildClinicalDraftKey({
+        userId,
+        userEmail,
+        caseId: caseItem.id,
+        sessionId: stableSessionRecordIdRef.current,
+        sessionNumber,
+        step: "preparation"
+      }),
+    [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
+  );
+  const preparationScrollKey = useMemo(
+    () =>
+      buildClinicalScrollKey({
         userId,
         userEmail,
         caseId: caseItem.id,
@@ -149,6 +167,8 @@ export function CaseBrief({
     setShowWeakPreparationWarning(false);
     setDraftStatus(null);
     restoredDraftRef.current = false;
+    restoredScrollKeyRef.current = "";
+    scrollPersistenceDisabledRef.current = false;
   }, [caseItem.id, sessionNumber]);
 
   useEffect(() => {
@@ -183,6 +203,44 @@ export function CaseBrief({
 
     return () => window.clearTimeout(timeoutId);
   }, [preparationDraftKey, preSessionPlan]);
+
+  useEffect(() => {
+    if (restoredScrollKeyRef.current === preparationScrollKey) return undefined;
+    restoredScrollKeyRef.current = preparationScrollKey;
+
+    const savedY = loadClinicalScrollPosition(preparationScrollKey);
+    if (!savedY) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: savedY, behavior: "auto" });
+      });
+    }, 220);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [preparationScrollKey, preSessionPlan]);
+
+  useEffect(() => {
+    let timeoutId = null;
+
+    function persistScrollPosition() {
+      timeoutId = null;
+      if (scrollPersistenceDisabledRef.current) return;
+      saveClinicalScrollPosition(preparationScrollKey, getCurrentScrollY());
+    }
+
+    function handleScroll() {
+      if (timeoutId) return;
+      timeoutId = window.setTimeout(persistScrollPosition, 400);
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      persistScrollPosition();
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [preparationScrollKey]);
 
   useEffect(() => {
     if (!hasMeaningfulPreSessionDraft(preSessionPlan)) return undefined;
@@ -246,7 +304,9 @@ export function CaseBrief({
 
   function beginWithPreparationState(overrideUsed = false) {
     if (!onBegin) return;
+    scrollPersistenceDisabledRef.current = true;
     clearClinicalDraft(preparationDraftKey);
+    clearClinicalScrollPosition(preparationScrollKey);
     setDraftStatus(null);
     onBegin({
       preparationQuality: preparationWeak ? "debil" : "suficiente",
@@ -916,6 +976,11 @@ function hasNonDefaultAreaSelection(areas = []) {
 
 function hasText(value) {
   return String(value || "").trim().length > 0;
+}
+
+function getCurrentScrollY() {
+  if (typeof window === "undefined") return 0;
+  return window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
 }
 
 function getInterviewTypeLabel(value) {
