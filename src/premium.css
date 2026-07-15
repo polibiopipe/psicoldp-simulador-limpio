@@ -6484,6 +6484,204 @@ body,
   }
 }
 
+/* Clinical closure hierarchy refinement */
+.closure-stage-list {
+  display: grid;
+  gap: 14px;
+}
+
+.closure-stage {
+  border: 1px solid rgba(23, 109, 117, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 30px rgba(15, 43, 70, 0.055);
+  overflow: hidden;
+}
+
+.closure-stage > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: center;
+  padding: 14px 16px;
+  color: #10212b;
+  cursor: pointer;
+  list-style: none;
+}
+
+.closure-stage > summary::-webkit-details-marker {
+  display: none;
+}
+
+.closure-stage > summary span {
+  display: grid;
+  grid-row: 1 / span 2;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #176d75;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.closure-stage > summary strong {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.closure-stage > summary small {
+  color: #5f6f73;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.closure-stage[open] > summary {
+  border-bottom: 1px solid rgba(23, 109, 117, 0.1);
+  background:
+    linear-gradient(135deg, rgba(232, 249, 247, 0.68), rgba(255, 255, 255, 0.94)),
+    #ffffff;
+}
+
+.closure-stage-body {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.closure-feedback-brief {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.72fr) repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.closure-feedback-brief article,
+.closure-feedback-brief > section,
+.compact-preparation-summary,
+.closure-inline-detail {
+  border: 1px solid rgba(23, 109, 117, 0.12);
+  border-radius: 14px;
+  background: #fbfcfa;
+}
+
+.closure-feedback-brief article,
+.closure-feedback-brief > section {
+  padding: 13px;
+}
+
+.closure-feedback-brief span {
+  display: block;
+  color: #176d75;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.closure-feedback-brief strong {
+  display: block;
+  margin-top: 7px;
+  color: #10212b;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.closure-feedback-brief p {
+  margin: 6px 0 0;
+  color: #5c6b73;
+  font-size: 0.84rem;
+}
+
+.closure-feedback-brief ul,
+.compact-clinical-list {
+  display: grid;
+  gap: 7px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #40545d;
+  font-size: 0.86rem;
+  line-height: 1.42;
+}
+
+.compact-clinical-list {
+  padding-left: 20px;
+}
+
+.compact-clinical-list strong {
+  color: #10212b;
+}
+
+.closure-inline-detail {
+  padding: 0;
+  overflow: hidden;
+}
+
+.closure-inline-detail > summary {
+  padding: 10px 13px;
+  color: #176d75;
+  background: rgba(240, 250, 249, 0.72);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.closure-inline-detail > .session-summary-grid,
+.closure-inline-detail > .closure-panels {
+  padding: 13px;
+}
+
+.session-closure .pedagogical-guide-shell,
+.session-closure .pedagogical-guide-shell.compact {
+  margin: 8px 0 10px;
+}
+
+.session-closure .guide-trigger {
+  min-height: 32px;
+  padding: 5px 11px;
+  font-size: 0.72rem;
+  box-shadow: none;
+}
+
+.session-closure .pedagogical-guide-card {
+  border-left-width: 5px;
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 14px 32px rgba(15, 43, 70, 0.08);
+}
+
+.session-closure .guide-card-heading h3 {
+  font-size: 1rem;
+}
+
+.session-closure .guide-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+}
+
+.session-closure .pedagogical-guide-card p,
+.session-closure .guide-example span,
+.session-closure .guide-objective span {
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.session-closure .guide-example,
+.session-closure .guide-objective {
+  padding: 9px 10px;
+}
+
+@media (max-width: 900px) {
+  .closure-feedback-brief {
+    grid-template-columns: 1fr;
+  }
+
+  .closure-stage > summary {
+    padding: 13px;
+  }
+}
+
 /* RC v1.0 clinical interface refinement */
 .authenticated-shell {
   font-size: 0.94rem;

@@ -49,7 +49,7 @@ import {
   saveClinicalScrollPosition,
   saveClinicalDraft
 } from "../engine/clinicalDraftAutosave.js";
-import { clinicalInstrumentOptions } from "../data/clinicalWorkflow.js";
+import { clinicalExplorationAreas, clinicalInstrumentOptions } from "../data/clinicalWorkflow.js";
 import { NextSessionModal } from "./NextSessionModal.jsx";
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
 
@@ -476,6 +476,14 @@ export function SessionClosure({
         )}
       </header>
 
+      <div className="closure-stage-list">
+        <details className="closure-stage" open>
+          <summary>
+            <span>1</span>
+            <strong>Resumen breve de sesion</strong>
+            <small>Paciente, turnos, apertura y senales generales del cierre.</small>
+          </summary>
+          <div className="closure-stage-body">
       {interviewTurns.length < 3 && (
         <div className="session-note low-turn-note">
           Esta sesión tuvo pocas intervenciones. Para un mejor aprendizaje, se recomienda
@@ -498,6 +506,21 @@ export function SessionClosure({
         </div>
       </div>
 
+            <section className="session-summary-card closure-panel closure-panel-wide">
+              <span className="eyebrow">Resumen narrativo</span>
+              <h2>Sesion {summary.sessionNumber} con {summary.patientName}</h2>
+              <p>{summary.resumenConversacion}</p>
+            </section>
+          </div>
+        </details>
+
+        <details className="closure-stage">
+          <summary>
+            <span>2</span>
+            <strong>Retroalimentación formativa</strong>
+            <small>Indicadores, fortalezas y aspectos prioritarios.</small>
+          </summary>
+          <div className="closure-stage-body">
       <div className="closure-metrics" aria-label="Métricas de cierre">
         <article>
           <Clock aria-hidden="true" />
@@ -521,41 +544,9 @@ export function SessionClosure({
         </article>
       </div>
 
-      {summary.preSessionEvaluation && (
-        <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
-          <span className="eyebrow">Preparacion previa</span>
-          <h2>Plan inicial de entrevista</h2>
-          <p>{summary.preSessionEvaluation.summary}</p>
-          <div className="session-summary-grid">
-            <div>
-              <h3>Fortalezas del plan</h3>
-              <ul>
-                {summary.preSessionEvaluation.strengths.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3>Brechas a revisar</h3>
-              <ul>
-                {summary.preSessionEvaluation.gaps.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-      )}
-
-      <div className="closure-panels">
-        <section className="session-summary-card closure-panel closure-panel-wide">
-          <span className="eyebrow">Resumen narrativo</span>
-          <h2>Sesión {summary.sessionNumber} con {summary.patientName}</h2>
-          <p>{summary.resumenConversacion}</p>
-        </section>
-
+      <div className="closure-panels closure-feedback-brief">
         <section className="closure-card closure-panel">
-          <h2>Aspectos logrados</h2>
+          <h2>Fortalezas principales</h2>
           <ul>
             {report.strengths.slice(0, 3).map((item) => (
               <li key={item}>{item}</li>
@@ -591,6 +582,73 @@ export function SessionClosure({
         </section>
       </div>
 
+          </div>
+        </details>
+
+        <details className="closure-stage">
+          <summary>
+            <span>3</span>
+            <strong>Preparación previa y continuidad</strong>
+            <small>Síntesis compacta del plan inicial utilizado.</small>
+          </summary>
+          <div className="closure-stage-body">
+            {summary.preSessionEvaluation ? (
+              <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel compact-preparation-summary">
+                <span className="eyebrow">Preparación previa utilizada</span>
+                <h2>Plan inicial de entrevista</h2>
+                <ul className="compact-clinical-list">
+                  <li>
+                    <strong>Modalidad:</strong> {summary.preSessionEvaluation.interviewType || "No registrada"}.
+                  </li>
+                  <li>
+                    <strong>Áreas planificadas:</strong>{" "}
+                    {formatClinicalAreaList(summary.preSessionEvaluation.plannedAreas)}.
+                  </li>
+                  <li>
+                    <strong>Áreas retomadas:</strong>{" "}
+                    {summary.preSessionEvaluation.coveredAreas.length} de{" "}
+                    {summary.preSessionEvaluation.plannedAreas.length}.
+                  </li>
+                  <li>
+                    <strong>Brechas relevantes:</strong>{" "}
+                    {summary.preSessionEvaluation.gaps.slice(0, 3).join("; ") || "No se observan brechas relevantes en el plan."}
+                  </li>
+                </ul>
+                <details className="closure-inline-detail">
+                  <summary>Ver análisis de preparación</summary>
+                  <div className="session-summary-grid">
+                    <div>
+                      <h3>Fortalezas del plan</h3>
+                      <ul>
+                        {summary.preSessionEvaluation.strengths.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h3>Brechas a revisar</h3>
+                      <ul>
+                        {summary.preSessionEvaluation.gaps.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </details>
+              </section>
+            ) : (
+              <div className="session-note">No hay preparación previa registrada para esta sesión.</div>
+            )}
+          </div>
+        </details>
+
+        <details className="closure-stage">
+          <summary>
+            <span>4</span>
+            <strong>Formulación clínica e instrumentos</strong>
+            <small>Hipótesis, datos, instrumentos e informe externo.</small>
+          </summary>
+          <div className="closure-stage-body">
       <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
         <span className="eyebrow">Formulacion y registro</span>
         <h2>Hipotesis, instrumentos y nota clinica</h2>
@@ -1019,7 +1077,16 @@ export function SessionClosure({
           </div>
         </div>
       </section>
+          </div>
+        </details>
 
+        <details className="closure-stage">
+          <summary>
+            <span>5</span>
+            <strong>Decisión clínica</strong>
+            <small>Continuidad, cierre, derivación o acción final.</small>
+          </summary>
+          <div className="closure-stage-body">
       <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
         <div className="clinical-plan-header">
           <div>
@@ -1278,6 +1345,9 @@ export function SessionClosure({
           </div>
         </section>
       )}
+          </div>
+        </details>
+      </div>
 
       <NextSessionModal
         open={modalOpen}
@@ -1292,6 +1362,14 @@ export function SessionClosure({
       />
     </section>
   );
+}
+
+function formatClinicalAreaList(areaIds = []) {
+  if (!Array.isArray(areaIds) || areaIds.length === 0) return "No registradas";
+  const labels = areaIds
+    .map((areaId) => clinicalExplorationAreas.find((area) => area.id === areaId)?.label || areaId)
+    .filter(Boolean);
+  return labels.slice(0, 6).join(", ") + (labels.length > 6 ? ` y ${labels.length - 6} mas` : "");
 }
 
 function mergeClinicalArtifactsDraft(base = {}, draft = {}) {
