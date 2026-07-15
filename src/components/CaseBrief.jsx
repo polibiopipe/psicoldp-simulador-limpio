@@ -90,7 +90,8 @@ export function CaseBrief({
 }) {
   const [assistantVisible, setAssistantVisible] = useState(false);
   const [showWeakPreparationWarning, setShowWeakPreparationWarning] = useState(false);
-  const [selectedPrepStepId, setSelectedPrepStepId] = useState(null);
+  const [selectedPrepStepId, setSelectedPrepStepId] = useState("objective");
+  const [prepStepFeedback, setPrepStepFeedback] = useState(null);
   const [draftStatus, setDraftStatus] = useState(null);
   const restoredDraftRef = useRef(false);
   const restoredScrollKeyRef = useRef("");
@@ -126,11 +127,7 @@ export function CaseBrief({
   const readiness = evaluatePreSessionReadiness(preSessionPlan, { languagePreference });
   const completion = readiness.requiredCompletion;
   const qualityCompletion = readiness.qualityCompletion;
-  const activeStepId =
-    prepSteps.find((step) => !completion[step.id])?.id ||
-    prepSteps.find((step) => !qualityCompletion[step.id])?.id ||
-    "summary";
-  const displayedPrepStepId = selectedPrepStepId || activeStepId;
+  const displayedPrepStepId = selectedPrepStepId || "objective";
   const allPrepSteps = [...prepSteps, prepReviewStep];
   const displayedPrepStepIndex = Math.max(0, allPrepSteps.findIndex((step) => step.id === displayedPrepStepId));
   const displayedPrepStep = allPrepSteps[displayedPrepStepIndex] || prepReviewStep;
@@ -153,7 +150,7 @@ export function CaseBrief({
     ? preparationWeak
       ? "Tu preparación permite iniciar, pero hay aspectos que conviene fortalecer. Puedes mejorarla o continuar de todos modos."
       : assistantMessages.ready
-    : assistantMessages[activeStepId] || assistantMessages.summary;
+    : assistantMessages[displayedPrepStepId] || assistantMessages.summary;
   const proposedSessionCount =
     Number(preSessionPlan?.proposedSessionCount) || totalSessions || SESSION_COUNT_LIMITS.defaultValue;
   const planBelowCompletedSessions = Number(proposedSessionCount) < Number(completedSessionCount || 0);
@@ -164,7 +161,8 @@ export function CaseBrief({
 
   useEffect(() => {
     setLanguagePreference(getClinicalTermPreference(caseItem.id));
-    setSelectedPrepStepId(null);
+    setSelectedPrepStepId("objective");
+    setPrepStepFeedback(null);
     setShowWeakPreparationWarning(false);
     setDraftStatus(null);
     restoredDraftRef.current = false;
@@ -258,6 +256,7 @@ export function CaseBrief({
   function updatePlan(patch) {
     if (!onPreSessionPlanChange) return;
     setShowWeakPreparationWarning(false);
+    setPrepStepFeedback(null);
     onPreSessionPlanChange({
       ...preSessionPlan,
       ...patch
@@ -331,6 +330,87 @@ export function CaseBrief({
     return "pending";
   }
 
+  function getPrepStepValidation(stepId = displayedPrepStepId) {
+    if (stepId === "objective") {
+      return hasSufficientPreparationText(preSessionPlan?.evaluationObjective)
+        ? { ok: true }
+        : {
+            ok: false,
+            message: "Desarrolla un poco más el objetivo inicial antes de avanzar."
+          };
+    }
+
+    if (stepId === "process") {
+      const proposedCount = Number(preSessionPlan?.proposedSessionCount);
+      const countIsValid =
+        Number.isFinite(proposedCount) &&
+        proposedCount >= SESSION_COUNT_LIMITS.min &&
+        proposedCount <= SESSION_COUNT_LIMITS.max;
+
+      if (!countIsValid) {
+        return {
+          ok: false,
+          message: `Elige una cantidad entre ${SESSION_COUNT_LIMITS.min} y ${SESSION_COUNT_LIMITS.max} sesiones.`
+        };
+      }
+
+      if (!hasSufficientPreparationText(preSessionPlan?.sessionCountJustification)) {
+        return {
+          ok: false,
+          message: "Agrega una justificación breve de la cantidad de sesiones antes de avanzar."
+        };
+      }
+
+      return hasSufficientPreparationText(preSessionPlan?.processObjectives)
+        ? { ok: true }
+        : {
+            ok: false,
+            message: "Define brevemente los objetivos del proceso antes de avanzar."
+          };
+    }
+
+    if (stepId === "interview") {
+      if (!preSessionPlan?.interviewType) {
+        return { ok: false, message: "Selecciona un tipo de entrevista antes de avanzar." };
+      }
+
+      return hasSufficientPreparationText(preSessionPlan?.interviewJustification)
+        ? { ok: true }
+        : {
+            ok: false,
+            message: "Justifica brevemente por qué esta modalidad es adecuada antes de avanzar."
+          };
+    }
+
+    if (stepId === "areas") {
+      return selectedAreas.length >= 4
+        ? { ok: true }
+        : { ok: false, message: "Selecciona al menos 4 áreas prioritarias antes de avanzar." };
+    }
+
+    if (stepId === "ethics") {
+      const minimumCareItems = Math.min(3, ethicalCareChecklist.length);
+      return selectedCareItems.length >= minimumCareItems
+        ? { ok: true }
+        : { ok: false, message: "Marca los cuidados éticos principales antes de avanzar." };
+    }
+
+    if (stepId === "priority") {
+      return hasSufficientPreparationText(preSessionPlan?.priorityInformation)
+        ? { ok: true }
+        : {
+            ok: false,
+            message: "Desarrolla un poco más la información clave antes de avanzar."
+          };
+    }
+
+    if (stepId === "summary" && !requiredComplete) {
+      return { ok: false, message: "Completa los pasos pendientes antes de iniciar la entrevista." };
+    }
+
+    return { ok: true };
+  }
+
   function getPrepStepStatusLabel(status) {
     if (status === "completed") return "Completado";
     if (status === "weak") return "Mejorar";
@@ -340,12 +420,41 @@ export function CaseBrief({
 
   function goToPreviousPrepStep() {
     const previousStep = allPrepSteps[displayedPrepStepIndex - 1];
-    if (previousStep) setSelectedPrepStepId(previousStep.id);
+    if (previousStep) {
+      setPrepStepFeedback(null);
+      setSelectedPrepStepId(previousStep.id);
+    }
   }
 
   function goToNextPrepStep() {
     const nextStep = allPrepSteps[displayedPrepStepIndex + 1];
-    if (nextStep) setSelectedPrepStepId(nextStep.id);
+    if (nextStep) {
+      setPrepStepFeedback(null);
+      setSelectedPrepStepId(nextStep.id);
+    }
+  }
+
+  function handlePrepStepSelect(stepId, stepIndex) {
+    if (stepIndex <= displayedPrepStepIndex) {
+      setPrepStepFeedback(null);
+      setSelectedPrepStepId(stepId);
+      return;
+    }
+
+    setPrepStepFeedback({
+      type: "warning",
+      message: "Usa Guardar avance / Siguiente paso para avanzar sin saltarte la validación."
+    });
+  }
+
+  function handlePrepNextClick() {
+    const validation = getPrepStepValidation(displayedPrepStepId);
+    if (!validation.ok) {
+      setPrepStepFeedback({ type: "warning", message: validation.message });
+      return;
+    }
+
+    goToNextPrepStep();
   }
 
   function renderPreparationStepContent() {
@@ -978,7 +1087,7 @@ export function CaseBrief({
                       className={`prep-step ${status} ${isActive ? "is-active" : ""}`}
                       type="button"
                       key={step.id}
-                      onClick={() => setSelectedPrepStepId(step.id)}
+                      onClick={() => handlePrepStepSelect(step.id, index)}
                       aria-current={isActive ? "step" : undefined}
                     >
                       <span className="prep-step-index">{index + 1}</span>
@@ -994,6 +1103,12 @@ export function CaseBrief({
                 <h3>{displayedPrepStep.label}</h3>
                 <p>{displayedPrepStep.hint}</p>
               </div>
+
+              {prepStepFeedback && (
+                <div className={`prep-step-feedback ${prepStepFeedback.type || "warning"}`} role="alert">
+                  {prepStepFeedback.message}
+                </div>
+              )}
 
               <div className={`prep-assistant-card ${assistantVisible ? "visible" : "minimized"}`}>
                 <div className="prep-assistant-orb" aria-hidden="true">
@@ -1049,7 +1164,7 @@ export function CaseBrief({
                     Iniciar entrevista con {caseItem.name}
                   </button>
                 ) : (
-                  <button className="primary-action" type="button" onClick={goToNextPrepStep}>
+                  <button className="primary-action" type="button" onClick={handlePrepNextClick}>
                     Guardar avance / Siguiente paso
                   </button>
                 )}
@@ -1081,6 +1196,23 @@ const DEFAULT_PREPARATION_AREAS = new Set([
   "red_apoyo",
   "riesgo"
 ]);
+
+const INSUFFICIENT_PREPARATION_ANSWERS = new Set(["a", "ok", "si", "no", "na", "n/a"]);
+
+function hasSufficientPreparationText(value, { minChars = 20, minWords = 4 } = {}) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+
+  const normalized = text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (INSUFFICIENT_PREPARATION_ANSWERS.has(normalized)) return false;
+
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return text.length >= minChars || wordCount >= minWords;
+}
 
 function hasMeaningfulPreSessionDraft(plan = null) {
   if (!plan || typeof plan !== "object") return false;
