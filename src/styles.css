@@ -829,6 +829,38 @@ a {
   color: #52606d;
 }
 
+.draft-autosave-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 10px;
+  padding: 7px 11px;
+  border: 1px solid #cfe7e8;
+  border-radius: 999px;
+  background: #f3fbfb;
+  color: #24545a;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.draft-autosave-status.pending {
+  border-color: #ead6a8;
+  background: #fff9ea;
+  color: #7a5a13;
+}
+
+.draft-autosave-status.restored {
+  border-color: #c5d8f2;
+  background: #f1f6ff;
+  color: #244a73;
+}
+
+.draft-autosave-status.saved {
+  border-color: #cce7d7;
+  background: #f2fbf6;
+  color: #22613a;
+}
+
 .case-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

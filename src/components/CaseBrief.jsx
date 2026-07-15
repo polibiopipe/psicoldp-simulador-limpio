@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -22,6 +22,12 @@ import {
   getClinicalTermPreference,
   saveClinicalTermPreference
 } from "../engine/clinicalLanguage.js";
+import {
+  buildClinicalDraftKey,
+  clearClinicalDraft,
+  loadClinicalDraft,
+  saveClinicalDraft
+} from "../engine/clinicalDraftAutosave.js";
 
 const prepSteps = [
   { id: "objective", label: "Objetivo inicial", hint: "Qué necesitas comprender primero." },
@@ -72,6 +78,9 @@ export function CaseBrief({
   totalSessions = SESSION_COUNT_LIMITS.defaultValue,
   completedSessionCount = 0,
   preSessionPlan,
+  userId = "",
+  userEmail = "",
+  sessionRecordId = "",
   onBack,
   onBegin,
   onSelectSession,
@@ -80,8 +89,24 @@ export function CaseBrief({
   const [assistantVisible, setAssistantVisible] = useState(true);
   const [showWeakPreparationWarning, setShowWeakPreparationWarning] = useState(false);
   const [selectedPrepStepId, setSelectedPrepStepId] = useState(null);
+  const [draftStatus, setDraftStatus] = useState(null);
+  const restoredDraftRef = useRef(false);
+  const stableSessionRecordIdRef = useRef(sessionRecordId);
   const [languagePreference, setLanguagePreference] = useState(() => getClinicalTermPreference(caseItem.id));
   const termCopy = getClinicalTermCopy(languagePreference);
+  if (sessionRecordId) stableSessionRecordIdRef.current = sessionRecordId;
+  const preparationDraftKey = useMemo(
+    () =>
+      buildClinicalDraftKey({
+        userId,
+        userEmail,
+        caseId: caseItem.id,
+        sessionId: stableSessionRecordIdRef.current,
+        sessionNumber,
+        step: "preparation"
+      }),
+    [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
+  );
   const readiness = evaluatePreSessionReadiness(preSessionPlan, { languagePreference });
   const completion = readiness.requiredCompletion;
   const qualityCompletion = readiness.qualityCompletion;
@@ -122,7 +147,54 @@ export function CaseBrief({
     setLanguagePreference(getClinicalTermPreference(caseItem.id));
     setSelectedPrepStepId(null);
     setShowWeakPreparationWarning(false);
+    setDraftStatus(null);
+    restoredDraftRef.current = false;
   }, [caseItem.id, sessionNumber]);
+
+  useEffect(() => {
+    if (!preSessionPlan || !onPreSessionPlanChange) return;
+    const draft = loadClinicalDraft(preparationDraftKey);
+    if (!hasMeaningfulPreSessionDraft(draft) || hasMeaningfulPreSessionDraft(preSessionPlan)) return;
+
+    restoredDraftRef.current = true;
+    setDraftStatus({ type: "restored", message: "Recuperamos tu borrador." });
+    onPreSessionPlanChange({
+      ...preSessionPlan,
+      ...draft,
+      caseId: caseItem.id,
+      sessionNumber
+    });
+  }, [preparationDraftKey]);
+
+  useEffect(() => {
+    if (!preSessionPlan || !hasMeaningfulPreSessionDraft(preSessionPlan)) return undefined;
+
+    if (!restoredDraftRef.current) {
+      setDraftStatus({ type: "pending", message: "Cambios pendientes de guardar." });
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const result = saveClinicalDraft(preparationDraftKey, preSessionPlan);
+      if (result.ok) {
+        setDraftStatus({ type: "saved", message: "Borrador guardado." });
+      }
+      restoredDraftRef.current = false;
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [preparationDraftKey, preSessionPlan]);
+
+  useEffect(() => {
+    if (!hasMeaningfulPreSessionDraft(preSessionPlan)) return undefined;
+
+    function warnBeforeUnload(event) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [preSessionPlan]);
 
   function updatePlan(patch) {
     if (!onPreSessionPlanChange) return;
@@ -174,6 +246,8 @@ export function CaseBrief({
 
   function beginWithPreparationState(overrideUsed = false) {
     if (!onBegin) return;
+    clearClinicalDraft(preparationDraftKey);
+    setDraftStatus(null);
     onBegin({
       preparationQuality: preparationWeak ? "debil" : "suficiente",
       preparationOverrideUsed: Boolean(overrideUsed),
@@ -725,6 +799,11 @@ export function CaseBrief({
                   compact
                   className="prep-context-guide"
                 />
+                {draftStatus && (
+                  <div className={`draft-autosave-status ${draftStatus.type}`} role="status">
+                    {draftStatus.message}
+                  </div>
+                )}
               </div>
 
               <div className="prep-workflow-stepper" aria-label="Avance de preparacion">
@@ -805,6 +884,39 @@ export function CaseBrief({
   );
 }
 
+const DEFAULT_PREPARATION_AREAS = new Set([
+  "motivo_consulta",
+  "estado_emocional",
+  "funcionamiento_diario",
+  "red_apoyo",
+  "riesgo"
+]);
+
+function hasMeaningfulPreSessionDraft(plan = null) {
+  if (!plan || typeof plan !== "object") return false;
+  const textFields = [
+    plan.evaluationObjective,
+    plan.sessionCountJustification,
+    plan.processObjectives,
+    plan.interviewJustification,
+    plan.priorityInformation,
+    plan.clinicalLanguageCustomTerm
+  ];
+  if (textFields.some(hasText)) return true;
+  if (Array.isArray(plan.ethicalCareItems) && plan.ethicalCareItems.length > 0) return true;
+  if (Array.isArray(plan.explorationAreas) && hasNonDefaultAreaSelection(plan.explorationAreas)) return true;
+  return false;
+}
+
+function hasNonDefaultAreaSelection(areas = []) {
+  if (!Array.isArray(areas)) return false;
+  if (areas.length !== DEFAULT_PREPARATION_AREAS.size) return true;
+  return areas.some((area) => !DEFAULT_PREPARATION_AREAS.has(area));
+}
+
+function hasText(value) {
+  return String(value || "").trim().length > 0;
+}
 
 function getInterviewTypeLabel(value) {
   return interviewTypeOptions.find((option) => option.value === value)?.label || "Pendiente";

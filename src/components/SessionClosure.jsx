@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -39,6 +39,12 @@ import {
   normalizeClinicalArtifacts
 } from "../engine/clinicalArtifacts.js";
 import { buildSimulatedExternalReport } from "../engine/clinicalComplementaryEvaluation.js";
+import {
+  buildClinicalDraftKey,
+  clearClinicalDraft,
+  loadClinicalDraft,
+  saveClinicalDraft
+} from "../engine/clinicalDraftAutosave.js";
 import { clinicalInstrumentOptions } from "../data/clinicalWorkflow.js";
 import { NextSessionModal } from "./NextSessionModal.jsx";
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
@@ -51,6 +57,9 @@ export function SessionClosure({
   totalSessions = 4,
   previousSessionSummaries = [],
   preSessionPlan = null,
+  userId = "",
+  userEmail = "",
+  sessionRecordId = "",
   onContinueSession,
   onBackHome,
   onSaveSessionRecord
@@ -60,7 +69,36 @@ export function SessionClosure({
   const [processCopied, setProcessCopied] = useState(false);
   const [hasSavedSessionRecord, setHasSavedSessionRecord] = useState(false);
   const [clinicalArtifacts, setClinicalArtifacts] = useState(() => buildInitialClinicalArtifacts());
+  const [draftStatus, setDraftStatus] = useState(null);
+  const restoredDraftRef = useRef(false);
+  const hydratingDraftRef = useRef(true);
+  const stableSessionRecordIdRef = useRef(sessionRecordId);
   const sessionPlan = useMemo(() => getClinicalSessionPlan(caseItem), [caseItem.id]);
+  if (sessionRecordId) stableSessionRecordIdRef.current = sessionRecordId;
+  const decisionDraftKey = useMemo(
+    () =>
+      buildClinicalDraftKey({
+        userId,
+        userEmail,
+        caseId: caseItem.id,
+        sessionId: stableSessionRecordIdRef.current,
+        sessionNumber,
+        step: "closure-decision"
+      }),
+    [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
+  );
+  const artifactsDraftKey = useMemo(
+    () =>
+      buildClinicalDraftKey({
+        userId,
+        userEmail,
+        caseId: caseItem.id,
+        sessionId: stableSessionRecordIdRef.current,
+        sessionNumber,
+        step: "closure-artifacts"
+      }),
+    [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
+  );
   const [clinicalDecision, setClinicalDecision] = useState(() =>
     buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan })
   );
@@ -163,10 +201,78 @@ export function SessionClosure({
   ].join("|");
 
   useEffect(() => {
-    setClinicalDecision(buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan }));
-    setClinicalArtifacts(buildInitialClinicalArtifacts());
+    hydratingDraftRef.current = true;
+    const initialDecision = buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan });
+    const initialArtifacts = buildInitialClinicalArtifacts();
+    const decisionDraft = loadClinicalDraft(decisionDraftKey);
+    const artifactsDraft = loadClinicalDraft(artifactsDraftKey);
+    const hasDecisionDraft = hasMeaningfulClinicalDecisionDraft(decisionDraft, initialDecision);
+    const hasArtifactsDraft = hasMeaningfulClinicalArtifactsDraft(artifactsDraft);
+
+    setClinicalDecision(hasDecisionDraft ? { ...initialDecision, ...decisionDraft } : initialDecision);
+    setClinicalArtifacts(hasArtifactsDraft ? mergeClinicalArtifactsDraft(initialArtifacts, artifactsDraft) : initialArtifacts);
     setHasSavedSessionRecord(false);
-  }, [caseItem.id, sessionNumber, sessionPlan, preSessionPlanKey]);
+    restoredDraftRef.current = hasDecisionDraft || hasArtifactsDraft;
+    setDraftStatus(
+      restoredDraftRef.current
+        ? { type: "restored", message: "Recuperamos tu borrador." }
+        : null
+    );
+  }, [caseItem.id, sessionNumber, sessionPlan, preSessionPlanKey, decisionDraftKey, artifactsDraftKey]);
+
+  useEffect(() => {
+    if (hydratingDraftRef.current) {
+      hydratingDraftRef.current = false;
+      return undefined;
+    }
+
+    const initialDecision = buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan });
+    const hasDecisionDraft = hasMeaningfulClinicalDecisionDraft(clinicalDecision, initialDecision);
+    const hasArtifactsDraft = hasMeaningfulClinicalArtifactsDraft(clinicalArtifacts);
+
+    if (!hasDecisionDraft) clearClinicalDraft(decisionDraftKey);
+    if (!hasArtifactsDraft) clearClinicalDraft(artifactsDraftKey);
+    if (!hasDecisionDraft && !hasArtifactsDraft) return undefined;
+
+    if (!restoredDraftRef.current) {
+      setDraftStatus({ type: "pending", message: "Cambios pendientes de guardar." });
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      if (hasDecisionDraft) saveClinicalDraft(decisionDraftKey, clinicalDecision);
+      if (hasArtifactsDraft) saveClinicalDraft(artifactsDraftKey, clinicalArtifacts);
+      setDraftStatus({ type: "saved", message: "Borrador guardado." });
+      restoredDraftRef.current = false;
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    decisionDraftKey,
+    artifactsDraftKey,
+    clinicalDecision,
+    clinicalArtifacts,
+    sessionNumber,
+    sessionPlan,
+    preSessionPlan
+  ]);
+
+  useEffect(() => {
+    const initialDecision = buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan });
+    const shouldWarn =
+      !hasSavedSessionRecord &&
+      (hasMeaningfulClinicalDecisionDraft(clinicalDecision, initialDecision) ||
+        hasMeaningfulClinicalArtifactsDraft(clinicalArtifacts));
+
+    if (!shouldWarn) return undefined;
+
+    function warnBeforeUnload(event) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [hasSavedSessionRecord, clinicalDecision, clinicalArtifacts, sessionNumber, sessionPlan, preSessionPlan]);
 
   function updateDecision(patch) {
     setClinicalDecision((current) => ({
@@ -250,6 +356,11 @@ export function SessionClosure({
       });
       setHasSavedSessionRecord(true);
     }
+    if (includeHistory) {
+      clearClinicalDraft(decisionDraftKey);
+      clearClinicalDraft(artifactsDraftKey);
+      setDraftStatus({ type: "saved", message: "Cambios guardados." });
+    }
   }
 
   async function continueToNextSession() {
@@ -298,6 +409,11 @@ export function SessionClosure({
           Puedes continuar evaluando, solicitar informacion complementaria o iniciar
           diseno de intervencion si la comprension clinica ya es suficiente.
         </p>
+        {draftStatus && (
+          <div className={`draft-autosave-status ${draftStatus.type}`} role="status">
+            {draftStatus.message}
+          </div>
+        )}
       </header>
 
       {interviewTurns.length < 3 && (
@@ -1160,4 +1276,91 @@ export function SessionClosure({
       />
     </section>
   );
+}
+
+function mergeClinicalArtifactsDraft(base = {}, draft = {}) {
+  if (!draft || typeof draft !== "object") return base;
+  return {
+    ...base,
+    ...draft,
+    complementaryEvaluation: {
+      ...(base.complementaryEvaluation || {}),
+      ...(draft.complementaryEvaluation || {}),
+      integration: {
+        ...(base.complementaryEvaluation?.integration || {}),
+        ...(draft.complementaryEvaluation?.integration || {})
+      }
+    },
+    interventionDesign: {
+      ...(base.interventionDesign || {}),
+      ...(draft.interventionDesign || {})
+    }
+  };
+}
+
+function hasMeaningfulClinicalDecisionDraft(decision = null, initialDecision = {}) {
+  if (!decision || typeof decision !== "object") return false;
+  const textFields = [
+    decision.justification,
+    decision.knownInformation,
+    decision.missingInformation,
+    decision.ethicalConsiderations,
+    decision.nextSessionObjectives,
+    decision.pendingRisks
+  ];
+  if (textFields.some(hasText)) return true;
+  if (decision.action && decision.action !== initialDecision.action) return true;
+  if (
+    Number(decision.proposedSessions) > 0 &&
+    Number(decision.proposedSessions) !== Number(initialDecision.proposedSessions)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function hasMeaningfulClinicalArtifactsDraft(artifacts = null) {
+  if (!artifacts || typeof artifacts !== "object") return false;
+  const baseTextFields = [
+    artifacts.clinicalHypothesis,
+    artifacts.supportingData,
+    artifacts.missingData,
+    artifacts.instrumentJustification,
+    artifacts.initialFeedbackDraft,
+    artifacts.clinicalNote
+  ];
+  if (baseTextFields.some(hasText)) return true;
+  if (Array.isArray(artifacts.selectedInstruments) && artifacts.selectedInstruments.length > 0) return true;
+  if (hasMeaningfulComplementaryEvaluationDraft(artifacts.complementaryEvaluation)) return true;
+  if (hasMeaningfulObjectText(artifacts.interventionDesign)) return true;
+  return false;
+}
+
+function hasMeaningfulComplementaryEvaluationDraft(value = null) {
+  if (!value || typeof value !== "object") return false;
+  const fields = [
+    value.instrumentId,
+    value.justification,
+    value.hypothesis,
+    value.expectedInformation,
+    value.agePertinence,
+    value.integrationPlan
+  ];
+  if (fields.some(hasText)) return true;
+  if (value.report) return true;
+  if (value.status && value.status !== "draft") return true;
+  return hasMeaningfulObjectText(value.integration);
+}
+
+function hasMeaningfulObjectText(value = null) {
+  if (!value || typeof value !== "object") return false;
+  return Object.values(value).some((item) => {
+    if (Array.isArray(item)) return item.length > 0;
+    if (item && typeof item === "object") return hasMeaningfulObjectText(item);
+    return hasText(item);
+  });
+}
+
+function hasText(value) {
+  return String(value || "").trim().length > 0;
 }
