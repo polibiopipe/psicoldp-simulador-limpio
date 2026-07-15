@@ -9174,3 +9174,180 @@ body,
     white-space: normal;
   }
 }
+
+/* Fine polish for the clinical antechamber */
+.interview-antechamber-header {
+  align-items: center;
+  padding-top: 4px;
+}
+
+.interview-antechamber-header > div {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 520px;
+}
+
+.interview-antechamber-header .eyebrow {
+  color: #176d75;
+  letter-spacing: 0.07em;
+}
+
+.interview-antechamber-header h1 {
+  margin: 0;
+}
+
+.interview-antechamber-header .case-practice-label {
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(23, 109, 117, 0.14);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #38515a;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  font-weight: 780;
+  line-height: 1.25;
+}
+
+.interview-antechamber-header .text-action {
+  align-self: center;
+  border: 1px solid rgba(15, 43, 70, 0.1);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #40545d;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.82rem;
+}
+
+.antechamber-case-file {
+  gap: 10px;
+  padding: 14px;
+}
+
+.antechamber-patient-strip {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.antechamber-patient-strip img {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+}
+
+.antechamber-patient-strip .eyebrow,
+.antechamber-brief-block > span {
+  color: #1d6b72;
+  font-size: 0.66rem;
+  letter-spacing: 0.055em;
+}
+
+.antechamber-patient-strip h2 {
+  font-size: 1.12rem;
+}
+
+.antechamber-brief-block,
+.antechamber-session-block {
+  gap: 6px;
+  padding-top: 9px;
+}
+
+.antechamber-brief-block ul {
+  gap: 5px;
+}
+
+.antechamber-brief-block li,
+.antechamber-brief-block p {
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.antechamber-meta-grid span {
+  padding: 6px 8px;
+  font-size: 0.74rem;
+}
+
+.antechamber-session-block h3 {
+  font-size: 0.86rem;
+}
+
+.antechamber-progress-card {
+  gap: 9px;
+  border-color: rgba(23, 109, 117, 0.11);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.antechamber-progress-card h2 {
+  font-size: 1.28rem;
+}
+
+.interview-antechamber-screen .clinical-preparation-panel {
+  gap: 14px;
+  padding: clamp(17px, 2.1vw, 24px);
+}
+
+.interview-antechamber-screen .clinical-prep-hero {
+  border-bottom: 1px solid rgba(15, 43, 70, 0.08);
+  padding-bottom: 10px;
+}
+
+.interview-antechamber-screen .clinical-prep-hero h2 {
+  margin-bottom: 5px;
+  font-size: clamp(1.28rem, 1.8vw, 1.62rem);
+}
+
+.interview-antechamber-screen .prep-workflow-stepper {
+  margin-top: 2px;
+}
+
+.interview-antechamber-screen .prep-step {
+  min-width: 0;
+}
+
+.interview-antechamber-screen .prep-step strong {
+  min-width: 0;
+}
+
+.prep-active-step-heading {
+  margin-top: 2px;
+  padding-bottom: 11px;
+}
+
+.interview-antechamber-screen .prep-assistant-card.minimized {
+  max-width: 100%;
+}
+
+.interview-antechamber-screen .prep-assistant-show {
+  color: #176d75;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.interview-antechamber-screen .clinical-prep-field textarea {
+  min-height: 150px;
+  overflow: auto;
+}
+
+.interview-antechamber-screen .clinical-prep-field select,
+.interview-antechamber-screen .clinical-prep-field input,
+.interview-antechamber-screen .clinical-prep-field textarea {
+  font-size: 0.88rem;
+}
+
+.prep-step-actions .primary-action {
+  padding-inline: 14px;
+}
+
+@media (max-width: 760px) {
+  .interview-antechamber-header .text-action {
+    justify-self: start;
+  }
+
+  .interview-antechamber-header .case-practice-label {
+    border-radius: 12px;
+    white-space: normal;
+  }
+
+  .interview-antechamber-screen .clinical-prep-field textarea {
+    min-height: 140px;
+  }
+}

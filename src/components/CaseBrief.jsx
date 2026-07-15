@@ -693,12 +693,12 @@ export function CaseBrief({
     <section className="screen interview-antechamber-screen">
       <header className="interview-antechamber-header">
         <div>
-          <span className="eyebrow">Escucha Viva - Entrevista PsicolÃ³gica Formativa</span>
+          <span className="eyebrow">Escucha Viva · Entrevista Psicológica Formativa</span>
           <h1>{caseItem.name}</h1>
           <span className="case-practice-label">
             {sessionNumber === 1
-              ? `Entrevista inicial simulada - SesiÃ³n ${sessionNumber} de ${proposedSessionCount}`
-              : `SesiÃ³n ${sessionNumber} de ${proposedSessionCount} - Continuidad simulada`}
+              ? `Entrevista inicial simulada · Sesión ${sessionNumber} de ${proposedSessionCount}`
+              : `Sesión ${sessionNumber} de ${proposedSessionCount} · Continuidad simulada`}
           </span>
         </div>
         <button className="text-action" type="button" onClick={onBack}>
@@ -709,14 +709,14 @@ export function CaseBrief({
 
       <div className="brief-layout preparation-brief-layout">
         <div className="brief-sidebar-stack">
-          <aside className="antechamber-case-file" aria-label="Ficha clÃ­nica resumida">
+          <aside className="antechamber-case-file" aria-label="Ficha clínica resumida">
             <div className="antechamber-patient-strip">
               <img
                 src={caseItem.image || "/avatar/placeholder.png"}
                 alt={`Retrato ficticio de ${caseItem.name}`}
               />
               <div>
-                <span className="eyebrow">Ficha de consulta rÃ¡pida</span>
+                <span className="eyebrow">Ficha de consulta rápida</span>
                 <h2>{caseItem.name}</h2>
                 <p>{caseItem.age}</p>
               </div>
@@ -735,7 +735,7 @@ export function CaseBrief({
             <div className="antechamber-session-block">
               <div className="panel-heading">
                 <ClipboardList aria-hidden="true" />
-                <h3>Tipo de sesiÃ³n</h3>
+                <h3>Tipo de sesión</h3>
               </div>
               <SessionSelector
                 currentSession={sessionNumber}
@@ -745,8 +745,8 @@ export function CaseBrief({
               />
               <p className="session-note">
                 {sessionSummary
-                  ? "Existe continuidad clÃ­nica simulada para esta sesiÃ³n."
-                  : "Antes de entrar al encuentro, ordena el foco inicial de exploraciÃ³n."}
+                  ? "Existe continuidad clínica simulada para esta sesión."
+                  : "Antes de entrar al encuentro, ordena el foco inicial de exploración."}
               </p>
             </div>
 
@@ -755,12 +755,12 @@ export function CaseBrief({
                 <span>Continuidad disponible</span>
                 <ul>
                   {previousClinicalDecision && (
-                    <li>DecisiÃ³n previa: {previousClinicalDecision.action || "registrada"}.</li>
+                    <li>Decisión previa: {previousClinicalDecision.action || "registrada"}.</li>
                   )}
                   {previousExternalReport && (
                     <li>
                       Informe externo: {previousExternalReport.requestedInstrument?.name ||
-                        previousExternalReport.caseData?.instrument || "evaluaciÃ³n complementaria simulada"}.
+                        previousExternalReport.caseData?.instrument || "evaluación complementaria simulada"}.
                     </li>
                   )}
                   {previousPendingTopics.slice(0, 2).map((item) => (
@@ -799,7 +799,7 @@ export function CaseBrief({
           </aside>
 
           {preSessionPlan && (
-            <aside className="prep-sidebar-card" aria-label="Progreso de preparación">
+            <aside className="prep-sidebar-card antechamber-progress-card" aria-label="Progreso de preparación">
               <div>
                 <span className="eyebrow">Preparación</span>
                 <h2>{prepProgressPercent}% listo</h2>
