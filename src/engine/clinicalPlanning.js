@@ -6,7 +6,7 @@ export const CLINICAL_DECISION_OPTIONS = [
     value: "continue_evaluation",
     label: "Continuar evaluacion clinica",
     shortLabel: "Continuar evaluacion",
-    description: "Aun falta informacion relevante antes de intervenir o cerrar."
+    description: "Aún falta información relevante antes de intervenir o cerrar."
   },
   {
     value: "request_complementary_evaluation",
@@ -16,33 +16,33 @@ export const CLINICAL_DECISION_OPTIONS = [
   },
   {
     value: "start_intervention_design",
-    label: "Iniciar diseno de intervencion",
-    shortLabel: "Diseno de intervencion",
-    description: "Ya existe comprension clinica suficiente para proponer objetivos y plan aplicado."
+    label: "Iniciar diseño de intervención",
+    shortLabel: "Diseño de intervención",
+    description: "Ya existe comprensión clínica suficiente para proponer objetivos y plan aplicado."
   },
   {
     value: "reformulate_hypothesis",
     label: "Reformular hipotesis clinica",
     shortLabel: "Reformulacion",
-    description: "La informacion disponible obliga a ajustar la comprension inicial del caso."
+    description: "La información disponible obliga a ajustar la comprensión inicial del caso."
   },
   {
     value: "close_or_refer",
     label: "Cerrar proceso o derivar",
     shortLabel: "Cierre o derivacion",
-    description: "La informacion disponible permite cerrar pedagogicamente o justificar derivacion."
+    description: "La información disponible permite cerrar pedagógicamente o justificar derivación."
   },
   {
     value: "additional_evaluation_session",
-    label: "Continuar con una sesion adicional de evaluacion",
-    shortLabel: "Sesion adicional",
-    description: "Se justifica otra sesion evaluativa antes de intervenir, cerrar o derivar."
+    label: "Continuar con una sesión adicional de evaluación",
+    shortLabel: "Sesión adicional",
+    description: "Se justifica otra sesión evaluativa antes de intervenir, cerrar o derivar."
   }
 ];
 
 const LEGACY_DECISION_LABELS = {
   close_process: { shortLabel: "Cierre", label: "Cerrar el proceso simulado" },
-  continue_session: { shortLabel: "Continuidad", label: "Agendar una nueva sesion" },
+  continue_session: { shortLabel: "Continuidad", label: "Agendar una nueva sesión" },
   refer: { shortLabel: "Derivacion", label: "Derivar a otro profesional o dispositivo" },
   risk_protocol: { shortLabel: "Riesgo", label: "Activar protocolo de riesgo" },
   request_supervision: { shortLabel: "Supervision", label: "Solicitar supervision" },
@@ -81,7 +81,7 @@ const FALLBACK_SESSION_PLAN = {
   continueIf: [
     "El motivo de consulta aun no esta delimitado.",
     "No se han explorado red de apoyo, recursos o riesgo.",
-    "Quedan temas relevantes abiertos para una siguiente sesion."
+    "Quedan temas relevantes abiertos para una siguiente sesión."
   ],
   closeIf: [
     "El motivo de consulta queda claro.",
@@ -193,10 +193,10 @@ export function buildContinuityAgreement({ decision, sessionPlan, fallbackAgreem
   if (decisionAllowsNextSession(normalized.action)) {
     return [
       `Decision del estudiante: ${label}.`,
-      `Propone un total de ${normalized.proposedSessions} sesion(es) dentro del simulador.`,
+      `Propone un total de ${normalized.proposedSessions} sesión(es) dentro del simulador.`,
       normalized.justification ? `Justificacion: ${normalized.justification}` : "",
-      normalized.knownInformation ? `Informacion clinica disponible: ${normalized.knownInformation}` : "",
-      normalized.missingInformation ? `Informacion faltante: ${normalized.missingInformation}` : "",
+      normalized.knownInformation ? `Información clínica disponible: ${normalized.knownInformation}` : "",
+      normalized.missingInformation ? `Información faltante: ${normalized.missingInformation}` : "",
       normalized.ethicalConsiderations ? `Riesgos o dilemas eticos: ${normalized.ethicalConsiderations}` : "",
       normalized.nextSessionObjectives ? `Objetivos siguientes: ${normalized.nextSessionObjectives}` : "",
       fallbackAgreement ? `Respuesta sugerida del paciente: ${fallbackAgreement}` : ""
@@ -209,8 +209,8 @@ export function buildContinuityAgreement({ decision, sessionPlan, fallbackAgreem
     `Decision del estudiante: ${label}.`,
     `Sesiones propuestas: ${normalized.proposedSessions}.`,
     normalized.justification ? `Justificacion: ${normalized.justification}` : "",
-    normalized.knownInformation ? `Informacion clinica disponible: ${normalized.knownInformation}` : "",
-    normalized.missingInformation ? `Informacion faltante: ${normalized.missingInformation}` : "",
+    normalized.knownInformation ? `Información clínica disponible: ${normalized.knownInformation}` : "",
+    normalized.missingInformation ? `Información faltante: ${normalized.missingInformation}` : "",
     normalized.ethicalConsiderations ? `Riesgos o dilemas eticos: ${normalized.ethicalConsiderations}` : "",
     normalized.nextSessionObjectives ? `Objetivos o pasos siguientes: ${normalized.nextSessionObjectives}` : "",
     normalized.pendingRisks ? `Riesgos o pendientes: ${normalized.pendingRisks}` : ""
@@ -255,15 +255,15 @@ export function evaluateClinicalPlanDecision({
   }
 
   if (hasKnownInformation) {
-    strengths.push("Nombraste informacion clinica ya disponible.");
+    strengths.push("Nombraste información clínica ya disponible.");
   } else {
-    concerns.push("Falta explicitar que informacion clinica ya tienes.");
+    concerns.push("Falta explicitar qué información clínica ya tienes.");
   }
 
   if (hasMissingInformation) {
-    strengths.push("Identificaste informacion faltante antes de decidir.");
+    strengths.push("Identificaste información faltante antes de decidir.");
   } else {
-    concerns.push("Falta registrar que informacion aun necesitas o por que ya no es necesaria.");
+    concerns.push("Falta registrar qué información aún necesitas o por qué ya no es necesaria.");
   }
 
   if (hasEthicalConsiderations) {
@@ -273,14 +273,14 @@ export function evaluateClinicalPlanDecision({
   }
 
   if (proposedInRange) {
-    strengths.push("El numero de sesiones propuesto queda dentro del rango permitido para este proceso simulado.");
+    strengths.push("El número de sesiones propuesto queda dentro del rango permitido para este proceso simulado.");
   } else {
-    concerns.push("El numero de sesiones propuesto queda fuera del rango permitido para el prototipo.");
+    concerns.push("El número de sesiones propuesto queda fuera del rango permitido para el prototipo.");
   }
 
   if (normalized.proposedSessions < completedCount) {
-    concerns.push(`Ya existen ${completedCount} sesiones registradas; reducir el plan no debe borrar ni invalidar memoria clinica previa.`);
-    recommendations.push("Mantener las sesiones realizadas como eventos historicos y ajustar solo las sesiones futuras o el cierre del proceso.");
+    concerns.push(`Ya existen ${completedCount} sesiones registradas; reducir el plan no debe borrar ni invalidar memoria clínica previa.`);
+    recommendations.push("Mantener las sesiones realizadas como eventos históricos y ajustar solo las sesiones futuras o el cierre del proceso.");
   }
 
   if (hasRiskExploration || hasPendingRiskNote) {
@@ -296,7 +296,7 @@ export function evaluateClinicalPlanDecision({
   }
 
   if (normalized.action === "close_process" && sessionNumber < (expected.minimum || 1)) {
-    concerns.push("Cerrar en esta sesion parece apresurado para el minimo sugerido por el caso.");
+    concerns.push("Cerrar en esta sesión parece apresurado para el mínimo sugerido por el caso.");
   }
 
   if (normalized.action === "close_process" && !hasClosure) {
@@ -304,7 +304,7 @@ export function evaluateClinicalPlanDecision({
   }
 
   if (decisionAllowsNextSession(normalized.action) && !hasObjectives) {
-    concerns.push("La continuidad requiere objetivos concretos para la siguiente sesion.");
+    concerns.push("La continuidad requiere objetivos concretos para la siguiente sesión.");
   }
 
   if (normalized.action === "close_or_refer" || normalized.action === "refer" || normalized.action === "risk_protocol") {
@@ -366,16 +366,16 @@ export function evaluateClinicalPlanDecision({
 
 function buildDecisionSummary(decision, level, expected) {
   if (decisionAllowsNextSession(decision.action)) {
-    return `Propusiste continuar hasta ${decision.proposedSessions} sesion(es). La decision es ${level === "achieved" ? "clinicamente razonable" : "formativamente revisable"} segun tu justificacion, los objetivos y los datos explorados.`;
+    return `Propusiste continuar hasta ${decision.proposedSessions} sesión(es). La decisión es ${level === "achieved" ? "clínicamente razonable" : "formativamente revisable"} según tu justificación, los objetivos y los datos explorados.`;
   }
   if (decision.action === "request_complementary_evaluation") {
     return "Propusiste solicitar evaluacion complementaria. La decision debe fundamentar pertinencia, hipotesis, edad, limites e integracion posterior.";
   }
   if (decision.action === "start_intervention_design") {
-    return "Propusiste iniciar diseno de intervencion. Revisa que el plan derive de la entrevista, hipotesis, contexto y datos suficientes.";
+    return "Propusiste iniciar diseño de intervención. Revisa que el plan derive de la entrevista, hipótesis, contexto y datos suficientes.";
   }
   if (decision.action === "reformulate_hypothesis") {
-    return "Propusiste reformular hipotesis. Es pertinente cuando nuevos datos tensionan la comprension inicial del caso.";
+    return "Propusiste reformular hipótesis. Es pertinente cuando nuevos datos tensionan la comprensión inicial del caso.";
   }
   if (decision.action === "close_or_refer" || decision.action === "close_process" || decision.action === "refer") {
     return "Propusiste cerrar o derivar. Revisa que la decision incluya sintesis, riesgo, red de apoyo, limites y proximos pasos.";

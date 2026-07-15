@@ -122,6 +122,8 @@ export function SessionClosure({
   );
   const fallbackAgreement = getNextSessionAgreement(caseItem.id);
   const interviewTurns = history.filter((entry) => !entry.isSessionPrelude);
+  const isNotEvaluable = report.evaluationStatus === "not_evaluable";
+  const isLimitedEvaluation = report.evaluationStatus === "limited";
   const achieved = report.criteria.filter((criterion) => criterion.level === "achieved").length;
   const partial = report.criteria.filter((criterion) => criterion.level === "partial").length;
   const normalizedClinicalDecision = useMemo(
@@ -455,6 +457,54 @@ export function SessionClosure({
     }
   }
 
+  if (isNotEvaluable) {
+    return (
+      <section className="session-closure session-closure-empty" aria-labelledby="session-closure-title">
+        <header className="session-closure-header">
+          <span className="eyebrow">Cierre de sesión</span>
+          <h1 id="session-closure-title">Sesión sin intervenciones suficientes para evaluar</h1>
+          <p>{report.emptySessionMessage}</p>
+        </header>
+
+        <section className="closure-card closure-panel closure-panel-wide">
+          <div className="closure-case-strip">
+            <div>
+              <span>Paciente ficticio</span>
+              <strong>{caseItem.name}</strong>
+            </div>
+            <div>
+              <span>Sesión</span>
+              <strong>{sessionNumber}</strong>
+            </div>
+            <div>
+              <span>Intervenciones</span>
+              <strong>0</strong>
+            </div>
+            <div>
+              <span>Estado</span>
+              <strong>No evaluable</strong>
+            </div>
+          </div>
+          <p>
+            Esta sesión no entrega evaluación formativa porque no hubo intervenciones
+            observables del estudiante.
+          </p>
+          <ul>
+            {report.nextSuggestions.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <div className="closure-action-row">
+            <button className="secondary-action" type="button" onClick={onBackHome}>
+              <Home aria-hidden="true" />
+              Volver al inicio
+            </button>
+          </div>
+        </section>
+      </section>
+    );
+  }
+
   return (
     <section className="session-closure" aria-labelledby="session-closure-title">
       <header className="session-closure-header">
@@ -466,8 +516,8 @@ export function SessionClosure({
         </p>
         <p>
           Las cuatro sesiones son una ruta formativa base, no un cierre obligatorio.
-          Puedes continuar evaluando, solicitar informacion complementaria o iniciar
-          diseno de intervencion si la comprension clinica ya es suficiente.
+          Puedes continuar evaluando, solicitar información complementaria o iniciar
+          diseño de intervención si la comprensión clínica ya es suficiente.
         </p>
         {draftStatus && (
           <div className={`draft-autosave-status ${draftStatus.type}`} role="status">
@@ -480,7 +530,7 @@ export function SessionClosure({
         <details className="closure-stage" open>
           <summary>
             <span>1</span>
-            <strong>Resumen breve de sesion</strong>
+            <strong>Resumen breve de sesión</strong>
             <small>Paciente, turnos, apertura y senales generales del cierre.</small>
           </summary>
           <div className="closure-stage-body">
@@ -508,7 +558,7 @@ export function SessionClosure({
 
             <section className="session-summary-card closure-panel closure-panel-wide">
               <span className="eyebrow">Resumen narrativo</span>
-              <h2>Sesion {summary.sessionNumber} con {summary.patientName}</h2>
+              <h2>Sesión {summary.sessionNumber} con {summary.patientName}</h2>
               <p>{summary.resumenConversacion}</p>
             </section>
           </div>
@@ -521,6 +571,13 @@ export function SessionClosure({
             <small>Indicadores, fortalezas y aspectos prioritarios.</small>
           </summary>
           <div className="closure-stage-body">
+      {isLimitedEvaluation ? (
+        <div className="session-note low-turn-note">
+          Retroalimentación limitada: hubo muy pocas intervenciones para sostener
+          porcentajes o logros robustos. Usa esta devolución como orientación para
+          iniciar mejor el próximo intento.
+        </div>
+      ) : (
       <div className="closure-metrics" aria-label="Métricas de cierre">
         <article>
           <Clock aria-hidden="true" />
@@ -543,6 +600,7 @@ export function SessionClosure({
           <span>apertura</span>
         </article>
       </div>
+      )}
 
       <div className="closure-panels closure-feedback-brief">
         <section className="closure-card closure-panel">
@@ -799,11 +857,11 @@ export function SessionClosure({
             </label>
 
             <label>
-              <span>Que informacion esperas obtener?</span>
+              <span>¿Qué información esperas obtener?</span>
               <textarea
                 value={clinicalArtifacts.complementaryEvaluation?.expectedInformation || ""}
                 onChange={(event) => updateComplementaryEvaluation({ expectedInformation: event.target.value })}
-                placeholder="Nombra informacion especifica que ayudaria a decidir continuidad, derivacion o intervencion."
+                placeholder="Nombra información específica que ayudaría a decidir continuidad, derivación o intervención."
                 rows={2}
               />
             </label>
@@ -912,7 +970,7 @@ export function SessionClosure({
           {complementaryEvaluation.report && (
             <div className="clinical-plan-form">
               <label>
-                <span>Que informacion nueva aporta el informe?</span>
+                <span>¿Qué información nueva aporta el informe?</span>
                 <textarea
                   value={clinicalArtifacts.complementaryEvaluation?.integration?.newInformation || ""}
                   onChange={(event) => updateReportIntegration({ newInformation: event.target.value })}
@@ -928,7 +986,7 @@ export function SessionClosure({
                 />
               </label>
               <label>
-                <span>Que integraras al diseno de intervencion?</span>
+                <span>¿Qué integrarás al diseño de intervención?</span>
                 <textarea
                   value={clinicalArtifacts.complementaryEvaluation?.integration?.interventionUse || ""}
                   onChange={(event) => updateReportIntegration({ interventionUse: event.target.value })}
@@ -984,7 +1042,7 @@ export function SessionClosure({
 
         {(shouldShowInterventionDesign || normalizedClinicalArtifacts.interventionDesign.caseUnderstanding) && (
           <div className="clinical-plan-subpanel">
-            <span className="eyebrow">Diseno de intervencion aplicado al caso</span>
+            <span className="eyebrow">Diseño de intervención aplicado al caso</span>
             <h3>Construir propuesta clinica situada</h3>
             <p>
               Esta pauta no es generica: debe sostenerse en entrevistas realizadas,
@@ -994,7 +1052,7 @@ export function SessionClosure({
 
             <div className="clinical-plan-form">
               {[
-                ["caseUnderstanding", "Comprension del caso"],
+                ["caseUnderstanding", "Comprensión del caso"],
                 ["clinicalFormulation", "Formulacion clinica"],
                 ["objectives", "Objetivos de intervencion"],
                 ["treatmentPlan", "Plan de tratamiento o intervencion"],
@@ -1094,7 +1152,7 @@ export function SessionClosure({
             <h2>Decision sobre continuidad del proceso</h2>
             <p>
               Decide si corresponde cerrar, continuar, derivar o activar una respuesta de
-              riesgo. La cantidad de sesiones es una hipotesis clinica que puedes sostener,
+              riesgo. La cantidad de sesiones es una hipótesis clínica que puedes sostener,
               ajustar o cuestionar durante el proceso.
             </p>
           </div>
@@ -1103,7 +1161,7 @@ export function SessionClosure({
             <strong>
               {plannedSessionTotal}
             </strong>
-            <span>sesion(es)</span>
+            <span>sesión(es)</span>
           </div>
         </div>
 
@@ -1151,20 +1209,20 @@ export function SessionClosure({
             >
               {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
                 <option key={value} value={value}>
-                  {value} sesion{value > 1 ? "es" : ""}
+                  {value} sesión{value > 1 ? "es" : ""}
                 </option>
               ))}
             </select>
             {planBelowCompletedSessions && (
               <div className="prep-plan-memory-warning" role="alert">
-                Ya existen {completedSessionCount} sesiones registradas. No se eliminara
+                Ya existen {completedSessionCount} sesiones registradas. No se eliminará
                 memoria clinica previa; el plan visual se ajustara sin borrar lo trabajado.
               </div>
             )}
           </label>
 
           <label>
-            <span>Por que propones esta cantidad de sesiones?</span>
+            <span>¿Por qué propones esta cantidad de sesiones?</span>
             <textarea
               value={clinicalDecision.justification}
               onChange={(event) => updateDecision({ justification: event.target.value })}
@@ -1174,7 +1232,7 @@ export function SessionClosure({
           </label>
 
           <label>
-            <span>Que informacion clinica ya tienes?</span>
+            <span>¿Qué información clínica ya tienes?</span>
             <textarea
               value={clinicalDecision.knownInformation || ""}
               onChange={(event) => updateDecision({ knownInformation: event.target.value })}
@@ -1184,7 +1242,7 @@ export function SessionClosure({
           </label>
 
           <label>
-            <span>Que informacion consideras que falta?</span>
+            <span>¿Qué información consideras que falta?</span>
             <textarea
               value={clinicalDecision.missingInformation || ""}
               onChange={(event) => updateDecision({ missingInformation: event.target.value })}
@@ -1264,8 +1322,8 @@ export function SessionClosure({
             </p>
           ) : (
             <p>
-              La sesion quedara guardada con tu decision de {formatClinicalDecision(normalizedClinicalDecision).toLowerCase()}.
-              {reachedSessionLimit ? " Ya llegaste a la ultima sesion del proceso que propusiste." : ""}
+              La sesión quedará guardada con tu decisión de {formatClinicalDecision(normalizedClinicalDecision).toLowerCase()}.
+              {reachedSessionLimit ? " Ya llegaste a la última sesión del proceso que propusiste." : ""}
             </p>
           )} 
         </div>
@@ -1278,7 +1336,7 @@ export function SessionClosure({
         <div className="closure-actions">
           {canContinueInSimulator ? (
             <button className="primary-action" type="button" onClick={() => setModalOpen(true)}>
-              Continuar a sesion {nextSessionNumber}
+              Continuar a sesión {nextSessionNumber}
               <ArrowRight aria-hidden="true" />
             </button>
           ) : (

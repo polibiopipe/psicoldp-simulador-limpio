@@ -8,8 +8,76 @@ function CriterionIcon({ level }) {
   return <XCircle className="growth-icon" aria-hidden="true" />;
 }
 
-export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, onRestart, onSelectCase }) {
+export function FeedbackPanel({
+  report,
+  caseItem,
+  history,
+  sessionNumber = 1,
+  onRestart,
+  onBackToInterview,
+  onSelectCase
+}) {
   const visibleHistory = history.filter((entry) => !entry.isSessionPrelude);
+  const isNotEvaluable = report.evaluationStatus === "not_evaluable";
+  const isLimitedEvaluation = report.evaluationStatus === "limited";
+
+  if (isNotEvaluable) {
+    return (
+      <section className="feedback-panel">
+        <header className="section-header">
+          <span className="eyebrow">Informe formativo</span>
+          <h1>Sesión sin intervenciones suficientes para evaluar</h1>
+          <p>{report.emptySessionMessage}</p>
+        </header>
+
+        <section className="feedback-empty-evaluation">
+          <div className="closure-case-strip">
+            <div>
+              <span>Paciente ficticio</span>
+              <strong>{caseItem.name}</strong>
+            </div>
+            <div>
+              <span>Sesión</span>
+              <strong>{sessionNumber}</strong>
+            </div>
+            <div>
+              <span>Intervenciones</span>
+              <strong>0</strong>
+            </div>
+            <div>
+              <span>Estado</span>
+              <strong>No evaluable</strong>
+            </div>
+          </div>
+
+          <div className="feedback-block">
+            <h2>Para recibir retroalimentación</h2>
+            <ul>
+              {report.nextSuggestions.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <div className="action-row">
+          <button className="secondary-action" type="button" onClick={onSelectCase}>
+            Elegir otro caso
+            <ArrowRight aria-hidden="true" />
+          </button>
+          {onBackToInterview && (
+            <button className="secondary-action" type="button" onClick={onBackToInterview}>
+              Volver a entrevista
+            </button>
+          )}
+          <button className="primary-action" type="button" onClick={onRestart}>
+            <RotateCcw aria-hidden="true" />
+            Repetir simulación
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="feedback-panel">
@@ -19,14 +87,17 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
         <p>{report.ethicalNotice}</p>
       </header>
 
-      <section className="feedback-score-card">
+      <section className={`feedback-score-card ${isLimitedEvaluation ? "limited" : ""}`}>
         <div>
-          <span className="eyebrow">Puntaje general formativo</span>
-          <strong>{report.generalScore ?? 0}/100</strong>
+          <span className="eyebrow">
+            {isLimitedEvaluation ? "Retroalimentación limitada" : "Puntaje general formativo"}
+          </span>
+          <strong>{isLimitedEvaluation ? "Sin puntaje robusto" : `${report.generalScore ?? 0}/100`}</strong>
         </div>
         <p>
-          Puntaje orientativo basado en habilidades de entrevista observadas. No equivale
-          a evaluación clínica ni reemplaza supervisión docente.
+          {isLimitedEvaluation
+            ? "Hubo muy poco material conversacional. La devolución orienta el próximo intento, pero no entrega porcentajes robustos."
+            : "Puntaje orientativo basado en habilidades de entrevista observadas. No equivale a evaluación clínica ni reemplaza supervisión docente."}
         </p>
       </section>
 
@@ -121,6 +192,7 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
         </section>
       )}
 
+      {!isLimitedEvaluation && (
       <div className="criteria-list">
         {report.criteria.map((criterion) => (
           <article className={`criterion ${criterion.level}`} key={criterion.id}>
@@ -133,8 +205,9 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
           </article>
         ))}
       </div>
+      )}
 
-      {report.objectiveEvaluation?.length > 0 && (
+      {!isLimitedEvaluation && report.objectiveEvaluation?.length > 0 && (
         <section className="feedback-block">
           <h2>Objetivos del caso</h2>
           <ul className="objective-feedback-list">

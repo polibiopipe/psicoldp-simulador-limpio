@@ -72,9 +72,9 @@ export function evaluateClinicalArtifacts({ artifacts = {}, report = {}, history
   }
 
   if (normalized.missingData.length >= 18) {
-    strengths.push("Identificaste informacion faltante o preguntas pendientes.");
+    strengths.push("Identificaste información faltante o preguntas pendientes.");
   } else {
-    gaps.push("Conviene registrar que informacion aun falta antes de concluir.");
+    gaps.push("Conviene registrar qué información aún falta antes de concluir.");
   }
 
   if (normalized.selectedInstruments.length > 0 && normalized.instrumentJustification.length >= 24) {
@@ -106,7 +106,7 @@ export function evaluateClinicalArtifacts({ artifacts = {}, report = {}, history
   }
 
   if (turnCount < 4 && normalized.clinicalHypothesis.length > 60) {
-    gaps.push("La formulacion puede ser apresurada para la cantidad de informacion recogida.");
+    gaps.push("La formulación puede ser apresurada para la cantidad de información recogida.");
   }
 
   const level = gaps.length <= 1 ? "achieved" : gaps.length <= 3 ? "partial" : "needsWork";

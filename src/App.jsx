@@ -771,6 +771,7 @@ export default function App() {
             history={history}
             sessionNumber={sessionNumber}
             onRestart={() => resetConversation(screens.simulation)}
+            onBackToInterview={() => setScreen(screens.simulation)}
             onSelectCase={() => setScreen(screens.select)}
           />
           <SessionClosure

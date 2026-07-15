@@ -970,6 +970,25 @@ textarea:focus {
   background: #fffdf8;
 }
 
+.feedback-score-card.limited,
+.feedback-empty-evaluation,
+.results-summary.not-evaluable {
+  border-color: rgba(176, 111, 28, 0.22);
+  background: rgba(255, 250, 241, 0.94);
+}
+
+.feedback-empty-evaluation {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgba(176, 111, 28, 0.2);
+  border-radius: var(--nv-radius);
+  padding: clamp(16px, 2.6vw, 24px);
+}
+
+.feedback-empty-evaluation .closure-case-strip {
+  margin: 0;
+}
+
 .feedback-score-card strong {
   color: var(--nv-navy);
 }
@@ -6817,7 +6836,40 @@ body,
 }
 
 .authenticated-shell.simulation-mode .chat-phase-guide {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
   margin: 8px 12px 0;
+}
+
+.authenticated-shell.simulation-mode .chat-phase-guide .pedagogical-guide-card {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(360px, calc(100vw - 48px));
+  max-height: min(430px, calc(100vh - 190px));
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.authenticated-shell.simulation-mode .chat-phase-guide .guide-card-heading {
+  align-items: flex-start;
+}
+
+.authenticated-shell.simulation-mode .chat-phase-guide .guide-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.authenticated-shell.simulation-mode .chat-phase-guide .guide-example,
+.authenticated-shell.simulation-mode .chat-phase-guide .guide-objective {
+  padding: 9px 10px;
+}
+
+.authenticated-shell.simulation-mode .chat-phase-guide .guide-card-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .authenticated-shell.simulation-mode .interview-experience {

@@ -236,6 +236,8 @@ export function SimulationChat({
 
         <PedagogicalGuide
           guideId={interviewGuideId}
+          autoOpen={false}
+          compact
           className="chat-phase-guide"
         />
 

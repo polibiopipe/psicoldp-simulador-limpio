@@ -36,16 +36,16 @@ export function PedagogicalGuide({
         aria-expanded={isOpen}
       >
         <HelpCircle aria-hidden="true" />
-        Guia
+        Guía
       </button>
 
       {isOpen && (
-        <aside className="pedagogical-guide-card" aria-label={`Guia: ${guide.title}`}>
+        <aside className="pedagogical-guide-card" aria-label={`Guía: ${guide.title}`}>
           <button
             className="guide-close"
             type="button"
             onClick={closeGuide}
-            aria-label="Cerrar guia"
+            aria-label="Cerrar guía"
           >
             <X aria-hidden="true" />
           </button>
@@ -55,7 +55,7 @@ export function PedagogicalGuide({
               <Lightbulb aria-hidden="true" />
             </span>
             <div>
-              <span className="guide-label">Guia pedagogica</span>
+              <span className="guide-label">Guía pedagógica</span>
               <h3>{guide.title}</h3>
             </div>
           </div>
