@@ -8296,6 +8296,527 @@ body,
   }
 }
 
+/* RC antechamber layout */
+.interview-antechamber-screen {
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+}
+
+.interview-antechamber-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 20px;
+  width: min(100%, 1180px);
+  margin: 0 auto;
+  padding: 2px 0 0;
+}
+
+.interview-antechamber-header > div {
+  min-width: min(100%, 420px);
+}
+
+.interview-antechamber-header h1 {
+  margin: 3px 0 7px;
+  color: #0f2b46;
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  line-height: 1.08;
+}
+
+.interview-antechamber-header .text-action {
+  margin-top: 6px;
+  white-space: nowrap;
+}
+
+.interview-antechamber-screen .preparation-brief-layout {
+  grid-template-columns: minmax(280px, 0.36fr) minmax(0, 0.64fr);
+  align-items: start;
+  width: min(100%, 1180px);
+  margin-inline: auto;
+  gap: clamp(18px, 2.4vw, 30px);
+}
+
+.interview-antechamber-screen .brief-content {
+  display: grid;
+  min-width: 0;
+}
+
+.interview-antechamber-screen .brief-content > .section-header,
+.interview-antechamber-screen .brief-content > .info-panel:not(.clinical-preparation-panel) {
+  display: none;
+}
+
+.interview-antechamber-screen .brief-sidebar-stack {
+  position: sticky;
+  top: 92px;
+  display: grid;
+  gap: 12px;
+}
+
+.antechamber-case-file {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(15, 43, 70, 0.1);
+  border-radius: 20px;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(244, 250, 249, 0.94)),
+    #ffffff;
+  box-shadow: 0 16px 38px rgba(15, 43, 70, 0.08);
+}
+
+.antechamber-patient-strip {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.antechamber-patient-strip img {
+  width: 72px;
+  height: 72px;
+  border: 1px solid rgba(15, 43, 70, 0.08);
+  border-radius: 16px;
+  background: #f5faf9;
+  object-fit: contain;
+}
+
+.antechamber-patient-strip h2 {
+  margin: 2px 0 2px;
+  color: #0f2b46;
+  font-size: 1.22rem;
+  line-height: 1.12;
+}
+
+.antechamber-patient-strip p,
+.antechamber-brief-block p {
+  margin: 0;
+  color: #52606d;
+  font-size: 0.82rem;
+  line-height: 1.42;
+}
+
+.antechamber-meta-grid {
+  display: grid;
+  gap: 7px;
+}
+
+.antechamber-meta-grid span {
+  border: 1px solid rgba(23, 109, 117, 0.12);
+  border-radius: 11px;
+  padding: 7px 9px;
+  color: #40545d;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.76rem;
+  font-weight: 720;
+  line-height: 1.32;
+}
+
+.antechamber-brief-block,
+.antechamber-session-block {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid rgba(15, 43, 70, 0.08);
+  padding-top: 11px;
+}
+
+.antechamber-brief-block > span {
+  color: #176d75;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.antechamber-brief-block ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 17px;
+}
+
+.antechamber-brief-block li {
+  color: #52606d;
+  font-size: 0.78rem;
+  line-height: 1.36;
+}
+
+.antechamber-brief-block.caution {
+  border-left: 3px solid rgba(201, 164, 90, 0.7);
+  border-top: 0;
+  border-radius: 12px;
+  padding: 10px 11px;
+  background: rgba(255, 249, 240, 0.72);
+}
+
+.antechamber-session-block .panel-heading {
+  gap: 8px;
+}
+
+.antechamber-session-block .panel-heading svg {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  padding: 6px;
+}
+
+.antechamber-session-block h3 {
+  margin: 0;
+  color: #0f2b46;
+  font-size: 0.92rem;
+}
+
+.antechamber-session-block .session-selector {
+  gap: 6px;
+}
+
+.antechamber-session-block .session-selector button {
+  min-height: 34px;
+  padding: 7px 8px;
+  font-size: 0.72rem;
+}
+
+.antechamber-session-block .session-note {
+  margin-top: 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.antechamber-progress-card {
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: none;
+}
+
+.antechamber-progress-card h2 {
+  margin: 2px 0;
+  font-size: clamp(1.25rem, 1.8vw, 1.5rem);
+}
+
+.antechamber-progress-card p {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.antechamber-progress-card .prep-sidebar-checklist {
+  display: none;
+}
+
+.antechamber-progress-card .prep-start-action {
+  min-height: 40px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+}
+
+.antechamber-preparation-panel,
+.interview-antechamber-screen .clinical-preparation-panel {
+  gap: 13px;
+  border-radius: 20px;
+  padding: clamp(16px, 2vw, 22px);
+  overflow: visible;
+}
+
+.interview-antechamber-screen .clinical-prep-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 14px;
+}
+
+.interview-antechamber-screen .clinical-prep-hero .panel-heading {
+  display: none;
+}
+
+.interview-antechamber-screen .clinical-prep-hero h2 {
+  margin: 2px 0 6px;
+  color: #0f2b46;
+  font-size: clamp(1.35rem, 2vw, 1.72rem);
+}
+
+.interview-antechamber-screen .clinical-prep-hero p {
+  max-width: 76ch;
+  font-size: 0.86rem;
+  line-height: 1.46;
+}
+
+.interview-antechamber-screen .draft-autosave-status {
+  justify-self: end;
+  align-self: start;
+}
+
+.interview-antechamber-screen .prep-workflow-stepper {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  border: 1px solid rgba(15, 43, 70, 0.08);
+  border-radius: 14px;
+  padding: 8px;
+  background: rgba(248, 252, 251, 0.78);
+}
+
+.interview-antechamber-screen .prep-step {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 8px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.interview-antechamber-screen .prep-step:hover {
+  transform: none;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: none;
+}
+
+.interview-antechamber-screen .prep-step.is-active {
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(15, 43, 70, 0.06);
+}
+
+.interview-antechamber-screen .prep-step-index {
+  width: 24px;
+  height: 24px;
+  color: #176d75;
+  background: rgba(42, 154, 164, 0.12);
+  font-size: 0.68rem;
+}
+
+.interview-antechamber-screen .prep-step strong {
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interview-antechamber-screen .prep-step small {
+  color: #687b82;
+  font-size: 0.68rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.interview-antechamber-screen .prep-step em,
+.interview-antechamber-screen .prep-step svg {
+  display: none;
+}
+
+.prep-active-step-heading {
+  display: grid;
+  gap: 4px;
+  border-bottom: 1px solid rgba(15, 43, 70, 0.08);
+  padding-bottom: 10px;
+}
+
+.prep-active-step-heading span {
+  color: #176d75;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.prep-active-step-heading h3 {
+  margin: 0;
+  color: #10212b;
+  font-size: 1.05rem;
+}
+
+.prep-active-step-heading p {
+  margin: 0;
+  color: #5f6f73;
+  font-size: 0.84rem;
+  line-height: 1.42;
+}
+
+.interview-antechamber-screen .prep-assistant-card {
+  width: fit-content;
+  max-width: min(100%, 620px);
+  gap: 8px;
+  border-radius: 13px;
+  padding: 7px 9px;
+  box-shadow: none;
+}
+
+.interview-antechamber-screen .prep-assistant-card.visible {
+  width: min(100%, 620px);
+}
+
+.interview-antechamber-screen .prep-assistant-orb {
+  width: 30px;
+  height: 30px;
+  border-radius: 11px;
+}
+
+.interview-antechamber-screen .prep-assistant-orb span {
+  width: 14px;
+  height: 14px;
+}
+
+.interview-antechamber-screen .prep-assistant-orb svg {
+  width: 14px;
+  height: 14px;
+}
+
+.interview-antechamber-screen .prep-assistant-message p {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.interview-antechamber-screen .prep-context-guide {
+  position: static;
+  grid-column: auto;
+  grid-row: auto;
+  justify-self: start;
+  margin-top: 6px;
+}
+
+.interview-antechamber-screen .prep-context-guide .guide-trigger {
+  min-height: 31px;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 0.72rem;
+  box-shadow: none;
+}
+
+.interview-antechamber-screen .prep-step-panel {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  max-width: 900px;
+}
+
+.interview-antechamber-screen .clinical-prep-field {
+  gap: 8px;
+  border-radius: 14px;
+  padding: 13px;
+  box-shadow: 0 6px 16px rgba(15, 43, 70, 0.035);
+}
+
+.interview-antechamber-screen .clinical-prep-field > span {
+  font-size: 0.88rem;
+}
+
+.interview-antechamber-screen .clinical-prep-field small {
+  font-size: 0.8rem;
+  line-height: 1.38;
+}
+
+.interview-antechamber-screen .clinical-prep-field textarea {
+  min-height: 138px;
+  resize: vertical;
+}
+
+.prep-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid rgba(15, 43, 70, 0.08);
+  padding-top: 12px;
+}
+
+.prep-step-actions .secondary-action,
+.prep-step-actions .primary-action {
+  min-height: 38px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+}
+
+.chat-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.chat-header > div:first-child {
+  min-width: min(100%, 360px);
+  flex: 1 1 420px;
+}
+
+.chat-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 10px;
+}
+
+.chat-panel .chat-header h1 {
+  flex: 0 0 auto;
+  margin: 0;
+  line-height: 1.08;
+}
+
+.chat-actions {
+  flex: 1 1 360px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 1020px) {
+  .interview-antechamber-screen .preparation-brief-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .interview-antechamber-screen .brief-sidebar-stack {
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .interview-antechamber-header {
+    gap: 10px;
+  }
+
+  .antechamber-patient-strip {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .antechamber-patient-strip img {
+    width: 56px;
+    height: 56px;
+    border-radius: 13px;
+  }
+
+  .interview-antechamber-screen .clinical-prep-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .interview-antechamber-screen .draft-autosave-status {
+    justify-self: start;
+  }
+
+  .interview-antechamber-screen .prep-workflow-stepper {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(180px, 78vw);
+    grid-template-columns: none;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .prep-step-actions {
+    justify-content: stretch;
+  }
+
+  .prep-step-actions .secondary-action,
+  .prep-step-actions .primary-action {
+    flex: 1 1 100%;
+  }
+
+  .chat-actions {
+    justify-content: flex-start;
+  }
+}
+
 /* Interview preparation UX refinement */
 @media (min-width: 1024px) {
   .preparation-brief-layout {
@@ -8601,6 +9122,55 @@ body,
 
   .clinical-preparation-panel .prep-step strong,
   .clinical-preparation-panel .prep-step small {
+    white-space: normal;
+  }
+}
+
+/* Final antechamber overrides: keep preparation as a clinical workspace, not cards */
+.interview-antechamber-screen .clinical-preparation-panel .prep-workflow-stepper {
+  grid-template-columns: 1fr;
+}
+
+.interview-antechamber-screen .clinical-preparation-panel .prep-step {
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  min-height: 36px;
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 8px;
+  box-shadow: none;
+}
+
+.interview-antechamber-screen .clinical-preparation-panel .prep-step strong {
+  align-self: center;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.interview-antechamber-screen .clinical-preparation-panel .prep-step small {
+  grid-column: auto;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.interview-antechamber-screen .clinical-preparation-panel .prep-step em,
+.interview-antechamber-screen .clinical-preparation-panel .prep-step svg {
+  display: none;
+}
+
+.interview-antechamber-screen .clinical-preparation-panel .prep-step-panel {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 900px;
+}
+
+@media (max-width: 760px) {
+  .interview-antechamber-screen .clinical-preparation-panel .prep-workflow-stepper {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(180px, 78vw);
+    grid-template-columns: none;
+  }
+
+  .interview-antechamber-screen .clinical-preparation-panel .prep-step strong,
+  .interview-antechamber-screen .clinical-preparation-panel .prep-step small {
     white-space: normal;
   }
 }

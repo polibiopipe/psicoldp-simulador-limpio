@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
-  Circle,
   ClipboardCheck,
   ClipboardList,
   Compass,
@@ -11,7 +10,6 @@ import {
   Target,
   TriangleAlert
 } from "lucide-react";
-import { PatientCard } from "./PatientCard.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
 import { clinicalExplorationAreas, interviewTypeOptions } from "../data/clinicalWorkflow.js";
@@ -133,6 +131,9 @@ export function CaseBrief({
     prepSteps.find((step) => !qualityCompletion[step.id])?.id ||
     "summary";
   const displayedPrepStepId = selectedPrepStepId || activeStepId;
+  const allPrepSteps = [...prepSteps, prepReviewStep];
+  const displayedPrepStepIndex = Math.max(0, allPrepSteps.findIndex((step) => step.id === displayedPrepStepId));
+  const displayedPrepStep = allPrepSteps[displayedPrepStepIndex] || prepReviewStep;
   const requiredComplete = readiness.requiredComplete;
   const qualityComplete = readiness.qualityComplete;
   const preparationWeak = requiredComplete && !qualityComplete;
@@ -328,6 +329,23 @@ export function CaseBrief({
     if (displayedPrepStepId === stepId && !completion[stepId]) return "in-progress";
     if (completion[stepId]) return qualityCompletion[stepId] ? "completed" : "weak";
     return "pending";
+  }
+
+  function getPrepStepStatusLabel(status) {
+    if (status === "completed") return "Completado";
+    if (status === "weak") return "Mejorar";
+    if (status === "in-progress") return "En progreso";
+    return "Pendiente";
+  }
+
+  function goToPreviousPrepStep() {
+    const previousStep = allPrepSteps[displayedPrepStepIndex - 1];
+    if (previousStep) setSelectedPrepStepId(previousStep.id);
+  }
+
+  function goToNextPrepStep() {
+    const nextStep = allPrepSteps[displayedPrepStepIndex + 1];
+    if (nextStep) setSelectedPrepStepId(nextStep.id);
   }
 
   function renderPreparationStepContent() {
@@ -672,22 +690,113 @@ export function CaseBrief({
   }
 
   return (
-    <section className="screen">
-      <button className="text-action" type="button" onClick={onBack}>
-        <ArrowLeft aria-hidden="true" />
-        Cambiar caso
-      </button>
+    <section className="screen interview-antechamber-screen">
+      <header className="interview-antechamber-header">
+        <div>
+          <span className="eyebrow">Escucha Viva - Entrevista PsicolÃ³gica Formativa</span>
+          <h1>{caseItem.name}</h1>
+          <span className="case-practice-label">
+            {sessionNumber === 1
+              ? `Entrevista inicial simulada - SesiÃ³n ${sessionNumber} de ${proposedSessionCount}`
+              : `SesiÃ³n ${sessionNumber} de ${proposedSessionCount} - Continuidad simulada`}
+          </span>
+        </div>
+        <button className="text-action" type="button" onClick={onBack}>
+          <ArrowLeft aria-hidden="true" />
+          Cambiar caso
+        </button>
+      </header>
 
       <div className="brief-layout preparation-brief-layout">
         <div className="brief-sidebar-stack">
-          <PatientCard
-            caseItem={caseItem}
-            difficulty={difficulty}
-            sessionNumber={sessionNumber}
-            totalSessions={proposedSessionCount}
-            sessionSummary={sessionSummary}
-            preSessionPlan={preSessionPlan}
-          />
+          <aside className="antechamber-case-file" aria-label="Ficha clÃ­nica resumida">
+            <div className="antechamber-patient-strip">
+              <img
+                src={caseItem.image || "/avatar/placeholder.png"}
+                alt={`Retrato ficticio de ${caseItem.name}`}
+              />
+              <div>
+                <span className="eyebrow">Ficha de consulta rÃ¡pida</span>
+                <h2>{caseItem.name}</h2>
+                <p>{caseItem.age}</p>
+              </div>
+            </div>
+
+            <div className="antechamber-brief-block">
+              <span>Motivo breve</span>
+              <p>{caseItem.motive}</p>
+            </div>
+
+            <div className="antechamber-meta-grid">
+              <span>Dificultad: {difficulty}</span>
+              <span>{caseItem.communicationStyle}</span>
+            </div>
+
+            <div className="antechamber-session-block">
+              <div className="panel-heading">
+                <ClipboardList aria-hidden="true" />
+                <h3>Tipo de sesiÃ³n</h3>
+              </div>
+              <SessionSelector
+                currentSession={sessionNumber}
+                availableSessions={availableSessions}
+                totalSessions={proposedSessionCount}
+                onSelect={onSelectSession}
+              />
+              <p className="session-note">
+                {sessionSummary
+                  ? "Existe continuidad clÃ­nica simulada para esta sesiÃ³n."
+                  : "Antes de entrar al encuentro, ordena el foco inicial de exploraciÃ³n."}
+              </p>
+            </div>
+
+            {sessionSummary && (
+              <div className="antechamber-brief-block">
+                <span>Continuidad disponible</span>
+                <ul>
+                  {previousClinicalDecision && (
+                    <li>DecisiÃ³n previa: {previousClinicalDecision.action || "registrada"}.</li>
+                  )}
+                  {previousExternalReport && (
+                    <li>
+                      Informe externo: {previousExternalReport.requestedInstrument?.name ||
+                        previousExternalReport.caseData?.instrument || "evaluaciÃ³n complementaria simulada"}.
+                    </li>
+                  )}
+                  {previousPendingTopics.slice(0, 2).map((item) => (
+                    <li key={item}>Pendiente: {item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="antechamber-brief-block">
+              <span>Antecedentes relevantes</span>
+              <ul>
+                {caseItem.background.slice(0, 3).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="antechamber-brief-block">
+              <span>Objetivos formativos</span>
+              <ul>
+                {(caseItem.learningObjectives || caseItem.objectives || []).slice(0, 3).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="antechamber-brief-block caution">
+              <span>Antes de iniciar</span>
+              <ul>
+                {caseItem.sensitiveTopics.slice(0, 3).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </aside>
 
           {preSessionPlan && (
             <aside className="prep-sidebar-card" aria-label="Progreso de preparación">
@@ -853,12 +962,6 @@ export function CaseBrief({
                   Completa estos pasos antes de hablar {termCopy.prep}. Esta
                   preparación será considerada en tu retroalimentación final.
                 </p>
-                <PedagogicalGuide
-                  guideId="preparacion_sesion"
-                  autoOpen={false}
-                  compact
-                  className="prep-context-guide"
-                />
                 {draftStatus && (
                   <div className={`draft-autosave-status ${draftStatus.type}`} role="status">
                     {draftStatus.message}
@@ -867,10 +970,9 @@ export function CaseBrief({
               </div>
 
               <div className="prep-workflow-stepper" aria-label="Avance de preparacion">
-                {[...prepSteps, prepReviewStep].map((step, index) => {
+                {allPrepSteps.map((step, index) => {
                   const status = getPrepStepStatus(step.id);
                   const isActive = displayedPrepStepId === step.id;
-                  const StatusIcon = status === "completed" ? CheckCircle2 : status === "weak" ? TriangleAlert : Circle;
                   return (
                     <button
                       className={`prep-step ${status} ${isActive ? "is-active" : ""}`}
@@ -880,21 +982,17 @@ export function CaseBrief({
                       aria-current={isActive ? "step" : undefined}
                     >
                       <span className="prep-step-index">{index + 1}</span>
-                      <StatusIcon aria-hidden="true" />
                       <strong>{step.label}</strong>
-                      <em>{step.hint}</em>
-                      <small>
-                        {status === "completed"
-                          ? "Completado"
-                          : status === "weak"
-                            ? "Necesita mejorar"
-                          : status === "in-progress"
-                            ? "En progreso"
-                            : "Pendiente"}
-                      </small>
+                      <small>{getPrepStepStatusLabel(status)}</small>
                     </button>
                   );
                 })}
+              </div>
+
+              <div className="prep-active-step-heading">
+                <span>Paso {displayedPrepStepIndex + 1} de {allPrepSteps.length}</span>
+                <h3>{displayedPrepStep.label}</h3>
+                <p>{displayedPrepStep.hint}</p>
               </div>
 
               <div className={`prep-assistant-card ${assistantVisible ? "visible" : "minimized"}`}>
@@ -911,6 +1009,12 @@ export function CaseBrief({
                       </button>
                     </div>
                     <p>{assistantMessage}</p>
+                    <PedagogicalGuide
+                      guideId="preparacion_sesion"
+                      autoOpen={false}
+                      compact
+                      className="prep-context-guide"
+                    />
                   </div>
                 ) : (
                   <button
@@ -918,12 +1022,38 @@ export function CaseBrief({
                     type="button"
                     onClick={() => setAssistantVisible(true)}
                   >
-                    Mostrar guía
+                    Guía disponible para este paso
                   </button>
                 )}
               </div>
 
               {renderPreparationStepContent()}
+
+              <div className="prep-step-actions">
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={goToPreviousPrepStep}
+                  disabled={displayedPrepStepIndex === 0}
+                >
+                  Volver
+                </button>
+                {displayedPrepStepId === "summary" ? (
+                  <button
+                    className="primary-action"
+                    type="button"
+                    onClick={handleBeginClick}
+                    disabled={!requiredComplete}
+                  >
+                    <Play aria-hidden="true" />
+                    Iniciar entrevista con {caseItem.name}
+                  </button>
+                ) : (
+                  <button className="primary-action" type="button" onClick={goToNextPrepStep}>
+                    Guardar avance / Siguiente paso
+                  </button>
+                )}
+              </div>
             </section>
           )}
 
