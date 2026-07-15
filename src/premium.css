@@ -6484,6 +6484,645 @@ body,
   }
 }
 
+/* RC v1.0 clinical interface refinement */
+.authenticated-shell {
+  font-size: 0.94rem;
+}
+
+.authenticated-shell .workspace-content {
+  padding-bottom: 28px;
+}
+
+.authenticated-shell .section-header h1,
+.authenticated-shell .saved-sessions-header h1,
+.authenticated-shell .clinical-agenda-header h1 {
+  font-size: clamp(1.55rem, 2.4vw, 2.25rem);
+}
+
+.authenticated-shell .section-header p,
+.authenticated-shell .saved-sessions-header p,
+.authenticated-shell .clinical-agenda-header p {
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.authenticated-shell.simulation-mode .authenticated-workspace {
+  grid-template-columns: 78px minmax(0, 1fr);
+}
+
+.authenticated-shell.simulation-mode .workspace-sidebar {
+  gap: 10px;
+  padding: 12px 9px;
+}
+
+.authenticated-shell.simulation-mode .workspace-brand,
+.authenticated-shell.simulation-mode .workspace-sidebar-note {
+  display: none;
+}
+
+.authenticated-shell.simulation-mode .workspace-nav button {
+  justify-content: center;
+  min-height: 42px;
+  padding: 0;
+  font-size: 0;
+}
+
+.authenticated-shell.simulation-mode .workspace-nav svg {
+  width: 21px;
+  height: 21px;
+}
+
+.authenticated-shell.simulation-mode .workspace-topbar {
+  min-height: 50px;
+  padding-inline: 18px;
+}
+
+.authenticated-shell.simulation-mode .workspace-topbar .eyebrow {
+  display: none;
+}
+
+.authenticated-shell.simulation-mode .workspace-topbar strong {
+  font-size: 0.9rem;
+}
+
+.authenticated-shell.simulation-mode .workspace-content {
+  padding: 0 18px 22px;
+}
+
+.authenticated-shell.simulation-mode .screen.chat-screen {
+  width: min(100%, 1500px);
+  grid-template-columns: minmax(196px, 232px) minmax(0, 1fr);
+  gap: 14px;
+  min-height: calc(100vh - 74px);
+  padding: 12px 0 18px;
+}
+
+.authenticated-shell.simulation-mode .chat-sidebar {
+  gap: 8px;
+}
+
+.authenticated-shell.simulation-mode .chat-sidebar .learning-box {
+  display: none;
+}
+
+.authenticated-shell.simulation-mode .chat-screen .patient-card {
+  padding: 12px;
+}
+
+.authenticated-shell.simulation-mode .chat-screen .patient-portrait {
+  width: 72px;
+  height: 88px;
+  margin-bottom: 8px;
+}
+
+.authenticated-shell.simulation-mode .chat-screen .patient-card h2 {
+  font-size: 1.05rem;
+}
+
+.authenticated-shell.simulation-mode .chat-screen .patient-card > p,
+.authenticated-shell.simulation-mode .chat-screen .patient-stat {
+  font-size: 0.76rem;
+}
+
+.authenticated-shell.simulation-mode .progress-wrap {
+  padding: 11px;
+}
+
+.authenticated-shell.simulation-mode .chat-panel {
+  min-height: calc(100vh - 96px);
+  border-radius: 16px;
+}
+
+.authenticated-shell.simulation-mode .chat-header {
+  min-height: 58px;
+  padding: 10px 13px;
+}
+
+.authenticated-shell.simulation-mode .chat-panel .chat-header h1 {
+  font-size: clamp(1.15rem, 1.6vw, 1.45rem);
+}
+
+.authenticated-shell.simulation-mode .session-context,
+.authenticated-shell.simulation-mode .chat-header .eyebrow {
+  font-size: 0.7rem;
+}
+
+.authenticated-shell.simulation-mode .chat-actions {
+  gap: 6px;
+}
+
+.authenticated-shell.simulation-mode .chat-actions .primary-action,
+.authenticated-shell.simulation-mode .chat-actions .secondary-action {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.72rem;
+}
+
+.authenticated-shell.simulation-mode .chat-phase-guide {
+  margin: 8px 12px 0;
+}
+
+.authenticated-shell.simulation-mode .interview-experience {
+  height: clamp(460px, calc(100vh - 286px), 680px);
+  min-height: 430px;
+}
+
+.authenticated-shell.simulation-mode .interview-experience.with-video {
+  grid-template-columns: minmax(280px, 0.72fr) minmax(520px, 1.28fr);
+  gap: 10px;
+  padding: 10px;
+}
+
+.authenticated-shell.simulation-mode .interview-experience > .conversation {
+  padding: 22px clamp(18px, 2.2vw, 36px) 28px;
+}
+
+.authenticated-shell.simulation-mode .message {
+  max-width: min(76%, 800px);
+  padding: 13px 15px;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.authenticated-shell.simulation-mode .message span {
+  font-size: 0.62rem;
+}
+
+.authenticated-shell.simulation-mode .question-form {
+  padding: 10px 13px 12px;
+}
+
+.authenticated-shell.simulation-mode .question-form > label,
+.authenticated-shell.simulation-mode .guided-intervention-panel label {
+  font-size: 0.76rem;
+}
+
+.authenticated-shell.simulation-mode .writing-support {
+  margin-bottom: 4px;
+}
+
+.authenticated-shell.simulation-mode .guided-intervention-panel {
+  grid-template-columns: 126px minmax(190px, 250px) minmax(0, 1fr);
+  gap: 5px 8px;
+  margin: 6px 0 8px;
+}
+
+.authenticated-shell.simulation-mode .guided-intervention-panel select {
+  min-height: 34px;
+  font-size: 0.78rem;
+}
+
+.authenticated-shell.simulation-mode .stage-suggestions-toggle {
+  font-size: 0.72rem;
+}
+
+.authenticated-shell.simulation-mode .chat-panel textarea {
+  height: 64px;
+  min-height: 64px;
+  font-size: 0.84rem;
+}
+
+.authenticated-shell.simulation-mode .chat-panel .icon-action,
+.authenticated-shell.simulation-mode .chat-panel .voice-dictation-button {
+  flex-basis: 46px;
+  width: 46px;
+  height: 46px;
+}
+
+.pedagogical-guide-shell,
+.pedagogical-guide-shell.compact {
+  margin: 10px 0 14px;
+}
+
+.guide-trigger {
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 0.74rem;
+  box-shadow: 0 8px 18px rgba(15, 43, 70, 0.07);
+}
+
+.pedagogical-guide-card {
+  border-left-width: 5px;
+  border-radius: 16px;
+  padding: 15px 16px 14px;
+  box-shadow: 0 14px 34px rgba(15, 43, 70, 0.09);
+  animation: guideEnter 200ms ease-out both;
+}
+
+.pedagogical-guide-card::after {
+  display: none;
+}
+
+.guide-card-heading {
+  gap: 10px;
+  padding-right: 34px;
+}
+
+.guide-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  box-shadow: none;
+}
+
+.guide-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.guide-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+}
+
+.guide-card-heading h3 {
+  max-width: 42ch;
+  font-size: clamp(0.98rem, 1.4vw, 1.16rem);
+}
+
+.guide-close {
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  box-shadow: none;
+}
+
+.pedagogical-guide-card p {
+  margin-top: 10px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.guide-example,
+.guide-objective {
+  margin-top: 10px;
+  border-radius: 12px;
+  padding: 10px 11px;
+}
+
+.guide-example span,
+.guide-objective span {
+  font-size: 0.84rem;
+  line-height: 1.44;
+}
+
+.guide-card-actions {
+  margin-top: 12px;
+  padding-top: 11px;
+}
+
+.guide-primary-action {
+  min-height: 36px;
+  border-radius: 11px;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  box-shadow: 0 10px 20px rgba(15, 43, 70, 0.14);
+}
+
+.clinical-plan-panel .pedagogical-guide-card,
+.clinical-preparation-panel .pedagogical-guide-card,
+.chat-phase-guide .pedagogical-guide-card,
+.input-guide .pedagogical-guide-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(243, 249, 248, 0.94));
+}
+
+.clinical-plan-panel,
+.clinical-preparation-panel {
+  border-radius: 18px;
+  padding: clamp(16px, 2vw, 22px);
+  box-shadow: 0 16px 38px rgba(15, 43, 70, 0.08);
+}
+
+.clinical-prep-hero h2,
+.session-closure-header h1 {
+  font-size: clamp(1.35rem, 2.1vw, 1.9rem);
+}
+
+.clinical-prep-hero p,
+.session-closure-header p {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.prep-workflow-stepper,
+.clinical-preparation-panel .prep-workflow-stepper {
+  gap: 7px;
+}
+
+.prep-step,
+.clinical-preparation-panel .prep-step {
+  min-height: 96px;
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 8px 20px rgba(15, 43, 70, 0.045);
+}
+
+.prep-step-index {
+  width: 24px;
+  height: 24px;
+  font-size: 0.68rem;
+}
+
+.prep-step svg {
+  top: 11px;
+  right: 10px;
+  width: 17px;
+  height: 17px;
+}
+
+.prep-step strong {
+  font-size: 0.8rem;
+}
+
+.clinical-preparation-panel .prep-step em,
+.prep-step small {
+  font-size: 0.68rem;
+}
+
+.prep-assistant-card {
+  gap: 10px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 24px rgba(15, 43, 70, 0.07);
+}
+
+.prep-assistant-orb {
+  width: 42px;
+  height: 42px;
+  border-radius: 15px;
+  animation: none;
+}
+
+.prep-assistant-message p {
+  margin-top: 4px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.prep-assistant-message button,
+.prep-assistant-show {
+  padding: 5px 9px;
+  font-size: 0.76rem;
+}
+
+.prep-step-panel {
+  gap: 10px;
+}
+
+.clinical-preparation-panel .clinical-prep-field,
+.clinical-plan-subpanel,
+.prep-summary-card {
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 8px 22px rgba(15, 43, 70, 0.045);
+}
+
+.clinical-preparation-panel .clinical-prep-field > span,
+.clinical-plan-form label,
+.clinical-prep-field {
+  font-size: 0.88rem;
+}
+
+.clinical-prep-field small,
+.clinical-plan-subpanel p,
+.closure-card p,
+.session-summary-card p,
+.saved-session-detail p,
+.saved-session-detail li {
+  font-size: 0.84rem;
+  line-height: 1.48;
+}
+
+.clinical-preparation-panel .clinical-prep-field select,
+.clinical-preparation-panel .clinical-prep-field textarea,
+.clinical-plan-form select,
+.clinical-plan-form textarea,
+.clinical-prep-field select,
+.clinical-prep-field textarea {
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.prep-step-panel textarea,
+.clinical-plan-form textarea {
+  min-height: 84px;
+}
+
+.clinical-area-grid,
+.ethical-care-grid {
+  gap: 7px;
+}
+
+.clinical-preparation-panel .clinical-area-grid label,
+.ethical-care-grid label {
+  min-height: 38px;
+  border-radius: 10px;
+  padding: 8px 9px;
+  font-size: 0.82rem;
+}
+
+.session-closure {
+  gap: 14px;
+  padding: clamp(18px, 2.8vw, 28px);
+}
+
+.closure-case-strip,
+.closure-metrics,
+.closure-panels,
+.session-summary-grid {
+  gap: 10px;
+}
+
+.closure-metrics article {
+  min-height: 88px;
+  padding: 12px;
+}
+
+.closure-metrics strong {
+  font-size: 1.28rem;
+}
+
+.session-summary-card,
+.closure-card,
+.continuity-callout {
+  padding: 15px;
+}
+
+.session-summary-card h2,
+.closure-card h2,
+.continuity-callout h2,
+.clinical-plan-subpanel h3,
+.clinical-plan-subpanel h4 {
+  font-size: 0.98rem;
+}
+
+.clinical-plan-header {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.clinical-plan-range {
+  min-width: 118px;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.clinical-plan-range strong {
+  font-size: 1.12rem;
+}
+
+.clinical-decision-grid {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.clinical-decision-option {
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.clinical-decision-option strong {
+  font-size: 0.86rem;
+}
+
+.clinical-decision-option small {
+  font-size: 0.78rem;
+}
+
+.clinical-plan-form {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.clinical-plan-form label:first-child {
+  max-width: none;
+}
+
+.clinical-plan-evaluation {
+  margin-top: 12px;
+  border-radius: 13px;
+  padding: 12px;
+}
+
+.saved-sessions-layout {
+  gap: 14px;
+}
+
+.saved-session-card,
+.saved-session-detail {
+  border-radius: 16px;
+}
+
+.saved-session-card {
+  padding: 14px;
+}
+
+.saved-session-card h2,
+.saved-session-detail h2,
+.saved-session-detail h3 {
+  font-size: 0.98rem;
+}
+
+@media (max-width: 1180px) {
+  .authenticated-shell.simulation-mode .authenticated-workspace {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .authenticated-shell.simulation-mode .screen.chat-screen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .authenticated-shell.simulation-mode .chat-sidebar {
+    display: none;
+  }
+
+  .authenticated-shell.simulation-mode .mobile-case-summary {
+    display: block;
+  }
+
+  .authenticated-shell.simulation-mode .interview-experience.with-video {
+    grid-template-columns: minmax(250px, 0.8fr) minmax(360px, 1.2fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .authenticated-shell.simulation-mode .authenticated-workspace {
+    display: block;
+  }
+
+  .authenticated-shell.simulation-mode .workspace-sidebar {
+    display: block;
+    padding: 8px;
+  }
+
+  .authenticated-shell.simulation-mode .workspace-nav button {
+    min-width: 42px;
+  }
+
+  .authenticated-shell.simulation-mode .workspace-topbar {
+    min-height: 0;
+    padding: 10px;
+  }
+
+  .clinical-plan-form,
+  .prep-step-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .authenticated-shell {
+    font-size: 0.92rem;
+  }
+
+  .authenticated-shell.simulation-mode .workspace-content {
+    padding-inline: 10px;
+  }
+
+  .authenticated-shell.simulation-mode .screen.chat-screen {
+    padding-top: 10px;
+  }
+
+  .authenticated-shell.simulation-mode .interview-experience,
+  .authenticated-shell.simulation-mode .interview-experience.with-video {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+  }
+
+  .authenticated-shell.simulation-mode .interview-experience > .conversation {
+    min-height: 320px;
+    height: clamp(320px, 48vh, 460px);
+  }
+
+  .authenticated-shell.simulation-mode .message {
+    max-width: 92%;
+  }
+
+  .authenticated-shell.simulation-mode .guided-intervention-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .authenticated-shell.simulation-mode .guided-intervention-panel label,
+  .authenticated-shell.simulation-mode .guided-intervention-panel select,
+  .authenticated-shell.simulation-mode .stage-suggestions-toggle {
+    grid-column: 1;
+  }
+
+  .clinical-decision-grid,
+  .closure-metrics,
+  .closure-case-strip,
+  .session-summary-grid,
+  .clinical-area-grid,
+  .ethical-care-grid,
+  .prep-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Minimal Escucha Viva identity layer */
 .identity-auth-screen {
   grid-template-columns: minmax(320px, 620px);
