@@ -1175,50 +1175,6 @@ export function SessionClosure({
         </div>
       </div>
 
-      <div className="continuity-callout" hidden>
-        <div>
-          <h2>{canContinueInSimulator ? "Continuar segun tu decision" : "Guardar decision y cerrar"}</h2>
-          {isFinalSession ? (
-            <p>
-              Has completado las sesiones simuladas de tu plan. Puedes copiar una sintesis del
-              proceso formativo o volver al inicio para trabajar otro caso.
-            </p>
-          ) : (
-            <p>
-              Puedes continuar con {nextSessionStage.title.toLowerCase()} para retomar
-              los temas abiertos y trabajar el foco: {nextSessionStage.focus}
-            </p>
-          )}
-        </div>
-        <div className="closure-actions">
-          {isFinalSession ? (
-            <>
-              <button className="primary-action" type="button" onClick={backHomeAfterSave}>
-                <Home aria-hidden="true" />
-                Finalizar proceso formativo
-              </button>
-              <button className="secondary-action" type="button" onClick={copyProcessSummary}>
-                <Clipboard aria-hidden="true" />
-                {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
-              </button>
-            </>
-          ) : (
-            <button className="primary-action" type="button" onClick={() => setModalOpen(true)}>
-              Continuar a sesión {nextSessionNumber}
-              <ArrowRight aria-hidden="true" />
-            </button>
-          )}
-          <button className="secondary-action" type="button" onClick={copyCurrentSummary}>
-            <Clipboard aria-hidden="true" />
-            {copied ? "Resumen copiado" : "Copiar resumen"}
-          </button>
-          <button className="secondary-action" type="button" onClick={backHomeAfterSave}>
-            <Home aria-hidden="true" />
-            Volver al inicio
-          </button>
-        </div>
-      </div>
-
       {reachedSessionLimit && (
         <section className="session-summary-card closure-panel closure-panel-wide">
           <span className="eyebrow">Síntesis de proceso</span>

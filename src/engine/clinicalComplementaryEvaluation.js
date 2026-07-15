@@ -120,30 +120,50 @@ export function evaluateComplementaryEvaluationRequest({
 
   if (normalized.justification.length >= 35) {
     strengths.push("Justificaste la solicitud con una razon clinica explicita.");
+  } else if (normalized.justification.length >= 16) {
+    recommendations.push("Iniciaste la justificacion del instrumento; conviene precisar pertinencia, limites y utilidad clinica.");
+  } else if (normalized.justification.length > 0) {
+    concerns.push("La justificacion esta iniciada, pero aun es demasiado breve para sostener la solicitud.");
   } else {
     concerns.push("La solicitud necesita explicar por que esta evaluacion es necesaria.");
   }
 
   if (normalized.hypothesis.length >= 28) {
     strengths.push("Vinculaste la solicitud con una hipotesis a explorar o contrastar.");
+  } else if (normalized.hypothesis.length >= 14) {
+    recommendations.push("Nombraste una hipotesis inicial; seria util formular mejor que se quiere contrastar.");
+  } else if (normalized.hypothesis.length > 0) {
+    concerns.push("La hipotesis esta iniciada, pero necesita mayor claridad clinica.");
   } else {
     concerns.push("Falta nombrar la hipotesis clinica que quieres contrastar.");
   }
 
   if (normalized.expectedInformation.length >= 24) {
     strengths.push("Definiste que informacion esperas obtener.");
+  } else if (normalized.expectedInformation.length >= 12) {
+    recommendations.push(
+      "Explicaste la informacion que esperas obtener, aunque puedes precisar como modificaria tu hipotesis clinica."
+    );
+  } else if (normalized.expectedInformation.length > 0) {
+    concerns.push("La informacion esperada esta iniciada, pero necesita mayor desarrollo.");
   } else {
     concerns.push("Debes precisar que informacion esperas que aporte el informe.");
   }
 
   if (normalized.agePertinence.length >= 20 || isAgeCompatible(instrument, patientAge)) {
     strengths.push("Consideraste pertinencia por edad y caracteristicas del caso.");
+  } else if (normalized.agePertinence.length > 0) {
+    recommendations.push("Mencionaste pertinencia del instrumento; conviene explicitar edad, contexto y limites de uso.");
   } else {
     concerns.push("Revisa si el instrumento es pertinente para la edad y caracteristicas del caso.");
   }
 
   if (normalized.integrationPlan.length >= 24) {
     strengths.push("Anticipaste como integraras los resultados al proceso.");
+  } else if (normalized.integrationPlan.length >= 12) {
+    recommendations.push("Anticipaste un uso del informe; falta precisar como se integrara sin cerrar diagnostico.");
+  } else if (normalized.integrationPlan.length > 0) {
+    concerns.push("El plan de integracion esta iniciado, pero aun no muestra como usaras los resultados.");
   } else {
     concerns.push("Falta explicar como usaras los resultados sin convertirlos en conclusion automatica.");
   }
