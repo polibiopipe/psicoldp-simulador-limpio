@@ -862,6 +862,7 @@ export default function App() {
   }
 
   const userEmail = isSupabaseConfigured && authSession ? authSession.user.email : "";
+  const userId = isSupabaseConfigured && authSession ? authSession.user.id : "";
 
   return (
     <main className={`app-shell authenticated-shell ${screen === screens.simulation ? "simulation-mode" : ""}`}>
@@ -937,6 +938,9 @@ export default function App() {
           totalSessions={sessionTotal}
           completedSessionCount={getCompletedSessionCount(sessionSummaries)}
           preSessionPlan={preSessionPlan}
+          userId={userId}
+          userEmail={userEmail}
+          sessionRecordId={activeSessionRecordId}
           onBack={() => setScreen(screens.select)}
           onBegin={(preparationState) => beginSessionFromPreparation(sessionNumber, preparationState)}
           onSelectSession={chooseSessionForBrief}
@@ -987,6 +991,7 @@ export default function App() {
             onRestart={() =>
               requestExitFromResults(screens.simulation, () => resetConversation(screens.simulation))
             }
+            onBackToInterview={() => requestExitFromResults(screens.simulation)}
             onSelectCase={() => requestExitFromResults(screens.select)}
           />
           <SessionClosure
@@ -997,6 +1002,9 @@ export default function App() {
             totalSessions={sessionTotal}
             previousSessionSummaries={sessionSummaries}
             preSessionPlan={normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber })}
+            userId={userId}
+            userEmail={userEmail}
+            sessionRecordId={activeSessionRecordId}
             onContinueSession={advanceToNextSession}
             onScheduleNextSession={(targetSession) => openClinicalAgenda(selectedCase.id, { scheduleSessionNumber: targetSession })}
             onBackHome={goHome}

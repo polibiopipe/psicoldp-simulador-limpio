@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
-  Circle,
   ClipboardCheck,
   ClipboardList,
   Compass,
@@ -11,7 +10,6 @@ import {
   Target,
   TriangleAlert
 } from "lucide-react";
-import { PatientCard } from "./PatientCard.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
 import { clinicalExplorationAreas, interviewTypeOptions } from "../data/clinicalWorkflow.js";
@@ -22,14 +20,32 @@ import {
   getClinicalTermPreference,
   saveClinicalTermPreference
 } from "../engine/clinicalLanguage.js";
+import {
+  buildClinicalDraftKey,
+  buildClinicalScrollKey,
+  clearClinicalDraft,
+  clearClinicalScrollPosition,
+  loadClinicalDraft,
+  loadClinicalScrollPosition,
+  saveClinicalScrollPosition,
+  saveClinicalDraft
+} from "../engine/clinicalDraftAutosave.js";
 
 const prepSteps = [
-  { id: "objective", label: "Objetivo inicial", hint: "Que necesitas comprender primero." },
-  { id: "areas", label: "Areas prioritarias", hint: "Foco clinico inicial." },
-  { id: "interview", label: "Tipo de entrevista", hint: "Modalidad y justificacion." },
-  { id: "ethics", label: "Cuidados eticos", hint: "Encuadre, limites y seguridad." },
-  { id: "summary", label: "Revision final", hint: "Confirma tu plan antes de iniciar." }
+  { id: "objective", label: "Objetivo inicial", hint: "Qué necesitas comprender primero." },
+  { id: "process", label: "Plan de sesiones", hint: "Cantidad, criterio y objetivos." },
+  { id: "interview", label: "Tipo de entrevista", hint: "Modalidad y justificación." },
+  { id: "areas", label: "Áreas prioritarias", hint: "Foco clínico inicial." },
+  { id: "ethics", label: "Cuidados éticos", hint: "Encuadre, límites y seguridad." },
+  { id: "priority", label: "Información clave", hint: "Lo que no debe faltar." }
 ];
+
+const prepReviewStep = {
+  id: "summary",
+  label: "Revisión final",
+  hint: "Confirma tu plan antes de iniciar."
+};
+
 const interviewJustificationExamples = [
   "Elijo entrevista abierta para favorecer vínculo y escuchar el relato inicial.",
   "Elijo entrevista semiestructurada para equilibrar escucha clínica con exploración de áreas relevantes.",
@@ -64,45 +80,66 @@ export function CaseBrief({
   totalSessions = SESSION_COUNT_LIMITS.defaultValue,
   completedSessionCount = 0,
   preSessionPlan,
+  userId = "",
+  userEmail = "",
+  sessionRecordId = "",
   onBack,
   onBegin,
   onSelectSession,
   onPreSessionPlanChange
 }) {
-  const [assistantVisible, setAssistantVisible] = useState(true);
+  const [assistantVisible, setAssistantVisible] = useState(false);
   const [showWeakPreparationWarning, setShowWeakPreparationWarning] = useState(false);
-  const [selectedPrepStepId, setSelectedPrepStepId] = useState(null);
+  const [selectedPrepStepId, setSelectedPrepStepId] = useState("objective");
+  const [prepStepFeedback, setPrepStepFeedback] = useState(null);
+  const [draftStatus, setDraftStatus] = useState(null);
+  const restoredDraftRef = useRef(false);
+  const restoredScrollKeyRef = useRef("");
+  const scrollPersistenceDisabledRef = useRef(false);
+  const stableSessionRecordIdRef = useRef(sessionRecordId);
   const [languagePreference, setLanguagePreference] = useState(() => getClinicalTermPreference(caseItem.id));
   const termCopy = getClinicalTermCopy(languagePreference);
+  if (sessionRecordId) stableSessionRecordIdRef.current = sessionRecordId;
+  const preparationDraftKey = useMemo(
+    () =>
+      buildClinicalDraftKey({
+        userId,
+        userEmail,
+        caseId: caseItem.id,
+        sessionId: stableSessionRecordIdRef.current,
+        sessionNumber,
+        step: "preparation"
+      }),
+    [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
+  );
+  const preparationScrollKey = useMemo(
+    () =>
+      buildClinicalScrollKey({
+        userId,
+        userEmail,
+        caseId: caseItem.id,
+        sessionId: stableSessionRecordIdRef.current,
+        sessionNumber,
+        step: "preparation"
+      }),
+    [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
+  );
   const readiness = evaluatePreSessionReadiness(preSessionPlan, { languagePreference });
-  const selectedAreas = preSessionPlan?.explorationAreas || [];
-  const selectedCareItems = preSessionPlan?.ethicalCareItems || [];
-  const completion = {
-    objective: String(preSessionPlan?.evaluationObjective || "").trim().length > 0,
-    areas: selectedAreas.length >= 2 && selectedAreas.length <= 3,
-    interview: Boolean(preSessionPlan?.interviewType) && String(preSessionPlan?.interviewJustification || "").trim().length > 0,
-    ethics: ethicalCareChecklist.every((item) => selectedCareItems.includes(item.id)),
-    summary: false
-  };
-  const qualityCompletion = {
-    objective: String(preSessionPlan?.evaluationObjective || "").trim().length >= 18,
-    areas: selectedAreas.length >= 2 && selectedAreas.length <= 3,
-    interview: Boolean(preSessionPlan?.interviewType) && String(preSessionPlan?.interviewJustification || "").trim().length >= 18,
-    ethics: ethicalCareChecklist.every((item) => selectedCareItems.includes(item.id)),
-    summary: Object.entries(completion).every(([stepId, ok]) => stepId === "summary" || ok)
-  };
-  const activeStepId =
-    prepSteps.find((step) => !completion[step.id])?.id ||
-    prepSteps.find((step) => !qualityCompletion[step.id])?.id ||
-    "summary";
-  const displayedPrepStepId = selectedPrepStepId || activeStepId;
-  const requiredComplete = Object.entries(completion).every(([stepId, ok]) => stepId === "summary" || ok);
-  const qualityComplete = Object.entries(qualityCompletion).every(([stepId, ok]) => stepId === "summary" || ok);
-  const preparationWeak = false;
+  const completion = readiness.requiredCompletion;
+  const qualityCompletion = readiness.qualityCompletion;
+  const displayedPrepStepId = selectedPrepStepId || "objective";
+  const allPrepSteps = [...prepSteps, prepReviewStep];
+  const displayedPrepStepIndex = Math.max(0, allPrepSteps.findIndex((step) => step.id === displayedPrepStepId));
+  const displayedPrepStep = allPrepSteps[displayedPrepStepIndex] || prepReviewStep;
+  const requiredComplete = readiness.requiredComplete;
+  const qualityComplete = readiness.qualityComplete;
+  const preparationWeak = requiredComplete && !qualityComplete;
   const requiredStepCount = prepSteps.length;
-  const completedRequiredSteps = prepSteps.filter((step) => step.id === "summary" ? requiredComplete : completion[step.id]).length;
+  const completedRequiredSteps = Object.values(completion).filter(Boolean).length;
   const prepProgressPercent = Math.round((completedRequiredSteps / requiredStepCount) * 100);
   const nextPrepStep = prepSteps.find((step) => !completion[step.id]) || prepSteps.find((step) => !qualityCompletion[step.id]);
+  const selectedAreas = preSessionPlan?.explorationAreas || [];
+  const selectedCareItems = preSessionPlan?.ethicalCareItems || [];
   const selectedAreaLabels = selectedAreas
     .map((areaId) => clinicalExplorationAreas.find((area) => area.id === areaId)?.label)
     .filter(Boolean);
@@ -113,20 +150,113 @@ export function CaseBrief({
     ? preparationWeak
       ? "Tu preparación permite iniciar, pero hay aspectos que conviene fortalecer. Puedes mejorarla o continuar de todos modos."
       : assistantMessages.ready
-    : assistantMessages[activeStepId] || assistantMessages.summary;
+    : assistantMessages[displayedPrepStepId] || assistantMessages.summary;
   const proposedSessionCount =
     Number(preSessionPlan?.proposedSessionCount) || totalSessions || SESSION_COUNT_LIMITS.defaultValue;
   const planBelowCompletedSessions = Number(proposedSessionCount) < Number(completedSessionCount || 0);
+  const previousClinicalDecision = getClinicalDecisionFromSummary(sessionSummary);
+  const previousExternalReport = getExternalReportFromSummary(sessionSummary);
+  const previousReportIntegration = getReportIntegrationFromSummary(sessionSummary);
+  const previousPendingTopics = getPendingTopicsFromSummary(sessionSummary);
 
   useEffect(() => {
     setLanguagePreference(getClinicalTermPreference(caseItem.id));
-    setSelectedPrepStepId(null);
+    setSelectedPrepStepId("objective");
+    setPrepStepFeedback(null);
     setShowWeakPreparationWarning(false);
+    setDraftStatus(null);
+    restoredDraftRef.current = false;
+    restoredScrollKeyRef.current = "";
+    scrollPersistenceDisabledRef.current = false;
   }, [caseItem.id, sessionNumber]);
+
+  useEffect(() => {
+    if (!preSessionPlan || !onPreSessionPlanChange) return;
+    const draft = loadClinicalDraft(preparationDraftKey);
+    if (!hasMeaningfulPreSessionDraft(draft) || hasMeaningfulPreSessionDraft(preSessionPlan)) return;
+
+    restoredDraftRef.current = true;
+    setDraftStatus({ type: "restored", message: "Recuperamos tu borrador." });
+    onPreSessionPlanChange({
+      ...preSessionPlan,
+      ...draft,
+      caseId: caseItem.id,
+      sessionNumber
+    });
+  }, [preparationDraftKey]);
+
+  useEffect(() => {
+    if (!preSessionPlan || !hasMeaningfulPreSessionDraft(preSessionPlan)) return undefined;
+
+    if (!restoredDraftRef.current) {
+      setDraftStatus({ type: "pending", message: "Cambios pendientes de guardar." });
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const result = saveClinicalDraft(preparationDraftKey, preSessionPlan);
+      if (result.ok) {
+        setDraftStatus({ type: "saved", message: "Borrador guardado." });
+      }
+      restoredDraftRef.current = false;
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [preparationDraftKey, preSessionPlan]);
+
+  useEffect(() => {
+    if (restoredScrollKeyRef.current === preparationScrollKey) return undefined;
+    restoredScrollKeyRef.current = preparationScrollKey;
+
+    const savedY = loadClinicalScrollPosition(preparationScrollKey);
+    if (!savedY) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: savedY, behavior: "auto" });
+      });
+    }, 220);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [preparationScrollKey, preSessionPlan]);
+
+  useEffect(() => {
+    let timeoutId = null;
+
+    function persistScrollPosition() {
+      timeoutId = null;
+      if (scrollPersistenceDisabledRef.current) return;
+      saveClinicalScrollPosition(preparationScrollKey, getCurrentScrollY());
+    }
+
+    function handleScroll() {
+      if (timeoutId) return;
+      timeoutId = window.setTimeout(persistScrollPosition, 400);
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      persistScrollPosition();
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [preparationScrollKey]);
+
+  useEffect(() => {
+    if (!hasMeaningfulPreSessionDraft(preSessionPlan)) return undefined;
+
+    function warnBeforeUnload(event) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [preSessionPlan]);
 
   function updatePlan(patch) {
     if (!onPreSessionPlanChange) return;
     setShowWeakPreparationWarning(false);
+    setPrepStepFeedback(null);
     onPreSessionPlanChange({
       ...preSessionPlan,
       ...patch
@@ -151,7 +281,7 @@ export function CaseBrief({
   function toggleArea(areaId) {
     const current = new Set(preSessionPlan?.explorationAreas || []);
     if (current.has(areaId)) current.delete(areaId);
-    else if (current.size < 3) current.add(areaId);
+    else current.add(areaId);
     updatePlan({ explorationAreas: Array.from(current) });
   }
 
@@ -174,19 +304,11 @@ export function CaseBrief({
 
   function beginWithPreparationState(overrideUsed = false) {
     if (!onBegin) return;
-    const selectedCareLabelsText = selectedCareLabels.join(", ");
-    const selectedAreaLabelsText = selectedAreaLabels.join(", ");
+    scrollPersistenceDisabledRef.current = true;
+    clearClinicalDraft(preparationDraftKey);
+    clearClinicalScrollPosition(preparationScrollKey);
+    setDraftStatus(null);
     onBegin({
-      sessionCountJustification:
-        preSessionPlan?.sessionCountJustification ||
-        "Se inicia con una primera entrevista formativa; la continuidad se decidira al cierre segun motivo de consulta, riesgo, red de apoyo y respuesta del paciente.",
-      processObjectives:
-        preSessionPlan?.processObjectives ||
-        "Comprender el motivo inicial, priorizar focos clinicos, sostener encuadre etico y definir proximos pasos al cierre de la entrevista.",
-      priorityInformation:
-        preSessionPlan?.priorityInformation ||
-        `Objetivo: ${preSessionPlan?.evaluationObjective || "Pendiente"}. Focos iniciales: ${selectedAreaLabelsText || "Pendiente"}.`,
-      ethicalCare: selectedCareLabelsText,
       preparationQuality: preparationWeak ? "debil" : "suficiente",
       preparationOverrideUsed: Boolean(overrideUsed),
       preparationWeakReasons: readiness.weakReasons,
@@ -208,26 +330,131 @@ export function CaseBrief({
     return "pending";
   }
 
-  function getCurrentStepIndex() {
-    return Math.max(0, prepSteps.findIndex((step) => step.id === displayedPrepStepId));
+  function getPrepStepValidation(stepId = displayedPrepStepId) {
+    if (stepId === "objective") {
+      return hasSufficientPreparationText(preSessionPlan?.evaluationObjective)
+        ? { ok: true }
+        : {
+            ok: false,
+            message: "Desarrolla un poco más el objetivo inicial antes de avanzar."
+          };
+    }
+
+    if (stepId === "process") {
+      const proposedCount = Number(preSessionPlan?.proposedSessionCount);
+      const countIsValid =
+        Number.isFinite(proposedCount) &&
+        proposedCount >= SESSION_COUNT_LIMITS.min &&
+        proposedCount <= SESSION_COUNT_LIMITS.max;
+
+      if (!countIsValid) {
+        return {
+          ok: false,
+          message: `Elige una cantidad entre ${SESSION_COUNT_LIMITS.min} y ${SESSION_COUNT_LIMITS.max} sesiones.`
+        };
+      }
+
+      if (!hasSufficientPreparationText(preSessionPlan?.sessionCountJustification)) {
+        return {
+          ok: false,
+          message: "Agrega una justificación breve de la cantidad de sesiones antes de avanzar."
+        };
+      }
+
+      return hasSufficientPreparationText(preSessionPlan?.processObjectives)
+        ? { ok: true }
+        : {
+            ok: false,
+            message: "Define brevemente los objetivos del proceso antes de avanzar."
+          };
+    }
+
+    if (stepId === "interview") {
+      if (!preSessionPlan?.interviewType) {
+        return { ok: false, message: "Selecciona un tipo de entrevista antes de avanzar." };
+      }
+
+      return hasSufficientPreparationText(preSessionPlan?.interviewJustification)
+        ? { ok: true }
+        : {
+            ok: false,
+            message: "Justifica brevemente por qué esta modalidad es adecuada antes de avanzar."
+          };
+    }
+
+    if (stepId === "areas") {
+      return selectedAreas.length >= 4
+        ? { ok: true }
+        : { ok: false, message: "Selecciona al menos 4 áreas prioritarias antes de avanzar." };
+    }
+
+    if (stepId === "ethics") {
+      const minimumCareItems = Math.min(3, ethicalCareChecklist.length);
+      return selectedCareItems.length >= minimumCareItems
+        ? { ok: true }
+        : { ok: false, message: "Marca los cuidados éticos principales antes de avanzar." };
+    }
+
+    if (stepId === "priority") {
+      return hasSufficientPreparationText(preSessionPlan?.priorityInformation)
+        ? { ok: true }
+        : {
+            ok: false,
+            message: "Desarrolla un poco más la información clave antes de avanzar."
+          };
+    }
+
+    if (stepId === "summary" && !requiredComplete) {
+      return { ok: false, message: "Completa los pasos pendientes antes de iniciar la entrevista." };
+    }
+
+    return { ok: true };
   }
 
-  function getCurrentStepMessage() {
-    if (displayedPrepStepId === "objective") return "Completa este campo para continuar.";
-    if (displayedPrepStepId === "areas") return "Selecciona 2 o 3 areas prioritarias para continuar.";
-    if (displayedPrepStepId === "interview") return "Elige una modalidad y justifica brevemente tu decision.";
-    if (displayedPrepStepId === "ethics") return "Marca todos los cuidados eticos para continuar.";
-    return "Completa los pasos pendientes antes de iniciar la entrevista.";
+  function getPrepStepStatusLabel(status) {
+    if (status === "completed") return "Completado";
+    if (status === "weak") return "Mejorar";
+    if (status === "in-progress") return "En progreso";
+    return "Pendiente";
   }
 
-  function canAdvanceCurrentStep() {
-    if (displayedPrepStepId === "summary") return requiredComplete;
-    return Boolean(completion[displayedPrepStepId]);
+  function goToPreviousPrepStep() {
+    const previousStep = allPrepSteps[displayedPrepStepIndex - 1];
+    if (previousStep) {
+      setPrepStepFeedback(null);
+      setSelectedPrepStepId(previousStep.id);
+    }
   }
 
-  function goToPrepStep(offset) {
-    const nextIndex = Math.min(prepSteps.length - 1, Math.max(0, getCurrentStepIndex() + offset));
-    setSelectedPrepStepId(prepSteps[nextIndex].id);
+  function goToNextPrepStep() {
+    const nextStep = allPrepSteps[displayedPrepStepIndex + 1];
+    if (nextStep) {
+      setPrepStepFeedback(null);
+      setSelectedPrepStepId(nextStep.id);
+    }
+  }
+
+  function handlePrepStepSelect(stepId, stepIndex) {
+    if (stepIndex <= displayedPrepStepIndex) {
+      setPrepStepFeedback(null);
+      setSelectedPrepStepId(stepId);
+      return;
+    }
+
+    setPrepStepFeedback({
+      type: "warning",
+      message: "Usa Guardar avance / Siguiente paso para avanzar sin saltarte la validación."
+    });
+  }
+
+  function handlePrepNextClick() {
+    const validation = getPrepStepValidation(displayedPrepStepId);
+    if (!validation.ok) {
+      setPrepStepFeedback({ type: "warning", message: validation.message });
+      return;
+    }
+
+    goToNextPrepStep();
   }
 
   function renderPreparationStepContent() {
@@ -399,7 +626,7 @@ export function CaseBrief({
           <div className="clinical-prep-field">
             <span>Áreas prioritarias</span>
             <small>
-              Selecciona 2 o 3 areas prioritarias para esta primera entrevista.
+              Selecciona entre 4 y 6 áreas prioritarias para esta primera entrevista.
               No necesitas explorarlo todo en una sola sesión.
             </small>
             <div className="clinical-area-grid">
@@ -408,20 +635,19 @@ export function CaseBrief({
                   <input
                     type="checkbox"
                     checked={selectedAreas.includes(area.id)}
-                    disabled={!selectedAreas.includes(area.id) && selectedAreas.length >= 3}
                     onChange={() => toggleArea(area.id)}
                   />
                   {area.label}
                 </label>
               ))}
             </div>
-            <div className={`prep-priority-status ${selectedAreas.length > 3 ? "warning" : ""}`}>
+            <div className={`prep-priority-status ${selectedAreas.length > 6 ? "warning" : ""}`}>
               <strong>{selectedAreas.length}</strong>
               <span>
-                {selectedAreas.length > 3
+                {selectedAreas.length > 6
                   ? "Intenta priorizar. Una primera entrevista necesita foco clínico, no solo acumulación de preguntas."
-                  : selectedAreas.length < 2
-                    ? "Elige al menos 2 areas para sostener un plan inicial suficiente."
+                  : selectedAreas.length < 4
+                    ? "Elige al menos 4 áreas para sostener un plan inicial suficiente."
                     : "Priorizar también es parte del criterio clínico."}
               </span>
             </div>
@@ -475,7 +701,7 @@ export function CaseBrief({
           <ClipboardCheck aria-hidden="true" />
           <div>
             <span className="eyebrow">Tu plan inicial</span>
-            <h3 id="prep-summary-title">Revisa antes de iniciar</h3>
+            <h3 id="prep-summary-title">Revisa antes de comenzar</h3>
           </div>
         </div>
         <p>
@@ -486,6 +712,18 @@ export function CaseBrief({
           <div>
             <dt>Objetivo</dt>
             <dd>{preSessionPlan.evaluationObjective || "Pendiente"}</dd>
+          </div>
+          <div>
+            <dt>Sesiones propuestas</dt>
+            <dd>{preSessionPlan.proposedSessionCount || "Pendiente"} sesión(es)</dd>
+          </div>
+          <div>
+            <dt>Justificación de sesiones</dt>
+            <dd>{preSessionPlan.sessionCountJustification || "Pendiente"}</dd>
+          </div>
+          <div>
+            <dt>Objetivos del proceso</dt>
+            <dd>{preSessionPlan.processObjectives || "Pendiente"}</dd>
           </div>
           <div>
             <dt>Modalidad</dt>
@@ -502,6 +740,10 @@ export function CaseBrief({
           <div>
             <dt>Cuidados</dt>
             <dd>{selectedCareLabels.length ? selectedCareLabels.join(", ") : "Pendiente"}</dd>
+          </div>
+          <div>
+            <dt>Información clave</dt>
+            <dd>{preSessionPlan.priorityInformation || "Pendiente"}</dd>
           </div>
         </dl>
         {requiredComplete && qualityComplete ? (
@@ -557,22 +799,158 @@ export function CaseBrief({
   }
 
   return (
-    <section className="screen">
-      <button className="text-action" type="button" onClick={onBack}>
-        <ArrowLeft aria-hidden="true" />
-        Cambiar caso
-      </button>
+    <section className="screen interview-antechamber-screen">
+      <header className="interview-antechamber-header">
+        <div>
+          <span className="eyebrow">Escucha Viva · Entrevista Psicológica Formativa</span>
+          <h1>{caseItem.name}</h1>
+          <span className="case-practice-label">
+            {sessionNumber === 1
+              ? `Entrevista inicial simulada · Sesión ${sessionNumber} de ${proposedSessionCount}`
+              : `Sesión ${sessionNumber} de ${proposedSessionCount} · Continuidad simulada`}
+          </span>
+        </div>
+        <button className="text-action" type="button" onClick={onBack}>
+          <ArrowLeft aria-hidden="true" />
+          Cambiar caso
+        </button>
+      </header>
 
       <div className="brief-layout preparation-brief-layout">
         <div className="brief-sidebar-stack">
-          <PatientCard
-            caseItem={caseItem}
-            difficulty={difficulty}
-            sessionNumber={sessionNumber}
-            totalSessions={proposedSessionCount}
-            sessionSummary={sessionSummary}
-            preSessionPlan={preSessionPlan}
-          />
+          <aside className="antechamber-case-file" aria-label="Ficha clínica resumida">
+            <div className="antechamber-patient-strip">
+              <img
+                src={caseItem.image || "/avatar/placeholder.png"}
+                alt={`Retrato ficticio de ${caseItem.name}`}
+              />
+              <div>
+                <span className="eyebrow">Ficha de consulta rápida</span>
+                <h2>{caseItem.name}</h2>
+                <p>{caseItem.age}</p>
+              </div>
+            </div>
+
+            <div className="antechamber-brief-block">
+              <span>Motivo breve</span>
+              <p>{caseItem.motive}</p>
+            </div>
+
+            <div className="antechamber-meta-grid">
+              <span>Dificultad: {difficulty}</span>
+              <span>{caseItem.communicationStyle}</span>
+            </div>
+
+            <div className="antechamber-session-block">
+              <div className="panel-heading">
+                <ClipboardList aria-hidden="true" />
+                <h3>Tipo de sesión</h3>
+              </div>
+              <SessionSelector
+                currentSession={sessionNumber}
+                availableSessions={availableSessions}
+                totalSessions={proposedSessionCount}
+                onSelect={onSelectSession}
+              />
+              <p className="session-note">
+                {sessionSummary
+                  ? "Existe continuidad clínica simulada para esta sesión."
+                  : "Antes de entrar al encuentro, ordena el foco inicial de exploración."}
+              </p>
+            </div>
+
+            {sessionSummary && (
+              <div className="antechamber-brief-block">
+                <span>Continuidad disponible</span>
+                <ul>
+                  {previousClinicalDecision && (
+                    <li>Decisión previa: {previousClinicalDecision.action || "registrada"}.</li>
+                  )}
+                  {previousExternalReport && (
+                    <li>
+                      Informe externo: {previousExternalReport.requestedInstrument?.name ||
+                        previousExternalReport.caseData?.instrument || "evaluación complementaria simulada"}.
+                    </li>
+                  )}
+                  {previousPendingTopics.slice(0, 2).map((item) => (
+                    <li key={item}>Pendiente: {item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="antechamber-brief-block">
+              <span>Antecedentes relevantes</span>
+              <ul>
+                {caseItem.background.slice(0, 3).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="antechamber-brief-block">
+              <span>Objetivos formativos</span>
+              <ul>
+                {(caseItem.learningObjectives || caseItem.objectives || []).slice(0, 3).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="antechamber-brief-block caution">
+              <span>Antes de iniciar</span>
+              <ul>
+                {caseItem.sensitiveTopics.slice(0, 3).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </aside>
+
+          {preSessionPlan && (
+            <aside className="prep-sidebar-card antechamber-progress-card" aria-label="Progreso de preparación">
+              <div>
+                <span className="eyebrow">Preparación</span>
+                <h2>{prepProgressPercent}% listo</h2>
+                <p>
+                  {nextPrepStep
+                    ? `Próximo paso: ${nextPrepStep.label}.`
+                    : preparationWeak
+                      ? "Plan completo con aspectos por fortalecer."
+                      : "Plan listo para iniciar."}
+                </p>
+              </div>
+              <div className="prep-progress-meter" aria-hidden="true">
+                <span style={{ width: `${prepProgressPercent}%` }} />
+              </div>
+              <ul className="prep-sidebar-checklist">
+                {prepSteps.map((step) => {
+                  const status = getPrepStepStatus(step.id);
+                  return (
+                    <li key={step.id} className={status}>
+                      <span>{step.label}</span>
+                      <strong>
+                        {status === "completed"
+                          ? "Listo"
+                          : status === "weak"
+                            ? "Mejorar"
+                            : "Pendiente"}
+                      </strong>
+                    </li>
+                  );
+                })}
+              </ul>
+              <button
+                className="primary-action prep-start-action"
+                type="button"
+                onClick={handleBeginClick}
+                disabled={!requiredComplete}
+              >
+                <Play aria-hidden="true" />
+                {preparationWeak ? "Revisar antes de iniciar" : "Iniciar entrevista"}
+              </button>
+            </aside>
+          )}
         </div>
 
         <div className="brief-content">
@@ -607,6 +985,77 @@ export function CaseBrief({
             )}
           </section>
 
+          {sessionSummary && (
+            <section className="info-panel">
+              <div className="panel-heading">
+                <ClipboardCheck aria-hidden="true" />
+                <h2>Continuidad clinica disponible</h2>
+              </div>
+              <ul>
+                {previousClinicalDecision && (
+                  <li>
+                    Decision previa: {previousClinicalDecision.action || "registrada"}
+                    {previousClinicalDecision.justification ? ` - ${previousClinicalDecision.justification}` : ""}
+                  </li>
+                )}
+                {previousExternalReport && (
+                  <li>
+                    Informe externo recibido: {previousExternalReport.requestedInstrument?.name ||
+                      previousExternalReport.caseData?.instrument || "evaluacion complementaria simulada"}.
+                  </li>
+                )}
+                {previousReportIntegration && (
+                  <li>
+                    Integracion del informe: {previousReportIntegration.hypothesisImpact ||
+                      previousReportIntegration.nextDecision ||
+                      "pendiente de profundizar"}.
+                  </li>
+                )}
+                {previousPendingTopics.slice(0, 3).map((item) => (
+                  <li key={item}>Pendiente: {item}</li>
+                ))}
+                {!previousClinicalDecision && !previousExternalReport && previousPendingTopics.length === 0 && (
+                  <li>Hay memoria de sesion previa, sin decisiones o informes externos registrados.</li>
+                )}
+              </ul>
+            </section>
+          )}
+
+          <section className="info-panel">
+            <div className="panel-heading">
+              <ClipboardList aria-hidden="true" />
+              <h2>Antecedentes relevantes</h2>
+            </div>
+            <ul>
+              {caseItem.background.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="info-panel">
+            <div className="panel-heading">
+              <Target aria-hidden="true" />
+              <h2>Objetivos formativos de esta simulación</h2>
+            </div>
+            <ul>
+              {(caseItem.learningObjectives || caseItem.objectives || []).slice(0, 6).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="info-panel caution">
+            <div className="panel-heading">
+              <TriangleAlert aria-hidden="true" />
+              <h2>Recomendaciones antes de iniciar</h2>
+            </div>
+            <ul>
+              {caseItem.sensitiveTopics.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
 
           {preSessionPlan && (
             <section className="info-panel clinical-preparation-panel">
@@ -614,54 +1063,52 @@ export function CaseBrief({
                 <div className="panel-heading">
                   <ClipboardList aria-hidden="true" />
                   <div>
-                    <span className="eyebrow">Preparacion de entrevista - Paso {getCurrentStepIndex() + 1} de {prepSteps.length}</span>
-                    <h2>{prepSteps[getCurrentStepIndex()]?.label || "Preparacion"}</h2>
+                    <span className="eyebrow">Antesala clínica</span>
+                    <h2>Antes de comenzar: prepara tu primera entrevista</h2>
                   </div>
                 </div>
                 <p>
-                  Completa un paso a la vez antes de hablar {termCopy.prep}. Esta preparacion sera considerada en tu retroalimentacion final.
+                  Completa estos pasos antes de hablar {termCopy.prep}. Esta
+                  preparación será considerada en tu retroalimentación final.
                 </p>
-                <div className="prep-progress-meter" aria-hidden="true">
-                  <span style={{ width: `${prepProgressPercent}%` }} />
-                </div>
-                <PedagogicalGuide
-                  guideId="preparacion_sesion"
-                  autoOpen={false}
-                  compact
-                  className="prep-context-guide"
-                />
+                {draftStatus && (
+                  <div className={`draft-autosave-status ${draftStatus.type}`} role="status">
+                    {draftStatus.message}
+                  </div>
+                )}
               </div>
 
               <div className="prep-workflow-stepper" aria-label="Avance de preparacion">
-                {prepSteps.map((step, index) => {
+                {allPrepSteps.map((step, index) => {
                   const status = getPrepStepStatus(step.id);
                   const isActive = displayedPrepStepId === step.id;
-                  const StatusIcon = status === "completed" ? CheckCircle2 : status === "weak" ? TriangleAlert : Circle;
                   return (
                     <button
                       className={`prep-step ${status} ${isActive ? "is-active" : ""}`}
                       type="button"
                       key={step.id}
-                      onClick={() => setSelectedPrepStepId(step.id)}
+                      onClick={() => handlePrepStepSelect(step.id, index)}
                       aria-current={isActive ? "step" : undefined}
                     >
                       <span className="prep-step-index">{index + 1}</span>
-                      <StatusIcon aria-hidden="true" />
                       <strong>{step.label}</strong>
-                      <em>{step.hint}</em>
-                      <small>
-                        {status === "completed"
-                          ? "Completado"
-                          : status === "weak"
-                            ? "Necesita mejorar"
-                          : status === "in-progress"
-                            ? "En progreso"
-                            : "Pendiente"}
-                      </small>
+                      <small>{getPrepStepStatusLabel(status)}</small>
                     </button>
                   );
                 })}
               </div>
+
+              <div className="prep-active-step-heading">
+                <span>Paso {displayedPrepStepIndex + 1} de {allPrepSteps.length}</span>
+                <h3>{displayedPrepStep.label}</h3>
+                <p>{displayedPrepStep.hint}</p>
+              </div>
+
+              {prepStepFeedback && (
+                <div className={`prep-step-feedback ${prepStepFeedback.type || "warning"}`} role="alert">
+                  {prepStepFeedback.message}
+                </div>
+              )}
 
               <div className={`prep-assistant-card ${assistantVisible ? "visible" : "minimized"}`}>
                 <div className="prep-assistant-orb" aria-hidden="true">
@@ -677,6 +1124,12 @@ export function CaseBrief({
                       </button>
                     </div>
                     <p>{assistantMessage}</p>
+                    <PedagogicalGuide
+                      guideId="preparacion_sesion"
+                      autoOpen={false}
+                      compact
+                      className="prep-context-guide"
+                    />
                   </div>
                 ) : (
                   <button
@@ -684,29 +1137,25 @@ export function CaseBrief({
                     type="button"
                     onClick={() => setAssistantVisible(true)}
                   >
-                    Mostrar guía
+                    Guía disponible para este paso
                   </button>
                 )}
               </div>
 
               {renderPreparationStepContent()}
-              {!canAdvanceCurrentStep() && (
-                <p className="prep-step-helper" role="alert">
-                  {getCurrentStepMessage()}
-                </p>
-              )}
+
               <div className="prep-step-actions">
                 <button
                   className="secondary-action"
                   type="button"
-                  onClick={() => goToPrepStep(-1)}
-                  disabled={getCurrentStepIndex() === 0}
+                  onClick={goToPreviousPrepStep}
+                  disabled={displayedPrepStepIndex === 0}
                 >
-                  Anterior
+                  Volver
                 </button>
                 {displayedPrepStepId === "summary" ? (
                   <button
-                    className="primary-action prep-start-action"
+                    className="primary-action"
                     type="button"
                     onClick={handleBeginClick}
                     disabled={!requiredComplete}
@@ -715,13 +1164,8 @@ export function CaseBrief({
                     Iniciar entrevista con {caseItem.name}
                   </button>
                 ) : (
-                  <button
-                    className="primary-action"
-                    type="button"
-                    onClick={() => goToPrepStep(1)}
-                    disabled={!canAdvanceCurrentStep()}
-                  >
-                    Continuar
+                  <button className="primary-action" type="button" onClick={handlePrepNextClick}>
+                    Guardar avance / Siguiente paso
                   </button>
                 )}
               </div>
@@ -745,7 +1189,84 @@ export function CaseBrief({
   );
 }
 
+const DEFAULT_PREPARATION_AREAS = new Set([
+  "motivo_consulta",
+  "estado_emocional",
+  "funcionamiento_diario",
+  "red_apoyo",
+  "riesgo"
+]);
+
+const INSUFFICIENT_PREPARATION_ANSWERS = new Set(["a", "ok", "si", "no", "na", "n/a"]);
+
+function hasSufficientPreparationText(value, { minChars = 20, minWords = 4 } = {}) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+
+  const normalized = text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (INSUFFICIENT_PREPARATION_ANSWERS.has(normalized)) return false;
+
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return text.length >= minChars || wordCount >= minWords;
+}
+
+function hasMeaningfulPreSessionDraft(plan = null) {
+  if (!plan || typeof plan !== "object") return false;
+  const textFields = [
+    plan.evaluationObjective,
+    plan.sessionCountJustification,
+    plan.processObjectives,
+    plan.interviewJustification,
+    plan.priorityInformation,
+    plan.clinicalLanguageCustomTerm
+  ];
+  if (textFields.some(hasText)) return true;
+  if (Array.isArray(plan.ethicalCareItems) && plan.ethicalCareItems.length > 0) return true;
+  if (Array.isArray(plan.explorationAreas) && hasNonDefaultAreaSelection(plan.explorationAreas)) return true;
+  return false;
+}
+
+function hasNonDefaultAreaSelection(areas = []) {
+  if (!Array.isArray(areas)) return false;
+  if (areas.length !== DEFAULT_PREPARATION_AREAS.size) return true;
+  return areas.some((area) => !DEFAULT_PREPARATION_AREAS.has(area));
+}
+
+function hasText(value) {
+  return String(value || "").trim().length > 0;
+}
+
+function getCurrentScrollY() {
+  if (typeof window === "undefined") return 0;
+  return window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
+}
 
 function getInterviewTypeLabel(value) {
   return interviewTypeOptions.find((option) => option.value === value)?.label || "Pendiente";
+}
+
+function getClinicalArtifactsFromSummary(summary) {
+  return summary?.clinicalArtifacts || summary?.sessionSummary?.clinicalArtifacts || null;
+}
+
+function getClinicalDecisionFromSummary(summary) {
+  return summary?.clinicalDecision || summary?.sessionSummary?.clinicalDecision || null;
+}
+
+function getExternalReportFromSummary(summary) {
+  return getClinicalArtifactsFromSummary(summary)?.complementaryEvaluation?.report || null;
+}
+
+function getReportIntegrationFromSummary(summary) {
+  const integration = getClinicalArtifactsFromSummary(summary)?.complementaryEvaluation?.integration;
+  if (!integration || !Object.values(integration).some(Boolean)) return null;
+  return integration;
+}
+
+function getPendingTopicsFromSummary(summary) {
+  return Array.isArray(summary?.temasPendientes) ? summary.temasPendientes : [];
 }

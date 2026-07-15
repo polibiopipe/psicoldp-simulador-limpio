@@ -3,8 +3,77 @@ import { ArrowRight, RotateCcw } from "lucide-react";
 import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 import { EmailShare } from "./EmailShare.jsx";
 
-export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, onRestart, onSelectCase }) {
+export function FeedbackPanel({
+  report,
+  caseItem,
+  history,
+  sessionNumber = 1,
+  onRestart,
+  onBackToInterview,
+  onSelectCase
+}) {
   const visibleHistory = history.filter((entry) => !entry.isSessionPrelude);
+  const isNotEvaluable = report.evaluationStatus === "not_evaluable";
+  const isLimitedEvaluation = report.evaluationStatus === "limited";
+
+  if (isNotEvaluable) {
+    return (
+      <section className="feedback-panel">
+        <header className="section-header">
+          <span className="eyebrow">Informe formativo</span>
+          <h1>Sesión sin intervenciones suficientes para evaluar</h1>
+          <p>{report.emptySessionMessage}</p>
+        </header>
+
+        <section className="feedback-empty-evaluation">
+          <div className="closure-case-strip">
+            <div>
+              <span>Paciente ficticio</span>
+              <strong>{caseItem.name}</strong>
+            </div>
+            <div>
+              <span>Sesión</span>
+              <strong>{sessionNumber}</strong>
+            </div>
+            <div>
+              <span>Intervenciones</span>
+              <strong>0</strong>
+            </div>
+            <div>
+              <span>Estado</span>
+              <strong>No evaluable</strong>
+            </div>
+          </div>
+
+          <div className="feedback-block">
+            <h2>Para recibir retroalimentación</h2>
+            <ul>
+              {report.nextSuggestions.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <div className="action-row">
+          <button className="secondary-action" type="button" onClick={onSelectCase}>
+            Elegir otro caso
+            <ArrowRight aria-hidden="true" />
+          </button>
+          {onBackToInterview && (
+            <button className="secondary-action" type="button" onClick={onBackToInterview}>
+              Volver a entrevista
+            </button>
+          )}
+          <button className="primary-action" type="button" onClick={onRestart}>
+            <RotateCcw aria-hidden="true" />
+            Repetir simulación
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   const sessionFeedback = buildSessionFeedback({
     sessionNumber,
     selectedCase: caseItem,
@@ -17,21 +86,27 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
     <section className="feedback-panel">
       <header className="section-header">
         <span className="eyebrow">Informe formativo</span>
-        <h1>Retroalimentacion educativa</h1>
+        <h1>Retroalimentación educativa</h1>
         <p>{report.ethicalNotice}</p>
       </header>
 
-      <section className="feedback-score-card">
+      <section className={`feedback-score-card ${isLimitedEvaluation ? "limited" : ""}`}>
         <div>
-          <span className="eyebrow">Nivel formativo</span>
-          <strong>{sessionFeedback.levelLabel}</strong>
+          <span className="eyebrow">
+            {isLimitedEvaluation ? "Retroalimentación limitada" : "Nivel formativo"}
+          </span>
+          <strong>{isLimitedEvaluation ? "Sin puntaje robusto" : sessionFeedback.levelLabel}</strong>
         </div>
-        <p>{sessionFeedback.levelDescription}</p>
+        <p>
+          {isLimitedEvaluation
+            ? "Hubo muy poco material conversacional. La devolución orienta el próximo intento, pero no entrega porcentajes robustos."
+            : sessionFeedback.levelDescription}
+        </p>
       </section>
 
       <div className="feedback-sections feedback-brief-grid">
         <section className="feedback-block">
-          <h2>Sintesis breve</h2>
+          <h2>Síntesis breve</h2>
           <p>{sessionFeedback.briefSummary}</p>
         </section>
 
@@ -54,7 +129,7 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
         </section>
 
         <section className="feedback-block">
-          <h2>Proximo paso sugerido</h2>
+          <h2>Próximo paso sugerido</h2>
           <p>{sessionFeedback.nextStep}</p>
         </section>
       </div>
@@ -124,16 +199,27 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
               {report.reformulationSuggestions.slice(0, 2).map((item) => (
                 <li key={`${item.insteadOf}-${item.tryThis}`}>
                   <span>En vez de: "{item.insteadOf}"</span>
-                  <strong>Podrias decir: "{item.tryThis}"</strong>
+                  <strong>Podrías decir: "{item.tryThis}"</strong>
                 </li>
               ))}
             </ul>
           </section>
         )}
+
+        {report.skillClassification?.length > 0 && (
+          <section className="feedback-block">
+            <h2>Habilidades observadas durante la entrevista</h2>
+            <div className="skill-chip-list">
+              {report.skillClassification.map((item) => (
+                <span key={item.label}>{item.label}: {item.count}</span>
+              ))}
+            </div>
+          </section>
+        )}
       </details>
 
       <details className="history-details">
-        <summary>Ver conversacion completa ({visibleHistory.length})</summary>
+        <summary>Ver conversación completa ({visibleHistory.length})</summary>
         <ol>
           {visibleHistory.map((entry) => (
             <li key={entry.id}>
@@ -154,7 +240,7 @@ export function FeedbackPanel({ report, caseItem, history, sessionNumber = 1, on
         </button>
         <button className="primary-action" type="button" onClick={onRestart}>
           <RotateCcw aria-hidden="true" />
-          Repetir simulacion
+          Repetir simulación
         </button>
       </div>
     </section>

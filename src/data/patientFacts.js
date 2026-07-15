@@ -1,3 +1,5 @@
+import { getAvatarCanonicalBiography } from "./avatarCanonicalBiographies.js";
+
 export const patientFacts = {
   tomas: {
     name: "Tomás",
@@ -411,4 +413,73 @@ const concreteProgressionByCase = {
 
 for (const [caseId, progression] of Object.entries(concreteProgressionByCase)) {
   Object.assign(patientFacts[caseId], progression);
+}
+
+for (const caseId of Object.keys(patientFacts)) {
+  const biography = getAvatarCanonicalBiography(caseId);
+  if (!biography) continue;
+
+  Object.assign(patientFacts[caseId], {
+    name: biography.identity.preferredName,
+    age: biography.identity.age,
+    school: buildCanonicalSchoolFact(biography),
+    academic: buildCanonicalAcademicFact(biography),
+    works: buildCanonicalWorkFact(biography),
+    family: buildCanonicalFamilyFact(biography),
+    social: buildCanonicalSocialFact(biography),
+    habits: biography.dailyLife.sleep,
+    preferences: buildCanonicalPreferencesFact(biography),
+    motive: biography.consultation.immediateReason,
+    concern: biography.consultation.concerns || biography.internalConflict,
+    expectation: biography.consultation.expectations,
+    canonicalProgram: biography.education.program,
+    canonicalInstitution: biography.education.institution,
+    canonicalWorkplace: biography.employment.employer,
+    canonicalRole: biography.employment.role
+  });
+}
+
+function buildCanonicalSchoolFact(biography) {
+  if (/universitaria|universitario|ensenanza|escolar/i.test(biography.education.status || "")) {
+    return biography.education.institution
+      ? `Estudio ${biography.education.program} en ${biography.education.institution}.`
+      : `Estoy en ${biography.education.program || biography.education.status}.`;
+  }
+  return "No estudio actualmente.";
+}
+
+function buildCanonicalAcademicFact(biography) {
+  if (!biography.education.program || /^no cursa/i.test(biography.education.status || "")) {
+    return biography.education.academicHistory || "No estudio actualmente.";
+  }
+  const institution = biography.education.institution ? ` en ${biography.education.institution}` : "";
+  const progress = [biography.education.year, biography.education.semester].filter(Boolean).join(", ");
+  return `Estudio ${biography.education.program}${institution}${progress ? `. Voy en ${progress}` : ""}.`;
+}
+
+function buildCanonicalWorkFact(biography) {
+  if (/sin empleo formal/i.test(biography.employment.status || "")) {
+    return biography.employment.role && biography.employment.role !== "sin empleo formal"
+      ? `No tengo empleo formal; principalmente soy ${biography.employment.role}.`
+      : "No trabajo formalmente.";
+  }
+  const employer = biography.employment.employer ? ` en ${biography.employment.employer}` : "";
+  return `Trabajo como ${biography.employment.role}${employer}.`;
+}
+
+function buildCanonicalFamilyFact(biography) {
+  const home = biography.identity.livingWith?.length
+    ? `Vivo con ${biography.identity.livingWith.join(", ")}.`
+    : "";
+  return `${home} ${biography.family.familyRole || ""}`.trim();
+}
+
+function buildCanonicalSocialFact(biography) {
+  const support = biography.relationships.supportNetwork || [];
+  return support.length ? `Cuento con ${support.join(", ")}.` : "Tengo algunas personas cercanas.";
+}
+
+function buildCanonicalPreferencesFact(biography) {
+  const hobbies = biography.interests.hobbies || [];
+  return hobbies.length ? `Me gusta ${hobbies.join(", ")}.` : biography.interests.technologyUse;
 }

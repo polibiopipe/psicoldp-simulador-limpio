@@ -1,3 +1,5 @@
+import { getAvatarCanonicalBiography } from "./avatarCanonicalBiographies.js";
+
 export const patientProfiles = {
   tomas: {
     identity: "Tomás, joven de 18 años cerrando la enseñanza media",
@@ -180,3 +182,15 @@ export const patientProfiles = {
     initialOpenness: 37
   }
 };
+
+for (const caseId of Object.keys(patientProfiles)) {
+  const biography = getAvatarCanonicalBiography(caseId);
+  if (!biography) continue;
+
+  patientProfiles[caseId] = {
+    ...patientProfiles[caseId],
+    identity: `${biography.identity.preferredName}, ${biography.identity.age} años`,
+    explicitReason: biography.consultation.immediateReason || patientProfiles[caseId].explicitReason,
+    hiddenConcern: biography.disclosure.deep?.[0] || patientProfiles[caseId].hiddenConcern
+  };
+}

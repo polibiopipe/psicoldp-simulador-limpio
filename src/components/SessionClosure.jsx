@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -9,6 +9,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import {
+  closureExamples,
   getNextSessionAgreement,
   getNextSessionNumber,
   getSessionClosureTitle,
@@ -17,6 +18,7 @@ import {
 import {
   buildProcessSummary,
   buildSessionSummary,
+  formatProcessSummary,
   formatSessionAgreement,
   saveSessionSummary
 } from "../engine/sessionMemory.js";
@@ -24,6 +26,8 @@ import {
   buildContinuityAgreement,
   buildInitialClinicalDecision,
   CLINICAL_DECISION_OPTIONS,
+  decisionAllowsComplementaryEvaluation,
+  decisionAllowsNextSession,
   evaluateClinicalPlanDecision,
   formatClinicalDecision,
   getClinicalSessionPlan,
@@ -34,8 +38,18 @@ import {
   evaluateClinicalArtifacts,
   normalizeClinicalArtifacts
 } from "../engine/clinicalArtifacts.js";
-import { buildSessionFeedback } from "../engine/sessionFeedback.js";
-import { clinicalInstrumentOptions } from "../data/clinicalWorkflow.js";
+import { buildSimulatedExternalReport } from "../engine/clinicalComplementaryEvaluation.js";
+import {
+  buildClinicalDraftKey,
+  buildClinicalScrollKey,
+  clearClinicalDraft,
+  clearClinicalScrollPosition,
+  loadClinicalDraft,
+  loadClinicalScrollPosition,
+  saveClinicalScrollPosition,
+  saveClinicalDraft
+} from "../engine/clinicalDraftAutosave.js";
+import { clinicalExplorationAreas, clinicalInstrumentOptions } from "../data/clinicalWorkflow.js";
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
 
 export function SessionClosure({
@@ -46,6 +60,9 @@ export function SessionClosure({
   totalSessions = 4,
   previousSessionSummaries = [],
   preSessionPlan = null,
+  userId = "",
+  userEmail = "",
+  sessionRecordId = "",
   onContinueSession,
   onScheduleNextSession,
   onBackHome,
@@ -53,15 +70,61 @@ export function SessionClosure({
   onSaveSessionRecord
 }) {
   const [copied, setCopied] = useState(false);
+  const [processCopied, setProcessCopied] = useState(false);
   const [hasSavedSessionRecord, setHasSavedSessionRecord] = useState(false);
   const [hasSavedContinuityAgreement, setHasSavedContinuityAgreement] = useState(false);
   const [clinicalArtifacts, setClinicalArtifacts] = useState(() => buildInitialClinicalArtifacts());
+  const [draftStatus, setDraftStatus] = useState(null);
+  const restoredDraftRef = useRef(false);
+  const restoredScrollKeyRef = useRef("");
+  const scrollPersistenceDisabledRef = useRef(false);
+  const hydratingDraftRef = useRef(true);
+  const stableSessionRecordIdRef = useRef(sessionRecordId);
   const sessionPlan = useMemo(() => getClinicalSessionPlan(caseItem), [caseItem.id]);
+  if (sessionRecordId) stableSessionRecordIdRef.current = sessionRecordId;
+  const decisionDraftKey = useMemo(
+    () =>
+      buildClinicalDraftKey({
+        userId,
+        userEmail,
+        caseId: caseItem.id,
+        sessionId: stableSessionRecordIdRef.current,
+        sessionNumber,
+        step: "closure-decision"
+      }),
+    [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
+  );
+  const artifactsDraftKey = useMemo(
+    () =>
+      buildClinicalDraftKey({
+        userId,
+        userEmail,
+        caseId: caseItem.id,
+        sessionId: stableSessionRecordIdRef.current,
+        sessionNumber,
+        step: "closure-artifacts"
+      }),
+    [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
+  );
+  const closureScrollKey = useMemo(
+    () =>
+      buildClinicalScrollKey({
+        userId,
+        userEmail,
+        caseId: caseItem.id,
+        sessionId: stableSessionRecordIdRef.current,
+        sessionNumber,
+        step: "closure"
+      }),
+    [userId, userEmail, caseItem.id, stableSessionRecordIdRef.current, sessionNumber]
+  );
   const [clinicalDecision, setClinicalDecision] = useState(() =>
     buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan })
   );
   const fallbackAgreement = getNextSessionAgreement(caseItem.id);
   const interviewTurns = history.filter((entry) => !entry.isSessionPrelude);
+  const isNotEvaluable = report.evaluationStatus === "not_evaluable";
+  const isLimitedEvaluation = report.evaluationStatus === "limited";
   const achieved = report.criteria.filter((criterion) => criterion.level === "achieved").length;
   const partial = report.criteria.filter((criterion) => criterion.level === "partial").length;
   const normalizedClinicalDecision = useMemo(
@@ -98,21 +161,8 @@ export function SessionClosure({
     [clinicalArtifacts]
   );
   const clinicalArtifactsEvaluation = useMemo(
-    () => evaluateClinicalArtifacts({ artifacts: normalizedClinicalArtifacts, report, history }),
-    [normalizedClinicalArtifacts, report, history]
-  );
-  const sessionFeedback = useMemo(
-    () =>
-      buildSessionFeedback({
-        sessionNumber,
-        selectedCase: caseItem,
-        conversation: history,
-        clinicalDecision: normalizedClinicalDecision,
-        studentPlan: preSessionPlan,
-        selectedApproach: report.therapeuticApproach,
-        report
-      }),
-    [sessionNumber, caseItem, history, normalizedClinicalDecision, preSessionPlan, report]
+    () => evaluateClinicalArtifacts({ artifacts: normalizedClinicalArtifacts, report, history, caseItem }),
+    [normalizedClinicalArtifacts, report, history, caseItem]
   );
   const agreement = useMemo(
     () =>
@@ -125,9 +175,16 @@ export function SessionClosure({
     [normalizedClinicalDecision, sessionPlan, fallbackAgreement, sessionNumber]
   );
   const canContinueInSimulator =
-    normalizedClinicalDecision.action === "continue_session" &&
+    decisionAllowsNextSession(normalizedClinicalDecision.action) &&
     Boolean(nextSessionNumber) &&
     normalizedClinicalDecision.proposedSessions > sessionNumber;
+  const canRequestComplementaryEvaluation = decisionAllowsComplementaryEvaluation(normalizedClinicalDecision.action);
+  const shouldShowInterventionDesign = normalizedClinicalDecision.action === "start_intervention_design";
+  const complementaryEvaluation = normalizedClinicalArtifacts.complementaryEvaluation;
+  const complementaryRequestEvaluation = clinicalArtifactsEvaluation.complementaryRequestEvaluation;
+  const externalReportIntegrationEvaluation = clinicalArtifactsEvaluation.externalReportIntegrationEvaluation;
+  const interventionDesignEvaluation = clinicalArtifactsEvaluation.interventionDesignEvaluation;
+  const isFinalSession = !canContinueInSimulator;
   const reachedSessionLimit = !nextSessionNumber;
   const closureAction = getClosureActionConfig({
     canContinueInSimulator,
@@ -173,30 +230,125 @@ export function SessionClosure({
   ].join("|");
 
   useEffect(() => {
-    setClinicalDecision(buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan }));
-    setClinicalArtifacts(buildInitialClinicalArtifacts());
+    hydratingDraftRef.current = true;
+    const initialDecision = buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan });
+    const initialArtifacts = buildInitialClinicalArtifacts();
+    const decisionDraft = loadClinicalDraft(decisionDraftKey);
+    const artifactsDraft = loadClinicalDraft(artifactsDraftKey);
+    const hasDecisionDraft = hasMeaningfulClinicalDecisionDraft(decisionDraft, initialDecision);
+    const hasArtifactsDraft = hasMeaningfulClinicalArtifactsDraft(artifactsDraft);
+
+    setClinicalDecision(hasDecisionDraft ? { ...initialDecision, ...decisionDraft } : initialDecision);
+    setClinicalArtifacts(hasArtifactsDraft ? mergeClinicalArtifactsDraft(initialArtifacts, artifactsDraft) : initialArtifacts);
     setHasSavedSessionRecord(false);
     setHasSavedContinuityAgreement(false);
-  }, [caseItem.id, sessionNumber, sessionPlan, preSessionPlanKey]);
+    restoredDraftRef.current = hasDecisionDraft || hasArtifactsDraft;
+    setDraftStatus(
+      restoredDraftRef.current
+        ? { type: "restored", message: "Recuperamos tu borrador." }
+        : null
+    );
+    restoredScrollKeyRef.current = "";
+    scrollPersistenceDisabledRef.current = false;
+  }, [caseItem.id, sessionNumber, sessionPlan, preSessionPlanKey, decisionDraftKey, artifactsDraftKey]);
+
+  useEffect(() => {
+    if (hydratingDraftRef.current) {
+      hydratingDraftRef.current = false;
+      return undefined;
+    }
+
+    const initialDecision = buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan });
+    const hasDecisionDraft = hasMeaningfulClinicalDecisionDraft(clinicalDecision, initialDecision);
+    const hasArtifactsDraft = hasMeaningfulClinicalArtifactsDraft(clinicalArtifacts);
+
+    if (!hasDecisionDraft) clearClinicalDraft(decisionDraftKey);
+    if (!hasArtifactsDraft) clearClinicalDraft(artifactsDraftKey);
+    if (!hasDecisionDraft && !hasArtifactsDraft) return undefined;
+
+    if (!restoredDraftRef.current) {
+      setDraftStatus({ type: "pending", message: "Cambios pendientes de guardar." });
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      if (hasDecisionDraft) saveClinicalDraft(decisionDraftKey, clinicalDecision);
+      if (hasArtifactsDraft) saveClinicalDraft(artifactsDraftKey, clinicalArtifacts);
+      setDraftStatus({ type: "saved", message: "Borrador guardado." });
+      restoredDraftRef.current = false;
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    decisionDraftKey,
+    artifactsDraftKey,
+    clinicalDecision,
+    clinicalArtifacts,
+    sessionNumber,
+    sessionPlan,
+    preSessionPlan
+  ]);
+
+  useEffect(() => {
+    const initialDecision = buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan });
+    const shouldWarn =
+      !hasSavedSessionRecord &&
+      (hasMeaningfulClinicalDecisionDraft(clinicalDecision, initialDecision) ||
+        hasMeaningfulClinicalArtifactsDraft(clinicalArtifacts));
+
+    if (!shouldWarn) return undefined;
+
+    function warnBeforeUnload(event) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [hasSavedSessionRecord, clinicalDecision, clinicalArtifacts, sessionNumber, sessionPlan, preSessionPlan]);
+
+  useEffect(() => {
+    if (restoredScrollKeyRef.current === closureScrollKey) return undefined;
+    restoredScrollKeyRef.current = closureScrollKey;
+
+    const savedY = loadClinicalScrollPosition(closureScrollKey);
+    if (!savedY) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: savedY, behavior: "auto" });
+      });
+    }, 260);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [closureScrollKey, clinicalDecision, clinicalArtifacts]);
+
+  useEffect(() => {
+    let timeoutId = null;
+
+    function persistScrollPosition() {
+      timeoutId = null;
+      if (scrollPersistenceDisabledRef.current) return;
+      saveClinicalScrollPosition(closureScrollKey, getCurrentScrollY());
+    }
+
+    function handleScroll() {
+      if (timeoutId) return;
+      timeoutId = window.setTimeout(persistScrollPosition, 400);
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      persistScrollPosition();
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [closureScrollKey]);
 
   function updateDecision(patch) {
     setClinicalDecision((current) => ({
       ...current,
       ...patch
     }));
-  }
-
-  function selectClinicalAction(action) {
-    const nextPatch = { action };
-    if (action === "continue_session") {
-      nextPatch.proposedSessions = Math.max(
-        Number(clinicalDecision.proposedSessions) || sessionNumber + 1,
-        sessionNumber + 1
-      );
-    } else {
-      nextPatch.proposedSessions = sessionNumber;
-    }
-    updateDecision(nextPatch);
   }
 
   function updateArtifacts(patch) {
@@ -213,6 +365,57 @@ export function SessionClosure({
     updateArtifacts({ selectedInstruments: Array.from(current) });
   }
 
+  function updateComplementaryEvaluation(patch) {
+    setClinicalArtifacts((current) => ({
+      ...current,
+      complementaryEvaluation: {
+        ...(current.complementaryEvaluation || {}),
+        ...patch
+      }
+    }));
+  }
+
+  function updateReportIntegration(patch) {
+    setClinicalArtifacts((current) => ({
+      ...current,
+      complementaryEvaluation: {
+        ...(current.complementaryEvaluation || {}),
+        integration: {
+          ...(current.complementaryEvaluation?.integration || {}),
+          ...patch
+        }
+      }
+    }));
+  }
+
+  function updateInterventionDesign(patch) {
+    setClinicalArtifacts((current) => ({
+      ...current,
+      interventionDesign: {
+        ...(current.interventionDesign || {}),
+        ...patch
+      }
+    }));
+  }
+
+  function requestExternalReport() {
+    if (!complementaryRequestEvaluation.canGenerateReport) {
+      updateComplementaryEvaluation({ status: "needs_revision" });
+      return;
+    }
+
+    const report = buildSimulatedExternalReport({
+      request: complementaryEvaluation,
+      caseItem,
+      history,
+      sessionNumber
+    });
+    updateComplementaryEvaluation({
+      status: report ? "received" : "needs_revision",
+      report
+    });
+  }
+
   async function saveCurrentSummary({ includeHistory = false } = {}) {
     saveSessionSummary(summary);
     if (includeHistory && !hasSavedSessionRecord && onSaveSessionRecord) {
@@ -223,6 +426,13 @@ export function SessionClosure({
       });
       setHasSavedSessionRecord(true);
     }
+    if (includeHistory) {
+      scrollPersistenceDisabledRef.current = true;
+      clearClinicalDraft(decisionDraftKey);
+      clearClinicalDraft(artifactsDraftKey);
+      clearClinicalScrollPosition(closureScrollKey);
+      setDraftStatus({ type: "saved", message: "Cambios guardados." });
+    }
   }
 
   async function continueToNextSession() {
@@ -232,7 +442,10 @@ export function SessionClosure({
 
   async function scheduleNextSession() {
     await saveCurrentSummary({ includeHistory: true });
-    if (canContinueInSimulator) onScheduleNextSession?.(nextSessionNumber);
+    if (canContinueInSimulator) {
+      if (onScheduleNextSession) onScheduleNextSession(nextSessionNumber);
+      else onContinueSession(summary);
+    }
   }
 
   async function saveContinuityAgreement() {
@@ -264,21 +477,98 @@ export function SessionClosure({
     }
   }
 
+  async function copyProcessSummary() {
+    await saveCurrentSummary();
+    try {
+      await navigator.clipboard.writeText(formatProcessSummary(processSummary));
+      setProcessCopied(true);
+      window.setTimeout(() => setProcessCopied(false), 1800);
+    } catch {
+      setProcessCopied(false);
+    }
+  }
+
+  if (isNotEvaluable) {
+    return (
+      <section className="session-closure session-closure-empty" aria-labelledby="session-closure-title">
+        <header className="session-closure-header">
+          <span className="eyebrow">Cierre de sesiÃ³n</span>
+          <h1 id="session-closure-title">SesiÃ³n sin intervenciones suficientes para evaluar</h1>
+          <p>{report.emptySessionMessage}</p>
+        </header>
+
+        <section className="closure-card closure-panel closure-panel-wide">
+          <div className="closure-case-strip">
+            <div>
+              <span>Paciente ficticio</span>
+              <strong>{caseItem.name}</strong>
+            </div>
+            <div>
+              <span>SesiÃ³n</span>
+              <strong>{sessionNumber}</strong>
+            </div>
+            <div>
+              <span>Intervenciones</span>
+              <strong>0</strong>
+            </div>
+            <div>
+              <span>Estado</span>
+              <strong>No evaluable</strong>
+            </div>
+          </div>
+          <p>
+            Esta sesiÃ³n no entrega evaluaciÃ³n formativa porque no hubo intervenciones
+            observables del estudiante.
+          </p>
+          <ul>
+            {report.nextSuggestions.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <div className="closure-action-row">
+            <button className="secondary-action" type="button" onClick={onBackHome}>
+              <Home aria-hidden="true" />
+              Volver al inicio
+            </button>
+          </div>
+        </section>
+      </section>
+    );
+  }
+
   return (
     <section className="session-closure" aria-labelledby="session-closure-title">
       <header className="session-closure-header">
         <span className="eyebrow">Proceso por sesiones</span>
         <h1 id="session-closure-title">{closureTitle}</h1>
         <p>
-          Resumen formativo de la sesión simulada. Esta síntesis es ficticia y ayuda a
-          ordenar qué se exploró y qué podría retomarse en el proceso.
+          Resumen formativo de la sesiÃ³n simulada. Esta sÃ­ntesis es ficticia y ayuda a
+          ordenar quÃ© se explorÃ³ y quÃ© podrÃ­a retomarse en el proceso.
         </p>
+        <p>
+          Las cuatro sesiones son una ruta formativa base, no un cierre obligatorio.
+          Puedes continuar evaluando, solicitar informaciÃ³n complementaria o iniciar
+          diseÃ±o de intervenciÃ³n si la comprensiÃ³n clÃ­nica ya es suficiente.
+        </p>
+        {draftStatus && (
+          <div className={`draft-autosave-status ${draftStatus.type}`} role="status">
+            {draftStatus.message}
+          </div>
+        )}
       </header>
 
+      <div className="closure-stage-list">
+        <details className="closure-stage" open>
+          <summary>
+            <span>1</span>
+            <strong>Resumen breve de sesiÃ³n</strong>
+            <small>Paciente, turnos, apertura y senales generales del cierre.</small>
+          </summary>
+          <div className="closure-stage-body">
       {interviewTurns.length < 3 && (
         <div className="session-note low-turn-note">
-          Esta sesión tuvo pocas intervenciones. Para un mejor aprendizaje, se recomienda
-          profundizar más antes de avanzar, aunque puedes continuar si estás probando el flujo.
+          Esta sesiÃ³n tuvo pocas intervenciones. Para un mejor aprendizaje, se recomienda
+          profundizar mÃ¡s antes de avanzar, aunque puedes continuar si estÃ¡s probando el flujo.
         </div>
       )}
 
@@ -288,7 +578,7 @@ export function SessionClosure({
           <strong>{caseItem.name}</strong>
         </div>
         <div>
-          <span>Sesión</span>
+          <span>SesiÃ³n</span>
           <strong>{sessionNumber}</strong>
         </div>
         <div>
@@ -297,7 +587,29 @@ export function SessionClosure({
         </div>
       </div>
 
-      <div className="closure-metrics" aria-label="Métricas de cierre">
+            <section className="session-summary-card closure-panel closure-panel-wide">
+              <span className="eyebrow">Resumen narrativo</span>
+              <h2>SesiÃ³n {summary.sessionNumber} con {summary.patientName}</h2>
+              <p>{summary.resumenConversacion}</p>
+            </section>
+          </div>
+        </details>
+
+        <details className="closure-stage">
+          <summary>
+            <span>2</span>
+            <strong>RetroalimentaciÃ³n formativa</strong>
+            <small>Indicadores, fortalezas y aspectos prioritarios.</small>
+          </summary>
+          <div className="closure-stage-body">
+      {isLimitedEvaluation ? (
+        <div className="session-note low-turn-note">
+          RetroalimentaciÃ³n limitada: hubo muy pocas intervenciones para sostener
+          porcentajes o logros robustos. Usa esta devoluciÃ³n como orientaciÃ³n para
+          iniciar mejor el prÃ³ximo intento.
+        </div>
+      ) : (
+      <div className="closure-metrics" aria-label="MÃ©tricas de cierre">
         <article>
           <Clock aria-hidden="true" />
           <strong>{interviewTurns.length}</strong>
@@ -319,94 +631,113 @@ export function SessionClosure({
           <span>apertura</span>
         </article>
       </div>
-
-      {summary.preSessionEvaluation && (
-        <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
-          <span className="eyebrow">Preparacion previa</span>
-          <h2>Plan inicial de entrevista</h2>
-          <p>{summary.preSessionEvaluation.summary}</p>
-          <div className="session-summary-grid">
-            <div>
-              <h3>Fortalezas del plan</h3>
-              <ul>
-                {summary.preSessionEvaluation.strengths.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3>Brechas a revisar</h3>
-              <ul>
-                {summary.preSessionEvaluation.gaps.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
       )}
 
-      <div className="closure-panels">
-        <section className="session-summary-card closure-panel closure-panel-wide session-feedback-compact">
-          <span className="eyebrow">Retroalimentacion breve</span>
-          <div className="feedback-brief-header">
-            <div>
-              <h2>{sessionFeedback.levelLabel}</h2>
-              <p>{sessionFeedback.levelDescription}</p>
-            </div>
-            <strong>Sesion {summary.sessionNumber}</strong>
-          </div>
+      <div className="closure-panels closure-feedback-brief">
+        <section className="closure-card closure-panel">
+          <h2>Fortalezas principales</h2>
+          <ul>
+            {report.strengths.slice(0, 3).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
 
-          <div className="feedback-sections feedback-brief-grid">
-            <article className="feedback-block">
-              <h3>Sintesis breve</h3>
-              <p>{sessionFeedback.briefSummary}</p>
-            </article>
-            <article className="feedback-block">
-              <h3>Fortalezas observadas</h3>
-              <ul>
-                {sessionFeedback.strengths.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </article>
-            <article className="feedback-block">
-              <h3>Aspecto a mejorar</h3>
-              <ul>
-                {sessionFeedback.improvements.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </article>
-            <article className="feedback-block">
-              <h3>Proximo paso sugerido</h3>
-              <p>{sessionFeedback.nextStep}</p>
-            </article>
-          </div>
+        <section className="closure-card closure-panel">
+          <h2>Aspectos por mejorar</h2>
+          <ul>
+            {report.improvements.slice(0, 3).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
 
-          <details className="history-details feedback-detail-toggle">
-            <summary>Ver detalle formativo</summary>
-            <div className="session-summary-grid">
-              <div>
-                <h3>Criterios</h3>
-                <ul>
-                  {sessionFeedback.formativeCriteria.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3>Referencias formativas</h3>
-                <ul>
-                  {sessionFeedback.referencesUsed.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </details>
+        <section className="closure-card closure-panel">
+          <h2>Temas pendientes</h2>
+          <ul>
+            {summary.temasPendientes.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="closure-card closure-panel">
+          <h2>Ejemplos de cierre formativo</h2>
+          <ul>
+            {closureExamples.slice(0, 3).map((example) => (
+              <li key={example}>"{example}"</li>
+            ))}
+          </ul>
         </section>
       </div>
+
+          </div>
+        </details>
+
+        <details className="closure-stage">
+          <summary>
+            <span>3</span>
+            <strong>PreparaciÃ³n previa y continuidad</strong>
+            <small>SÃ­ntesis compacta del plan inicial utilizado.</small>
+          </summary>
+          <div className="closure-stage-body">
+            {summary.preSessionEvaluation ? (
+              <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel compact-preparation-summary">
+                <span className="eyebrow">PreparaciÃ³n previa utilizada</span>
+                <h2>Plan inicial de entrevista</h2>
+                <ul className="compact-clinical-list">
+                  <li>
+                    <strong>Modalidad:</strong> {summary.preSessionEvaluation.interviewType || "No registrada"}.
+                  </li>
+                  <li>
+                    <strong>Ãreas planificadas:</strong>{" "}
+                    {formatClinicalAreaList(summary.preSessionEvaluation.plannedAreas)}.
+                  </li>
+                  <li>
+                    <strong>Ãreas retomadas:</strong>{" "}
+                    {summary.preSessionEvaluation.coveredAreas.length} de{" "}
+                    {summary.preSessionEvaluation.plannedAreas.length}.
+                  </li>
+                  <li>
+                    <strong>Brechas relevantes:</strong>{" "}
+                    {summary.preSessionEvaluation.gaps.slice(0, 3).join("; ") || "No se observan brechas relevantes en el plan."}
+                  </li>
+                </ul>
+                <details className="closure-inline-detail">
+                  <summary>Ver anÃ¡lisis de preparaciÃ³n</summary>
+                  <div className="session-summary-grid">
+                    <div>
+                      <h3>Fortalezas del plan</h3>
+                      <ul>
+                        {summary.preSessionEvaluation.strengths.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h3>Brechas a revisar</h3>
+                      <ul>
+                        {summary.preSessionEvaluation.gaps.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </details>
+              </section>
+            ) : (
+              <div className="session-note">No hay preparaciÃ³n previa registrada para esta sesiÃ³n.</div>
+            )}
+          </div>
+        </details>
+
+        <details className="closure-stage">
+          <summary>
+            <span>4</span>
+            <strong>FormulaciÃ³n clÃ­nica e instrumentos</strong>
+            <small>HipÃ³tesis, datos, instrumentos e informe externo.</small>
+          </summary>
+          <div className="closure-stage-body">
       <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
         <span className="eyebrow">Formulacion y registro</span>
         <h2>Hipotesis, instrumentos y nota clinica</h2>
@@ -483,7 +814,7 @@ export function SessionClosure({
                   checked={(clinicalArtifacts.selectedInstruments || []).includes(instrument.id)}
                   onChange={() => toggleInstrument(instrument.id)}
                 />
-                {instrument.label} · {instrument.useCase}
+                {instrument.label} Â· {instrument.useCase}
               </label>
             ))}
           </div>
@@ -498,6 +829,299 @@ export function SessionClosure({
             rows={2}
           />
         </label>
+
+        <div className="clinical-plan-subpanel">
+          <span className="eyebrow">Evaluacion complementaria simulada</span>
+          <h3>Solicitar informe externo</h3>
+          <p>
+            El estudiante no aplica pruebas dentro del simulador. Solicita una evaluacion
+            complementaria, justifica su pertinencia y recibe un informe externo simulado
+            para integrarlo al caso.
+          </p>
+          {!canRequestComplementaryEvaluation && (
+            <div className="session-note">
+              Esta seccion queda disponible especialmente si decides continuar evaluando,
+              solicitar evaluacion complementaria o reformular hipotesis.
+            </div>
+          )}
+
+          <div className="clinical-plan-form">
+            <label>
+              <span>Prueba, area o instrumento solicitado</span>
+              <select
+                value={clinicalArtifacts.complementaryEvaluation?.instrumentId || ""}
+                onChange={(event) =>
+                  updateComplementaryEvaluation({
+                    instrumentId: event.target.value,
+                    status: "draft",
+                    report: null
+                  })
+                }
+              >
+                <option value="">Selecciona una opcion</option>
+                {clinicalInstrumentOptions.map((instrument) => (
+                  <option key={instrument.id} value={instrument.id}>
+                    {instrument.label} - {instrument.area}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span>Por que solicitas esta evaluacion complementaria?</span>
+              <textarea
+                value={clinicalArtifacts.complementaryEvaluation?.justification || ""}
+                onChange={(event) => updateComplementaryEvaluation({ justification: event.target.value })}
+                placeholder="Explica que dato clinico falta y por que no basta con concluir todavia."
+                rows={2}
+              />
+            </label>
+
+            <label>
+              <span>Que hipotesis quieres explorar o contrastar?</span>
+              <textarea
+                value={clinicalArtifacts.complementaryEvaluation?.hypothesis || ""}
+                onChange={(event) => updateComplementaryEvaluation({ hypothesis: event.target.value })}
+                placeholder="Ej.: distinguir si el malestar se explica mejor por ansiedad, sobrecarga o evitacion."
+                rows={2}
+              />
+            </label>
+
+            <label>
+              <span>Â¿QuÃ© informaciÃ³n esperas obtener?</span>
+              <textarea
+                value={clinicalArtifacts.complementaryEvaluation?.expectedInformation || ""}
+                onChange={(event) => updateComplementaryEvaluation({ expectedInformation: event.target.value })}
+                placeholder="Nombra informaciÃ³n especÃ­fica que ayudarÃ­a a decidir continuidad, derivaciÃ³n o intervenciÃ³n."
+                rows={2}
+              />
+            </label>
+
+            <label>
+              <span>Pertinencia por edad y caracteristicas del caso</span>
+              <textarea
+                value={clinicalArtifacts.complementaryEvaluation?.agePertinence || ""}
+                onChange={(event) => updateComplementaryEvaluation({ agePertinence: event.target.value })}
+                placeholder="Justifica por que esta evaluacion corresponde a este paciente y a este momento del proceso."
+                rows={2}
+              />
+            </label>
+
+            <label>
+              <span>Como integraras estos resultados al proceso?</span>
+              <textarea
+                value={clinicalArtifacts.complementaryEvaluation?.integrationPlan || ""}
+                onChange={(event) => updateComplementaryEvaluation({ integrationPlan: event.target.value })}
+                placeholder="Explica como evitaras usar el informe como conclusion automatica."
+                rows={2}
+              />
+            </label>
+          </div>
+
+          <div className={`clinical-plan-evaluation ${complementaryRequestEvaluation.level}`}>
+            <div>
+              <span>{complementaryRequestEvaluation.title}</span>
+              <strong>{complementaryRequestEvaluation.levelLabel}</strong>
+            </div>
+            <p>{complementaryRequestEvaluation.summary}</p>
+            {(complementaryRequestEvaluation.concerns.length > 0 ||
+              complementaryRequestEvaluation.recommendations.length > 0) && (
+              <ul>
+                {[...complementaryRequestEvaluation.concerns, ...complementaryRequestEvaluation.recommendations]
+                  .slice(0, 4)
+                  .map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="closure-actions">
+            <button className="primary-action" type="button" onClick={requestExternalReport}>
+              Solicitar informe externo simulado
+            </button>
+          </div>
+
+          {complementaryEvaluation.status === "needs_revision" && (
+            <div className="session-note low-turn-note">
+              Antes de entregar el informe, mejora la justificacion clinica, la hipotesis
+              y el plan de integracion.
+            </div>
+          )}
+
+          {complementaryEvaluation.report && (
+            <article className="session-summary-card closure-panel">
+              <span className="eyebrow">Informe externo recibido</span>
+              <h3>{complementaryEvaluation.report.title}</h3>
+              <p><strong>Motivo de derivacion:</strong> {complementaryEvaluation.report.referralReason}</p>
+              <p>
+                <strong>Prueba o area:</strong> {complementaryEvaluation.report.requestedInstrument.name}
+                {" "}({complementaryEvaluation.report.requestedInstrument.type})
+              </p>
+              <div className="session-summary-grid">
+                <div>
+                  <h4>Observaciones conductuales</h4>
+                  <ul>
+                    {complementaryEvaluation.report.behavioralObservations.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4>Resultados principales</h4>
+                  <ul>
+                    {complementaryEvaluation.report.mainResults.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4>Hipotesis complementarias</h4>
+                  <ul>
+                    {complementaryEvaluation.report.complementaryHypotheses.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4>Recomendaciones</h4>
+                  <ul>
+                    {complementaryEvaluation.report.recommendations.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <p><strong>Interpretacion clinica-formativa:</strong> {complementaryEvaluation.report.clinicalInterpretation}</p>
+              <p><strong>Limitaciones:</strong> {complementaryEvaluation.report.limitations.join(" ")}</p>
+              <p><strong>Nota etica:</strong> {complementaryEvaluation.report.ethicalNote}</p>
+            </article>
+          )}
+
+          {complementaryEvaluation.report && (
+            <div className="clinical-plan-form">
+              <label>
+                <span>Â¿QuÃ© informaciÃ³n nueva aporta el informe?</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.newInformation || ""}
+                  onChange={(event) => updateReportIntegration({ newInformation: event.target.value })}
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Confirma, modifica o tensiona tu hipotesis?</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.hypothesisImpact || ""}
+                  onChange={(event) => updateReportIntegration({ hypothesisImpact: event.target.value })}
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Â¿QuÃ© integrarÃ¡s al diseÃ±o de intervenciÃ³n?</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.interventionUse || ""}
+                  onChange={(event) => updateReportIntegration({ interventionUse: event.target.value })}
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Que riesgos o dilemas eticos aparecen?</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.ethicalRisks || ""}
+                  onChange={(event) => updateReportIntegration({ ethicalRisks: event.target.value })}
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Que limitaciones tiene este informe?</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.limitations || ""}
+                  onChange={(event) => updateReportIntegration({ limitations: event.target.value })}
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Decision clinica posterior al informe</span>
+                <textarea
+                  value={clinicalArtifacts.complementaryEvaluation?.integration?.nextDecision || ""}
+                  onChange={(event) => updateReportIntegration({ nextDecision: event.target.value })}
+                  placeholder="Continuar evaluacion, iniciar intervencion, reformular hipotesis, cerrar o derivar."
+                  rows={2}
+                />
+              </label>
+            </div>
+          )}
+
+          {externalReportIntegrationEvaluation && (
+            <div className={`clinical-plan-evaluation ${externalReportIntegrationEvaluation.level}`}>
+              <div>
+                <span>{externalReportIntegrationEvaluation.title}</span>
+                <strong>{externalReportIntegrationEvaluation.levelLabel}</strong>
+              </div>
+              <p>{externalReportIntegrationEvaluation.summary}</p>
+              <ul>
+                {(externalReportIntegrationEvaluation.gaps.length
+                  ? externalReportIntegrationEvaluation.gaps
+                  : externalReportIntegrationEvaluation.strengths
+                ).slice(0, 4).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {(shouldShowInterventionDesign || normalizedClinicalArtifacts.interventionDesign.caseUnderstanding) && (
+          <div className="clinical-plan-subpanel">
+            <span className="eyebrow">DiseÃ±o de intervenciÃ³n aplicado al caso</span>
+            <h3>Construir propuesta clinica situada</h3>
+            <p>
+              Esta pauta no es generica: debe sostenerse en entrevistas realizadas,
+              decisiones previas, informes externos, contexto del paciente e hipotesis
+              clinicas.
+            </p>
+
+            <div className="clinical-plan-form">
+              {[
+                ["caseUnderstanding", "ComprensiÃ³n del caso"],
+                ["clinicalFormulation", "Formulacion clinica"],
+                ["objectives", "Objetivos de intervencion"],
+                ["treatmentPlan", "Plan de tratamiento o intervencion"],
+                ["strategies", "Estrategias clinicas"],
+                ["processEvaluation", "Evaluacion del proceso"],
+                ["ethics", "Consideraciones eticas"],
+                ["reflexivity", "Reflexividad del estudiante"],
+                ["contextualIntegration", "Integracion situada/contextual"],
+                ["continuityDecision", "Continuidad, cierre o derivacion"]
+              ].map(([key, label]) => (
+                <label key={key}>
+                  <span>{label}</span>
+                  <textarea
+                    value={clinicalArtifacts.interventionDesign?.[key] || ""}
+                    onChange={(event) => updateInterventionDesign({ [key]: event.target.value })}
+                    rows={2}
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className={`clinical-plan-evaluation ${interventionDesignEvaluation.level}`}>
+              <div>
+                <span>{interventionDesignEvaluation.title}</span>
+                <strong>{interventionDesignEvaluation.levelLabel}</strong>
+              </div>
+              <p>{interventionDesignEvaluation.summary}</p>
+              <ul>
+                {(interventionDesignEvaluation.gaps.length
+                  ? interventionDesignEvaluation.gaps
+                  : interventionDesignEvaluation.strengths
+                ).slice(0, 5).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         <PedagogicalGuide
           guideId="nota_clinica"
@@ -542,7 +1166,16 @@ export function SessionClosure({
           </div>
         </div>
       </section>
+          </div>
+        </details>
 
+        <details className="closure-stage">
+          <summary>
+            <span>5</span>
+            <strong>DecisiÃ³n clÃ­nica</strong>
+            <small>Continuidad, cierre, derivaciÃ³n o acciÃ³n final.</small>
+          </summary>
+          <div className="closure-stage-body">
       <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
         <div className="clinical-plan-header">
           <div>
@@ -550,7 +1183,7 @@ export function SessionClosure({
             <h2>Decision sobre continuidad del proceso</h2>
             <p>
               Decide si corresponde cerrar, continuar, derivar o activar una respuesta de
-              riesgo. La cantidad de sesiones es una hipotesis clinica que puedes sostener,
+              riesgo. La cantidad de sesiones es una hipÃ³tesis clÃ­nica que puedes sostener,
               ajustar o cuestionar durante el proceso.
             </p>
           </div>
@@ -559,7 +1192,7 @@ export function SessionClosure({
             <strong>
               {plannedSessionTotal}
             </strong>
-            <span>sesion(es)</span>
+            <span>sesiÃ³n(es)</span>
           </div>
         </div>
 
@@ -584,7 +1217,7 @@ export function SessionClosure({
                 name="clinical-decision-action"
                 value={option.value}
                 checked={normalizedClinicalDecision.action === option.value}
-                onChange={() => selectClinicalAction(option.value)}
+                onChange={() => updateDecision({ action: option.value })}
               />
               <span>
                 <strong>{option.label}</strong>
@@ -593,12 +1226,6 @@ export function SessionClosure({
             </label>
           ))}
         </div>
-
-        {normalizedClinicalDecision.action === "continue_session" && (
-          <div className="session-note" role="status">
-            Primero se registrara la continuidad. La sesion siguiente podra iniciarse despues como accion opcional.
-          </div>
-        )}
 
         <div className="clinical-plan-form">
           <label>
@@ -613,25 +1240,55 @@ export function SessionClosure({
             >
               {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
                 <option key={value} value={value}>
-                  {value} sesion{value > 1 ? "es" : ""}
+                  {value} sesiÃ³n{value > 1 ? "es" : ""}
                 </option>
               ))}
             </select>
             {planBelowCompletedSessions && (
               <div className="prep-plan-memory-warning" role="alert">
-                Ya existen {completedSessionCount} sesiones registradas. No se eliminara
+                Ya existen {completedSessionCount} sesiones registradas. No se eliminarÃ¡
                 memoria clinica previa; el plan visual se ajustara sin borrar lo trabajado.
               </div>
             )}
           </label>
 
           <label>
-            <span>Por que propones esta cantidad de sesiones?</span>
+            <span>Â¿Por quÃ© propones esta cantidad de sesiones?</span>
             <textarea
               value={clinicalDecision.justification}
               onChange={(event) => updateDecision({ justification: event.target.value })}
               placeholder="Ej.: porque el motivo aun necesita delimitarse y falta explorar apoyo o riesgo."
               rows={3}
+            />
+          </label>
+
+          <label>
+            <span>Â¿QuÃ© informaciÃ³n clÃ­nica ya tienes?</span>
+            <textarea
+              value={clinicalDecision.knownInformation || ""}
+              onChange={(event) => updateDecision({ knownInformation: event.target.value })}
+              placeholder="Resume los datos relevantes obtenidos en entrevista, sin convertirlos aun en diagnostico cerrado."
+              rows={2}
+            />
+          </label>
+
+          <label>
+            <span>Â¿QuÃ© informaciÃ³n consideras que falta?</span>
+            <textarea
+              value={clinicalDecision.missingInformation || ""}
+              onChange={(event) => updateDecision({ missingInformation: event.target.value })}
+              placeholder="Nombra antecedentes, riesgo, red de apoyo, contexto o hipotesis que aun requieren exploracion."
+              rows={2}
+            />
+          </label>
+
+          <label>
+            <span>Que riesgos, dilemas eticos o aspectos contextuales debes considerar?</span>
+            <textarea
+              value={clinicalDecision.ethicalConsiderations || ""}
+              onChange={(event) => updateDecision({ ethicalConsiderations: event.target.value })}
+              placeholder="Ej.: confidencialidad, riesgo, pertinencia de derivacion, contexto familiar o limites del simulador."
+              rows={2}
             />
           </label>
 
@@ -691,7 +1348,7 @@ export function SessionClosure({
           <h2>{canContinueInSimulator && hasSavedContinuityAgreement ? "Continuidad registrada" : closureAction.title}</h2>
           <p>
             {canContinueInSimulator && hasSavedContinuityAgreement
-              ? `La continuidad dentro del simulador quedo registrada. Agenda la sesion ${nextSessionNumber} para sostener el proceso sin iniciar otra entrevista ahora.`
+              ? `La continuidad dentro del simulador quedó registrada. La sesión ${nextSessionNumber} podrá iniciarse después como acción opcional.`
               : closureAction.description}
           </p>
         </div>
@@ -710,13 +1367,13 @@ export function SessionClosure({
           ) : null}
           {canContinueInSimulator && hasSavedContinuityAgreement ? (
             <>
-              <button className="primary-action" type="button" onClick={scheduleNextSession}>
-                <ArrowRight aria-hidden="true" />
-                Agendar sesion {nextSessionNumber}
-              </button>
-              <button className="secondary-action" type="button" onClick={backHomeAfterSave}>
+              <button className="primary-action" type="button" onClick={backHomeAfterSave}>
                 <Home aria-hidden="true" />
                 Volver al inicio
+              </button>
+              <button className="secondary-action" type="button" onClick={scheduleNextSession}>
+                <ArrowRight aria-hidden="true" />
+                Iniciar sesión {nextSessionNumber} ahora
               </button>
             </>
           ) : null}
@@ -730,18 +1387,22 @@ export function SessionClosure({
             <Clipboard aria-hidden="true" />
             {copied ? "Resumen copiado" : "Copiar resumen"}
           </button>
-          {!(canContinueInSimulator && hasSavedContinuityAgreement) && (
-          <button className="secondary-action" type="button" onClick={requestBackHomeWithoutDecision}>
-            <Home aria-hidden="true" />
-            Volver al inicio
-          </button>
+          {!hasSavedContinuityAgreement && (
+            <button className="secondary-action" type="button" onClick={requestBackHomeWithoutDecision}>
+              <Home aria-hidden="true" />
+              Volver al inicio
+            </button>
           )}
+          <button className="secondary-action" type="button" onClick={copyProcessSummary}>
+            <Clipboard aria-hidden="true" />
+            {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
+          </button>
         </div>
       </div>
 
       {reachedSessionLimit && (
         <section className="session-summary-card closure-panel closure-panel-wide">
-          <span className="eyebrow">Síntesis de proceso</span>
+          <span className="eyebrow">SÃ­ntesis de proceso</span>
           <h2>Resumen del proceso con {processSummary.patientName}</h2>
           <p>{processSummary.summaryText}</p>
           <div className="session-summary-grid">
@@ -754,11 +1415,11 @@ export function SessionClosure({
               </ul>
             </div>
             <div>
-              <h3>Evolución de apertura</h3>
+              <h3>EvoluciÃ³n de apertura</h3>
               <ul>
                 {processSummary.opennessEvolution.map((item) => (
                   <li key={item.sessionNumber}>
-                    Sesión {item.sessionNumber}: {item.trustFinal}/100 ({item.label})
+                    SesiÃ³n {item.sessionNumber}: {item.trustFinal}/100 ({item.label})
                   </li>
                 ))}
               </ul>
@@ -782,6 +1443,9 @@ export function SessionClosure({
           </div>
         </section>
       )}
+          </div>
+        </details>
+      </div>
 
     </section>
   );
@@ -790,66 +1454,171 @@ export function SessionClosure({
 function getClosureActionConfig({
   canContinueInSimulator,
   normalizedClinicalDecision,
-  nextSessionNumber,
   nextSessionStage,
-  plannedSessionTotal,
   reachedSessionLimit
 }) {
   if (canContinueInSimulator) {
     return {
       title: "Registrar continuidad",
-      description: `Registra primero la continuidad dentro del simulador. Luego podras iniciar ${nextSessionStage?.title?.toLowerCase() || "la proxima sesion simulada"} si quieres continuar ahora.`,
+      description:
+        "Primero se registrará la continuidad. La sesión siguiente podrá iniciarse después como acción opcional.",
       primaryLabel: "Registrar continuidad"
     };
   }
 
-  const suffix = reachedSessionLimit ? " Ya llegaste a la ultima sesion del proceso que propusiste." : "";
+  const suffix = reachedSessionLimit ? " Ya llegaste a la última sesión del proceso que propusiste." : "";
   const configs = {
     close_process: {
       title: "Cerrar proceso simulado",
-      description: `La sesion quedara guardada como cierre del proceso simulado.${suffix}`,
+      description: `La sesión quedará guardada como cierre del proceso simulado.${suffix}`,
       primaryLabel: "Cerrar proceso y volver al inicio"
     },
     refer: {
-      title: "Registrar derivacion",
-      description: "La sesion quedara guardada con una decision de derivacion. Revisa que la justificacion indique el motivo y el dispositivo sugerido.",
-      primaryLabel: "Registrar derivacion y finalizar sesion"
+      title: "Registrar derivación",
+      description:
+        "La sesión quedará guardada con una decisión de derivación. Revisa que la justificación indique el motivo y el dispositivo sugerido.",
+      primaryLabel: "Registrar derivación y finalizar sesión"
     },
     risk_protocol: {
       title: "Registrar protocolo de riesgo",
-      description: "La prioridad formativa es dejar registrada la decision de seguridad, supervisar el caso y no avanzar automaticamente a otra sesion.",
+      description:
+        "La prioridad formativa es dejar registrada la decisión de seguridad, supervisar el caso y no avanzar automáticamente a otra sesión.",
       primaryLabel: "Registrar protocolo de riesgo"
     },
     request_supervision: {
-      title: "Registrar solicitud de supervision",
-      description: "La sesion quedara guardada para revision docente o supervision antes de tomar una nueva decision clinica.",
-      primaryLabel: "Registrar solicitud de supervision"
+      title: "Registrar solicitud de supervisión",
+      description:
+        "La sesión quedará guardada para revisión docente o supervisión antes de tomar una nueva decisión clínica.",
+      primaryLabel: "Registrar solicitud de supervisión"
     },
     apply_instruments: {
-      title: "Registrar evaluacion complementaria",
-      description: "La sesion quedara guardada indicando que se requieren instrumentos o evaluacion complementaria antes de continuar.",
-      primaryLabel: "Registrar evaluacion complementaria"
+      title: "Registrar evaluación complementaria",
+      description:
+        "La sesión quedará guardada indicando que se requieren instrumentos o evaluación complementaria antes de continuar.",
+      primaryLabel: "Registrar evaluación complementaria"
     },
     initial_feedback: {
-      title: "Guardar devolucion inicial",
-      description: "La sesion quedara guardada con una decision de devolucion inicial, sin forzar avance automatico a una nueva sesion.",
-      primaryLabel: "Guardar devolucion inicial"
+      title: "Guardar devolución inicial",
+      description:
+        "La sesión quedará guardada con una decisión de devolución inicial, sin forzar avance automático a una nueva sesión.",
+      primaryLabel: "Guardar devolución inicial"
     },
     follow_up: {
-      title: "Guardar recomendacion de seguimiento",
-      description: "La sesion quedara guardada con recomendacion de seguimiento y monitoreo segun lo observado.",
-      primaryLabel: "Guardar recomendacion de seguimiento"
+      title: "Guardar recomendación de seguimiento",
+      description: "La sesión quedará guardada con recomendación de seguimiento y monitoreo según lo observado.",
+      primaryLabel: "Guardar recomendación de seguimiento"
     },
     beyond_simulator: {
       title: "Registrar continuidad extendida",
-      description: "La sesion quedara guardada indicando que el caso requiere continuidad mas alla del ciclo disponible en el simulador.",
+      description:
+        "La sesión quedará guardada indicando que el caso requiere continuidad más allá del ciclo disponible en el simulador.",
       primaryLabel: "Registrar continuidad extendida"
     }
   };
 
   return configs[normalizedClinicalDecision.action] || {
-    title: "Guardar decision y cerrar",
-    description: `La sesion quedara guardada con tu decision de ${formatClinicalDecision(normalizedClinicalDecision).toLowerCase()}.${suffix}`,
-    primaryLabel: "Guardar decision y volver al inicio"
+    title: "Guardar decisión y cerrar",
+    description: `La sesión quedará guardada con tu decisión de ${formatClinicalDecision(normalizedClinicalDecision).toLowerCase()}.${suffix}`,
+    primaryLabel: "Guardar decisión y volver al inicio"
   };
+}
+
+function formatClinicalAreaList(areaIds = []) {
+  if (!Array.isArray(areaIds) || areaIds.length === 0) return "No registradas";
+  const labels = areaIds
+    .map((areaId) => clinicalExplorationAreas.find((area) => area.id === areaId)?.label || areaId)
+    .filter(Boolean);
+  return labels.slice(0, 6).join(", ") + (labels.length > 6 ? ` y ${labels.length - 6} mas` : "");
+}
+
+function mergeClinicalArtifactsDraft(base = {}, draft = {}) {
+  if (!draft || typeof draft !== "object") return base;
+  return {
+    ...base,
+    ...draft,
+    complementaryEvaluation: {
+      ...(base.complementaryEvaluation || {}),
+      ...(draft.complementaryEvaluation || {}),
+      integration: {
+        ...(base.complementaryEvaluation?.integration || {}),
+        ...(draft.complementaryEvaluation?.integration || {})
+      }
+    },
+    interventionDesign: {
+      ...(base.interventionDesign || {}),
+      ...(draft.interventionDesign || {})
+    }
+  };
+}
+
+function hasMeaningfulClinicalDecisionDraft(decision = null, initialDecision = {}) {
+  if (!decision || typeof decision !== "object") return false;
+  const textFields = [
+    decision.justification,
+    decision.knownInformation,
+    decision.missingInformation,
+    decision.ethicalConsiderations,
+    decision.nextSessionObjectives,
+    decision.pendingRisks
+  ];
+  if (textFields.some(hasText)) return true;
+  if (decision.action && decision.action !== initialDecision.action) return true;
+  if (
+    Number(decision.proposedSessions) > 0 &&
+    Number(decision.proposedSessions) !== Number(initialDecision.proposedSessions)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function hasMeaningfulClinicalArtifactsDraft(artifacts = null) {
+  if (!artifacts || typeof artifacts !== "object") return false;
+  const baseTextFields = [
+    artifacts.clinicalHypothesis,
+    artifacts.supportingData,
+    artifacts.missingData,
+    artifacts.instrumentJustification,
+    artifacts.initialFeedbackDraft,
+    artifacts.clinicalNote
+  ];
+  if (baseTextFields.some(hasText)) return true;
+  if (Array.isArray(artifacts.selectedInstruments) && artifacts.selectedInstruments.length > 0) return true;
+  if (hasMeaningfulComplementaryEvaluationDraft(artifacts.complementaryEvaluation)) return true;
+  if (hasMeaningfulObjectText(artifacts.interventionDesign)) return true;
+  return false;
+}
+
+function hasMeaningfulComplementaryEvaluationDraft(value = null) {
+  if (!value || typeof value !== "object") return false;
+  const fields = [
+    value.instrumentId,
+    value.justification,
+    value.hypothesis,
+    value.expectedInformation,
+    value.agePertinence,
+    value.integrationPlan
+  ];
+  if (fields.some(hasText)) return true;
+  if (value.report) return true;
+  if (value.status && value.status !== "draft") return true;
+  return hasMeaningfulObjectText(value.integration);
+}
+
+function hasMeaningfulObjectText(value = null) {
+  if (!value || typeof value !== "object") return false;
+  return Object.values(value).some((item) => {
+    if (Array.isArray(item)) return item.length > 0;
+    if (item && typeof item === "object") return hasMeaningfulObjectText(item);
+    return hasText(item);
+  });
+}
+
+function hasText(value) {
+  return String(value || "").trim().length > 0;
+}
+
+function getCurrentScrollY() {
+  if (typeof window === "undefined") return 0;
+  return window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
 }

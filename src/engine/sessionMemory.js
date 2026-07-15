@@ -30,7 +30,7 @@ export function buildSessionSummary({
     : null;
   const normalizedClinicalArtifacts = clinicalArtifacts ? normalizeClinicalArtifacts(clinicalArtifacts) : null;
   const clinicalArtifactsEvaluation = normalizedClinicalArtifacts
-    ? evaluateClinicalArtifacts({ artifacts: normalizedClinicalArtifacts, report, history })
+    ? evaluateClinicalArtifacts({ artifacts: normalizedClinicalArtifacts, report, history, caseItem })
     : null;
   const processMemory = buildPatientProcessMemory({
     history: meaningfulHistory,
@@ -130,6 +130,19 @@ export function buildProcessSummary({ caseItem, summaries = [] }) {
       justification: summary.clinicalDecision.justification
     }))
     .filter(Boolean);
+  const externalReports = orderedSummaries
+    .map((summary) => {
+      const report = summary.clinicalArtifacts?.complementaryEvaluation?.report;
+      if (!report) return null;
+      return {
+        sessionNumber: summary.sessionNumber,
+        title: report.title,
+        instrument: report.requestedInstrument?.name || report.caseData?.instrument || "",
+        area: report.requestedInstrument?.area || report.caseData?.area || "",
+        createdAt: report.createdAt
+      };
+    })
+    .filter(Boolean);
   const processMemory = mergeProcessMemories(orderedSummaries);
   const summaryText = orderedSummaries.length >= 2
     ? `Proceso formativo de ${orderedSummaries.length} sesion(es) con ${caseItem.name}. Se trabajaron objetivos, continuidad y decisiones clinicas segun el plan del estudiante.`
@@ -145,6 +158,7 @@ export function buildProcessSummary({ caseItem, summaries = [] }) {
     studentImprovements,
     opennessEvolution,
     clinicalDecisions,
+    externalReports,
     processMemory,
     summaryText
   };
@@ -176,6 +190,13 @@ export function formatProcessSummary(processSummary) {
     ...withEmptyFallback(
       (processSummary.clinicalDecisions || []).map((item) =>
         `Sesion ${item.sessionNumber}: ${item.action} (${item.proposedSessions} sesion(es)). ${item.justification || ""}`.trim()
+      )
+    ).map((item) => `- ${item}`),
+    "",
+    "Informes externos recibidos:",
+    ...withEmptyFallback(
+      (processSummary.externalReports || []).map((item) =>
+        `Sesion ${item.sessionNumber}: ${item.instrument || item.title} (${item.area || "area no especificada"})`
       )
     ).map((item) => `- ${item}`),
     "",

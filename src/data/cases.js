@@ -1,4 +1,5 @@
 import { patientFacts } from "./patientFacts.js";
+import { getAvatarCanonicalBiography } from "./avatarCanonicalBiographies.js";
 
 const caseImages = {
   tomas: "/avatar/tomas.png",
@@ -245,6 +246,7 @@ const catalog = [
 
 export const cases = catalog.map((caseItem) => ({
   ...caseItem,
+  ...canonicalVisibleCasePatch(caseItem),
   image: caseImages[caseItem.id],
   learningObjectives: learningObjectivesByCase[caseItem.id] || caseItem.objectives || [],
   objectives: learningObjectivesByCase[caseItem.id] || caseItem.objectives || [],
@@ -275,4 +277,39 @@ function advancedCase(id, name, age, shortTitle, difficulty, accent, motive, bac
       "Usa validación y seguimiento conversacional."
     ]
   };
+}
+
+function canonicalVisibleCasePatch(caseItem) {
+  const biography = getAvatarCanonicalBiography(caseItem.id);
+  if (!biography) return {};
+
+  const visibleBackground = [
+    biography.education.program && !/^no cursa/i.test(biography.education.status || "")
+      ? biography.education.institution
+        ? `Estudia ${biography.education.program} en ${biography.education.institution}.`
+        : `Estudia ${biography.education.program}.`
+      : "",
+    biography.employment.employer
+      ? `Trabaja como ${biography.employment.role} en ${biography.employment.employer}.`
+      : "",
+    formatLivingWithBackground(biography.identity.livingWith),
+    biography.consultation.immediateReason
+  ].filter(Boolean).slice(0, 3);
+
+  return {
+    age: `${biography.identity.age} años`,
+    motive: biography.consultation.immediateReason || caseItem.motive,
+    background: visibleBackground.length ? visibleBackground : caseItem.background
+  };
+}
+
+function formatLivingWithBackground(livingWith = []) {
+  const value = livingWith.slice(0, 3).join(", ").trim();
+  if (!value) return "";
+
+  if (/^vive\s+/i.test(value)) {
+    return `${value.charAt(0).toUpperCase()}${value.slice(1).replace(/\.$/, "")}.`;
+  }
+
+  return `Vive con ${value}.`;
 }

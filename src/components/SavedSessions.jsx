@@ -233,6 +233,36 @@ export function SavedSessions({ authSession, onBackHome }) {
                     </section>
                   )}
 
+                  {getExternalReport(selectedSession) && (
+                    <section>
+                      <h3>Informe externo recibido</h3>
+                      <p>
+                        <strong>{getExternalReport(selectedSession).requestedInstrument?.name}: </strong>
+                        {getExternalReport(selectedSession).clinicalInterpretation}
+                      </p>
+                      <ul>
+                        {(getExternalReport(selectedSession).recommendations || []).slice(0, 3).map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  {getExternalReportIntegration(selectedSession) && (
+                    <section>
+                      <h3>Integración del informe externo</h3>
+                      <p>{getExternalReportIntegration(selectedSession).hypothesisImpact || "Integración pendiente."}</p>
+                    </section>
+                  )}
+
+                  {getInterventionDesign(selectedSession) && (
+                    <section>
+                      <h3>Diseño de intervención aplicado</h3>
+                      <p>{getInterventionDesign(selectedSession).clinicalFormulation || "Formulación pendiente."}</p>
+                      <p>{getInterventionDesign(selectedSession).objectives || ""}</p>
+                    </section>
+                  )}
+
                   <details className="history-details feedback-detail-toggle">
                     <summary>Ver detalle formativo</summary>
                     <section>
@@ -426,4 +456,29 @@ function getSessionStatusLabel(status) {
   if (status === "closure_pending") return "Cierre pendiente";
   if (status === "in_progress") return "Sesion por retomar";
   return "Sesion completada";
+}
+
+function getClinicalArtifacts(session) {
+  return (
+    session?.feedback?.clinicalArtifacts ||
+    session?.sessionSummary?.clinicalArtifacts ||
+    session?.summary?.clinicalArtifacts ||
+    null
+  );
+}
+
+function getExternalReport(session) {
+  return getClinicalArtifacts(session)?.complementaryEvaluation?.report || null;
+}
+
+function getExternalReportIntegration(session) {
+  const integration = getClinicalArtifacts(session)?.complementaryEvaluation?.integration;
+  if (!integration) return null;
+  return Object.values(integration).some(Boolean) ? integration : null;
+}
+
+function getInterventionDesign(session) {
+  const design = getClinicalArtifacts(session)?.interventionDesign;
+  if (!design) return null;
+  return Object.values(design).some(Boolean) ? design : null;
 }

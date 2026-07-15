@@ -16,10 +16,16 @@ function labelFor(score) {
 
 export function buildEducationalReport(history, caseItem) {
   const scoredHistory = history.filter((entry) => !entry.isSessionPrelude);
+  const turnCount = scoredHistory.length;
+
+  if (turnCount === 0) {
+    return buildNoInterventionReport(caseItem);
+  }
+
+  const isLimitedEvaluation = turnCount < 2;
   const therapeuticApproach = analyzeTherapeuticApproaches(scoredHistory.map((entry) => entry.question));
   const guidedInterventionFeedback = analyzeGuidedInterventionUsage(scoredHistory);
   const memory = summarizeConversationMemory(scoredHistory);
-  const turnCount = scoredHistory.length;
   const hasJudgment = memory.judgment > 0;
   const hasRushedAdvice = memory.rushedAdvice > 0;
   const hasPrematureInterpretation = memory.prematureInterpretation > 0;
@@ -67,7 +73,7 @@ export function buildEducationalReport(history, caseItem) {
         : 0
   };
 
-  const criteria = rubricCriteria.map((criterion) => {
+  let criteria = rubricCriteria.map((criterion) => {
     const score = rawScores[criterion.id] ?? 0;
     return {
       ...criterion,
@@ -76,10 +82,19 @@ export function buildEducationalReport(history, caseItem) {
       levelLabel: labelFor(score)
     };
   });
-  const generalScore = Math.round(
-    (criteria.reduce((sum, criterion) => sum + criterion.score, 0) / (criteria.length * 2)) * 100
-  );
-  const objectiveEvaluation = evaluateLearningObjectives({ caseItem, memory, history: scoredHistory });
+  if (isLimitedEvaluation) {
+    criteria = criteria.map(limitCriterionForSparseEvidence);
+  }
+
+  const generalScore = isLimitedEvaluation
+    ? null
+    : Math.round(
+        (criteria.reduce((sum, criterion) => sum + criterion.score, 0) / (criteria.length * 2)) * 100
+      );
+  let objectiveEvaluation = evaluateLearningObjectives({ caseItem, memory, history: scoredHistory });
+  if (isLimitedEvaluation) {
+    objectiveEvaluation = objectiveEvaluation.map(limitObjectiveForSparseEvidence);
+  }
   const reformulationSuggestions = buildReformulationSuggestions(scoredHistory, caseItem);
   const skillClassification = buildSkillClassification(memory);
 
@@ -92,7 +107,7 @@ export function buildEducationalReport(history, caseItem) {
   if (memory.contextExploration >= 2) strengths.push("Exploraste dimensiones contextuales relevantes para el caso.");
   if (memory.empathicSummary || memory.followUp) strengths.push("Retomaste contenido del paciente ficticio y usaste seguimiento conversacional, favoreciendo continuidad.");
   if (trustDelta > 8) strengths.push(`La apertura del paciente aumentó durante la entrevista (+${trustDelta} puntos de confianza simulada).`);
-  if (!hasJudgment) strengths.push("Evitaste juicios directos o etiquetas sobre el paciente ficticio.");
+  if (!hasJudgment && !isLimitedEvaluation) strengths.push("Evitaste juicios directos o etiquetas sobre el paciente ficticio.");
 
   if (!memory.framing) improvements.push("Inicia con un encuadre más explícito: propósito, límites, ritmo y carácter educativo.");
   if (memory.closedQuestions > memory.openQuestions) improvements.push("Hubo predominio de preguntas cerradas; alterna con preguntas abiertas para favorecer relato.");
@@ -140,6 +155,9 @@ export function buildEducationalReport(history, caseItem) {
   return {
     caseName: caseItem.name,
     turnCount,
+    evaluationStatus: isLimitedEvaluation ? "limited" : "complete",
+    isEvaluable: true,
+    isLimitedEvaluation,
     generalScore,
     trust: {
       initial: initialTrust,
@@ -152,15 +170,15 @@ export function buildEducationalReport(history, caseItem) {
     objectiveEvaluation,
     reformulationSuggestions,
     skillClassification,
-    therapeuticApproach,
+    therapeuticApproach: isLimitedEvaluation ? null : therapeuticApproach,
     guidedInterventionFeedback,
-    strengths: strengths.length ? strengths : ["Mantuviste la entrevista activa y generaste oportunidades de exploración."],
+    strengths: strengths.length ? strengths : ["Realizaste una primera intervención observable, aunque todavía insuficiente para una evaluación robusta."],
     improvements,
     bondMoments: bondMoments.length ? bondMoments : ["No se observaron momentos claros de aumento de apertura; prioriza validación y preguntas abiertas."],
     closingMoments: closingMoments.length ? closingMoments : ["No se observaron intervenciones claramente cerradoras o juzgadoras."],
     summary:
-      turnCount === 0
-        ? "La sesión terminó sin intervenciones registradas."
+      isLimitedEvaluation
+        ? `Retroalimentación limitada: se registró ${turnCount} intervención con ${caseItem.name}. Se requiere más material conversacional para evaluar habilidades clínicas con solidez.`
         : `Se realizaron ${turnCount} intervenciones con ${caseItem.name}. La entrevista mostró ${memory.openQuestions} pregunta(s) abierta(s), ${memory.validation} validación(es), ${memory.contextExploration} exploración(es) contextuales, ${memory.followUp} seguimiento(s) conversacionales y una apertura final ${trustLabels[trustStage]}.`,
     nextSuggestions: [
       "Ensaya un encuadre inicial breve antes de explorar el motivo de consulta.",
@@ -170,6 +188,65 @@ export function buildEducationalReport(history, caseItem) {
     ],
     ethicalNotice:
       "Informe formativo basado en una simulación con datos ficticios. No corresponde a diagnóstico, tratamiento ni intervención clínica real."
+  };
+}
+
+function buildNoInterventionReport(caseItem) {
+  return {
+    caseName: caseItem.name,
+    turnCount: 0,
+    evaluationStatus: "not_evaluable",
+    isEvaluable: false,
+    isLimitedEvaluation: false,
+    generalScore: null,
+    trust: {
+      initial: 0,
+      final: 0,
+      delta: 0,
+      stage: "not_evaluable",
+      label: "no evaluable"
+    },
+    criteria: [],
+    objectiveEvaluation: [],
+    reformulationSuggestions: [],
+    skillClassification: [],
+    therapeuticApproach: null,
+    guidedInterventionFeedback: null,
+    strengths: [],
+    improvements: [],
+    bondMoments: [],
+    closingMoments: [],
+    summary: "Sesión sin intervenciones suficientes para evaluar.",
+    emptySessionMessage:
+      "No se registraron intervenciones del estudiante. Para recibir retroalimentación formativa, realiza al menos una intervención de encuadre, exploración, validación o cierre.",
+    nextSuggestions: [
+      "Inicia con un encuadre breve sobre el propósito de la entrevista simulada.",
+      "Formula una pregunta abierta que permita conocer el motivo de consulta.",
+      "Incluye una validación simple antes de profundizar en nuevas áreas."
+    ],
+    ethicalNotice:
+      "Informe formativo basado en una simulación con datos ficticios. No corresponde a diagnóstico, tratamiento ni intervención clínica real."
+  };
+}
+
+function limitCriterionForSparseEvidence(criterion) {
+  const score = Math.min(criterion.score || 0, 1);
+  return {
+    ...criterion,
+    score,
+    level: level(score),
+    levelLabel: labelFor(score)
+  };
+}
+
+function limitObjectiveForSparseEvidence(item) {
+  if (!item || item.score <= 0) return item;
+  return {
+    ...item,
+    score: Math.min(item.score, 1),
+    status: "parcialmente observado",
+    level: "partial",
+    levelLabel: "Parcialmente observado"
   };
 }
 

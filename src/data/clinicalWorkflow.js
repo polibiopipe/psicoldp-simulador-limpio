@@ -34,13 +34,116 @@ export const clinicalExplorationAreas = [
 ];
 
 export const clinicalInstrumentOptions = [
-  { id: "bdi_ii", label: "BDI-II", useCase: "Sintomas depresivos" },
-  { id: "bai", label: "BAI", useCase: "Sintomas ansiosos" },
-  { id: "c_ssrs", label: "C-SSRS", useCase: "Riesgo suicida" },
-  { id: "mmse", label: "MMSE / Mini Mental", useCase: "Sospecha cognitiva" },
-  { id: "wais_iv", label: "WAIS-IV", useCase: "Funcionamiento intelectual" },
-  { id: "raven", label: "Raven", useCase: "Razonamiento no verbal" },
-  { id: "genograma", label: "Genograma", useCase: "Dinamica familiar" },
-  { id: "entrevista_semiestructurada", label: "Entrevista semiestructurada", useCase: "Claridad diagnostica" },
-  { id: "registro_conductual", label: "Registro conductual", useCase: "Patrones conducta-emocion" }
+  {
+    id: "bdi_ii",
+    label: "BDI-II",
+    type: "psicometrica",
+    area: "Sintomas depresivos",
+    useCase: "Sintomas depresivos",
+    ageRange: "adolescentes mayores y adultos",
+    caseRelevance: ["animo bajo", "agotamiento", "culpa", "perdida de interes"],
+    suggestedMoment: "Cuando la entrevista sugiere sintomatologia depresiva y se requiere dimensionar intensidad.",
+    ethicalWarning: "No usar como diagnostico aislado ni reproducir items, baremos o claves de correccion.",
+    reportAvailable: true
+  },
+  {
+    id: "bai",
+    label: "BAI",
+    type: "psicometrica",
+    area: "Sintomas ansiosos",
+    useCase: "Sintomas ansiosos",
+    ageRange: "adolescentes mayores y adultos",
+    caseRelevance: ["ansiedad", "tension", "somatizacion", "preocupacion persistente"],
+    suggestedMoment: "Cuando el malestar ansioso aparece de forma consistente en entrevista.",
+    ethicalWarning: "Debe integrarse con entrevista clinica y contexto; no entrega diagnostico por si solo.",
+    reportAvailable: true
+  },
+  {
+    id: "c_ssrs",
+    label: "C-SSRS",
+    type: "screening",
+    area: "Riesgo suicida",
+    useCase: "Riesgo suicida",
+    ageRange: "adolescentes y adultos",
+    caseRelevance: ["ideacion suicida", "autolesion", "riesgo", "desesperanza"],
+    suggestedMoment: "Cuando emerge ideacion, desesperanza intensa o riesgo de dano.",
+    ethicalWarning: "No reemplaza protocolo institucional ni evaluacion profesional presencial ante riesgo.",
+    reportAvailable: true
+  },
+  {
+    id: "mmse",
+    label: "MMSE / Mini Mental",
+    type: "screening",
+    area: "Funcionamiento cognitivo global",
+    useCase: "Sospecha cognitiva",
+    ageRange: "adultos y personas mayores",
+    caseRelevance: ["memoria", "orientacion", "deterioro cognitivo", "funcionamiento diario"],
+    suggestedMoment: "Cuando hay quejas cognitivas, cambios funcionales o dudas de orientacion.",
+    ethicalWarning: "Usar solo como tamizaje narrativo-formativo; no entregar puntajes protegidos ni baremos.",
+    reportAvailable: true
+  },
+  {
+    id: "wais_iv",
+    label: "WAIS-IV",
+    type: "psicometrica",
+    area: "Funcionamiento intelectual",
+    useCase: "Funcionamiento intelectual",
+    ageRange: "adultos",
+    caseRelevance: ["rendimiento cognitivo", "dificultades academicas", "perfil intelectual"],
+    suggestedMoment: "Solo si la pregunta clinica justifica una evaluacion cognitiva amplia.",
+    ethicalWarning: "No reproducir subpruebas, items, puntajes normativos ni claves de interpretacion.",
+    reportAvailable: false
+  },
+  {
+    id: "raven",
+    label: "Raven",
+    type: "psicometrica",
+    area: "Razonamiento no verbal",
+    useCase: "Razonamiento no verbal",
+    ageRange: "adolescentes mayores y adultos",
+    caseRelevance: ["razonamiento", "evaluacion cognitiva", "perfil no verbal"],
+    suggestedMoment: "Cuando se requiere explorar razonamiento no verbal de forma complementaria.",
+    ethicalWarning: "No reproducir laminas, matrices, respuestas correctas ni criterios de correccion.",
+    reportAvailable: false
+  },
+  {
+    id: "genograma",
+    label: "Genograma",
+    type: "evaluacion clinica",
+    area: "Dinamica familiar",
+    useCase: "Dinamica familiar",
+    ageRange: "adolescentes y adultos",
+    caseRelevance: ["familia", "patrones relacionales", "lealtades", "red de apoyo"],
+    suggestedMoment: "Cuando el problema se sostiene en relaciones familiares o roles de cuidado.",
+    ethicalWarning: "Debe construirse con cuidado, consentimiento y lenguaje no culpabilizante.",
+    reportAvailable: true
+  },
+  {
+    id: "entrevista_semiestructurada",
+    label: "Entrevista semiestructurada",
+    type: "entrevista",
+    area: "Claridad diagnostica y formulacion",
+    useCase: "Claridad diagnostica",
+    ageRange: "adolescentes y adultos",
+    caseRelevance: ["motivo difuso", "hipotesis inicial", "antecedentes", "riesgo"],
+    suggestedMoment: "Cuando faltan datos nucleares para ordenar motivo, sintomas, historia y contexto.",
+    ethicalWarning: "No debe usarse como interrogatorio rigido ni sustituir alianza terapeutica.",
+    reportAvailable: true
+  },
+  {
+    id: "registro_conductual",
+    label: "Registro conductual",
+    type: "evaluacion clinica",
+    area: "Patrones conducta-emocion",
+    useCase: "Patrones conducta-emocion",
+    ageRange: "adolescentes y adultos",
+    caseRelevance: ["rutina", "evitacion", "habitos", "desencadenantes"],
+    suggestedMoment: "Cuando se requiere observar frecuencia, contexto y consecuencias de conductas relevantes.",
+    ethicalWarning: "Debe acordarse con el paciente y no convertirse en vigilancia o control.",
+    reportAvailable: true
+  }
 ];
+
+export function getClinicalInstrumentById(instrumentId) {
+  return clinicalInstrumentOptions.find((instrument) => instrument.id === instrumentId) || null;
+}
