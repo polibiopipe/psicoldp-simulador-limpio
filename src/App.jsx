@@ -17,8 +17,11 @@ import {
   buildAppointmentRecord,
   ensureAppointmentForSession,
   findActiveAppointmentForCase,
+  findReusableAppointmentForSession,
   getSimulationAppointments,
-  saveSimulationAppointment
+  isAppointmentExpired,
+  saveSimulationAppointment,
+  startAppointmentForPractice
 } from "./engine/simulationAppointments.js";
 import {
   SESSION_DURATION_MINUTES,
@@ -565,15 +568,62 @@ export default function App() {
     return appointments;
   }
 
+  function getCurrentAppointmentForSession({ includeExpired = true } = {}) {
+    const byActiveId =
+      activeAppointmentIdRef.current &&
+      appointmentRecords.find((appointment) => appointment.id === activeAppointmentIdRef.current);
+    if (byActiveId && (includeExpired || !isAppointmentExpired(byActiveId))) return byActiveId;
+
+    const activeRecord =
+      activeSessionRecordIdRef.current &&
+      sessionRecords.find((record) => record.id === activeSessionRecordIdRef.current);
+    const bySessionRecord =
+      activeRecord?.appointmentId &&
+      appointmentRecords.find((appointment) => appointment.id === activeRecord.appointmentId);
+    if (bySessionRecord && (includeExpired || !isAppointmentExpired(bySessionRecord))) return bySessionRecord;
+
+    if (!includeExpired) {
+      return findActiveAppointmentForCase(appointmentRecords, selectedCase.id, sessionNumber);
+    }
+
+    return appointmentRecords
+      .filter((appointment) =>
+        appointment.caseId === selectedCase.id &&
+        Number(appointment.sessionNumber) === Number(sessionNumber) &&
+        ["scheduled", "in_progress", "closure_pending"].includes(appointment.status)
+      )
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())[0] || null;
+  }
+
+  async function activateAppointmentForPractice(appointment) {
+    const nextAppointment = startAppointmentForPractice(appointment);
+    if (!nextAppointment) return null;
+
+    const mustPersist =
+      appointment.status !== nextAppointment.status ||
+      appointment.startedAt !== nextAppointment.startedAt ||
+      appointment.endsAt !== nextAppointment.endsAt;
+
+    if (!mustPersist) {
+      updateActiveAppointmentId(nextAppointment.id);
+      return nextAppointment;
+    }
+
+    const result = await saveSimulationAppointment(authSession, nextAppointment);
+    const savedAppointment = result.data || nextAppointment;
+    updateActiveAppointmentId(savedAppointment.id);
+    setAppointmentRecords((current) => mergeAppointmentRecordList(current, savedAppointment));
+    return savedAppointment;
+  }
+
   async function ensureActiveAppointmentForCurrentSession() {
     const existing =
-      (activeAppointmentIdRef.current &&
-        appointmentRecords.find((appointment) => appointment.id === activeAppointmentIdRef.current)) ||
-      findActiveAppointmentForCase(appointmentRecords, selectedCase.id, sessionNumber);
+      getCurrentAppointmentForSession({ includeExpired: false }) ||
+      findReusableAppointmentForSession(appointmentRecords, selectedCase.id, sessionNumber, getZonedDateKey(new Date()));
 
     if (existing) {
-      updateActiveAppointmentId(existing.id);
-      return existing;
+      const activeAppointment = await activateAppointmentForPractice(existing);
+      if (activeAppointment) return activeAppointment;
     }
 
     const today = getZonedDateKey(new Date());
@@ -588,26 +638,22 @@ export default function App() {
     });
 
     if (result?.appointment?.id) {
-      updateActiveAppointmentId(result.appointment.id);
-      setAppointmentRecords((current) => mergeAppointmentRecordList(current, result.appointment));
-      return result.appointment;
+      const activeAppointment = await activateAppointmentForPractice(result.appointment);
+      if (activeAppointment) return activeAppointment;
     }
 
     const refreshed = await refreshAppointments();
     const recovered = findActiveAppointmentForCase(refreshed, selectedCase.id, sessionNumber);
     if (recovered) {
-      updateActiveAppointmentId(recovered.id);
-      return recovered;
+      const activeAppointment = await activateAppointmentForPractice(recovered);
+      if (activeAppointment) return activeAppointment;
     }
 
     throw new Error("No se pudo preparar la cita de esta sesion. Revisa la agenda antes de iniciar.");
   }
 
   async function updateAppointmentStatusForClosure(status) {
-    const appointment =
-      (activeAppointmentIdRef.current &&
-        appointmentRecords.find((item) => item.id === activeAppointmentIdRef.current)) ||
-      findActiveAppointmentForCase(appointmentRecords, selectedCase.id, sessionNumber);
+    const appointment = getCurrentAppointmentForSession({ includeExpired: true });
     if (!appointment) return;
 
     const now = new Date().toISOString();
@@ -651,6 +697,50 @@ export default function App() {
     setScreen(screens.results);
   }
 
+  async function startNewPracticeAfterExpiration() {
+    const expiredAppointment = getCurrentAppointmentForSession({ includeExpired: true });
+    const expiredRecordId = activeSessionRecordIdRef.current;
+
+    if (history.length > 0 && expiredRecordId) {
+      const pendingRecord = buildSessionHistoryRecord({
+        id: expiredRecordId,
+        caseItem: selectedCase,
+        history,
+        report,
+        sessionNumber,
+        preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
+        appointmentId: expiredAppointment?.id || activeAppointmentIdRef.current || "",
+        startedAt: expiredAppointment?.startedAt || "",
+        endsAt: expiredAppointment?.endsAt || "",
+        status: "closure_pending"
+      });
+      const saveResult = await saveSessionHistory(pendingRecord);
+      setSessionRecords((current) => mergeSessionRecordList(current, pendingRecord));
+      if (!saveResult.cloudSaved && saveResult.error) {
+        console.warn("[sessions] save error message", saveResult.error?.message || saveResult.error);
+        console.warn("[sessions] save error code", saveResult.error?.code || null);
+      }
+    }
+
+    if (expiredAppointment?.id) {
+      const now = new Date().toISOString();
+      const pendingAppointment = {
+        ...expiredAppointment,
+        status: "closure_pending",
+        updatedAt: now
+      };
+      await saveSimulationAppointment(authSession, pendingAppointment);
+      setAppointmentRecords((current) => mergeAppointmentRecordList(current, pendingAppointment));
+    }
+
+    setHistory(sessionNumber > 1 ? [createSessionPrelude(selectedCase, sessionNumber, sessionSummary, sessionTotal)] : []);
+    updateActiveSessionRecordId("");
+    updateActiveAppointmentId("");
+    setSaveStatus(null);
+    setClosureSaveState("idle");
+    setScreen(screens.simulation);
+  }
+
   async function saveCompletedSession({
     clinicalDecision = null,
     clinicalPlanEvaluation = null,
@@ -669,8 +759,8 @@ export default function App() {
       sessionNumber,
       preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
       appointmentId: activeAppointmentIdRef.current || "",
-      startedAt: findActiveAppointmentForCase(appointmentRecords, selectedCase.id, sessionNumber)?.startedAt || "",
-      endsAt: findActiveAppointmentForCase(appointmentRecords, selectedCase.id, sessionNumber)?.endsAt || "",
+      startedAt: getCurrentAppointmentForSession({ includeExpired: true })?.startedAt || "",
+      endsAt: getCurrentAppointmentForSession({ includeExpired: true })?.endsAt || "",
       clinicalArtifacts,
       clinicalDecision,
       clinicalPlanEvaluation,
@@ -863,6 +953,14 @@ export default function App() {
 
   const userEmail = isSupabaseConfigured && authSession ? authSession.user.email : "";
   const userId = isSupabaseConfigured && authSession ? authSession.user.id : "";
+  const activeSessionRecordForUsage =
+    activeSessionRecordId &&
+    sessionRecords.find((record) => record.id === activeSessionRecordId);
+  const activeAppointmentForUsage =
+    (activeAppointmentId && appointmentRecords.find((appointment) => appointment.id === activeAppointmentId)) ||
+    (activeSessionRecordForUsage?.appointmentId &&
+      appointmentRecords.find((appointment) => appointment.id === activeSessionRecordForUsage.appointmentId)) ||
+    findActiveAppointmentForCase(appointmentRecords, selectedCase.id, sessionNumber);
 
   return (
     <main className={`app-shell authenticated-shell ${screen === screens.simulation ? "simulation-mode" : ""}`}>
@@ -959,12 +1057,14 @@ export default function App() {
           sessionSummary={sessionSummary}
           history={history}
           sessionUsage={buildSessionUsage({
-            appointment: appointmentRecords.find((appointment) => appointment.id === activeAppointmentId),
+            appointment: activeAppointmentForUsage,
+            sessionRecord: activeSessionRecordForUsage,
             history
           })}
           onAsk={handleAsk}
           onFinish={finishSession}
           onRestart={() => resetConversation(screens.simulation)}
+          onStartNewPractice={startNewPracticeAfterExpiration}
           onChangeCase={() => setScreen(screens.select)}
           onOpenTrust={openTrustCenter}
         />
@@ -1130,13 +1230,22 @@ function mergeAppointmentRecordList(records = [], nextRecord = null) {
   );
 }
 
-function buildSessionUsage({ appointment = null, history = [] } = {}) {
+function buildSessionUsage({ appointment = null, sessionRecord = null, history = [] } = {}) {
+  const startedAt = appointment?.startedAt || sessionRecord?.startedAt || "";
+  const endsAt = appointment?.endsAt || sessionRecord?.endsAt || "";
+  const durationMinutes = appointment?.durationMinutes || sessionRecord?.durationMinutes || SESSION_DURATION_MINUTES;
+  const usageSource = {
+    startedAt,
+    endsAt,
+    durationMinutes
+  };
+
   return {
     appointmentId: appointment?.id || "",
     status: appointment?.status || "",
-    startedAt: appointment?.startedAt || "",
-    durationMinutes: appointment?.durationMinutes || SESSION_DURATION_MINUTES,
-    remainingMs: getRemainingSessionTime(appointment, new Date()),
+    startedAt,
+    durationMinutes,
+    remainingMs: getRemainingSessionTime(usageSource, new Date()),
     remainingTurns: getRemainingTurns(history),
     usedTurns: Math.max(0, MAX_STUDENT_TURNS - getRemainingTurns(history))
   };

@@ -4,7 +4,10 @@ import {
   SIMULATION_TIMEZONE,
   buildScheduledFor,
   getZonedDateKey,
-  normalizeLocalDate
+  isSessionTimeExpired,
+  isSessionUsableForPractice,
+  normalizeLocalDate,
+  startSessionUsageWindow
 } from "./simulationUsagePolicy.js";
 
 const LOCAL_APPOINTMENTS_KEY = "escuchaViva.simulationAppointments.v1";
@@ -112,7 +115,7 @@ export async function ensureAppointmentForSession({
       }
     };
   }
-  const existing = findAppointmentForSession(appointments, caseItem?.id, sessionNumber, scheduledDate);
+  const existing = findReusableAppointmentForSession(appointments, caseItem?.id, sessionNumber, scheduledDate);
   if (existing) return { appointment: existing, created: false };
 
   const appointment = buildAppointmentRecord({
@@ -180,6 +183,17 @@ export function findAppointmentForSession(appointments = [], caseId = "", sessio
     .sort((a, b) => new Date(a.scheduledFor || a.createdAt).getTime() - new Date(b.scheduledFor || b.createdAt).getTime())[0] || null;
 }
 
+export function findReusableAppointmentForSession(appointments = [], caseId = "", sessionNumber = 1, date = "", now = new Date()) {
+  return (appointments || [])
+    .filter((appointment) =>
+      appointment.caseId === caseId &&
+      Number(appointment.sessionNumber) === Number(sessionNumber) &&
+      (!date || appointment.scheduledLocalDate === date) &&
+      isAppointmentReusableForPractice(appointment, now)
+    )
+    .sort((a, b) => new Date(a.scheduledFor || a.createdAt).getTime() - new Date(b.scheduledFor || b.createdAt).getTime())[0] || null;
+}
+
 export function findNextAppointment(appointments = [], caseId = "", sessionNumber = null) {
   const now = Date.now();
   return (appointments || [])
@@ -195,14 +209,26 @@ export function findNextAppointment(appointments = [], caseId = "", sessionNumbe
     })[0] || null;
 }
 
-export function findActiveAppointmentForCase(appointments = [], caseId = "", sessionNumber = 1) {
+export function findActiveAppointmentForCase(appointments = [], caseId = "", sessionNumber = 1, now = new Date()) {
   return (appointments || [])
     .filter((appointment) =>
       appointment.caseId === caseId &&
       Number(appointment.sessionNumber) === Number(sessionNumber) &&
-      ["scheduled", "in_progress", "closure_pending"].includes(appointment.status)
+      isAppointmentReusableForPractice(appointment, now)
     )
     .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())[0] || null;
+}
+
+export function isAppointmentExpired(appointment = null, now = new Date()) {
+  return isSessionTimeExpired(appointment, now);
+}
+
+export function isAppointmentReusableForPractice(appointment = null, now = new Date()) {
+  return isSessionUsableForPractice(appointment, now);
+}
+
+export function startAppointmentForPractice(appointment = null, now = new Date()) {
+  return startSessionUsageWindow(appointment, now);
 }
 
 function normalizeAppointmentInput(authSession, appointment) {

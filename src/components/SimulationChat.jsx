@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MonitorPlay, RotateCcw, Send, ShieldCheck, SquareCheckBig, Users } from "lucide-react";
+import { MonitorPlay, RotateCcw, Send, ShieldCheck, SquareCheckBig, TriangleAlert, Users } from "lucide-react";
 import { PatientCard } from "./PatientCard.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
@@ -29,6 +29,7 @@ export function SimulationChat({
   onAsk,
   onFinish,
   onRestart,
+  onStartNewPractice,
   onChangeCase,
   onOpenTrust
 }) {
@@ -192,6 +193,20 @@ export function SimulationChat({
     attemptSendQuestion(failedTurn?.question || question);
   }
 
+  function startNewPractice() {
+    setQuestion("");
+    setSelectedInterventionType("");
+    setValidationFeedback("");
+    setFailedTurn(null);
+    setCanRetryLastMessage(false);
+    setAvatarState("idle");
+    if (typeof onStartNewPractice === "function") {
+      onStartNewPractice();
+      return;
+    }
+    onRestart?.();
+  }
+
   function appendDictatedText(text) {
     if (avatarState === "thinking" || avatarState === "closed") return;
     const transcript = text.trim();
@@ -285,9 +300,9 @@ export function SimulationChat({
               <Users aria-hidden="true" />
               Caso
             </button>
-            <button className="secondary-action" type="button" onClick={onRestart}>
+            <button className="secondary-action" type="button" onClick={timeExpired ? startNewPractice : onRestart}>
               <RotateCcw aria-hidden="true" />
-              Reiniciar
+              {timeExpired ? "Nueva práctica" : "Reiniciar"}
             </button>
             <button
               className="primary-action"
@@ -386,6 +401,29 @@ export function SimulationChat({
           </div>
         </div>
 
+        {usageNotice && (
+          <section
+            className={`session-time-alert usage-${usageNotice.tone}`}
+            role={timeExpired ? "alert" : "status"}
+            aria-live="polite"
+          >
+            <TriangleAlert aria-hidden="true" />
+            <div>
+              <p>{usageNotice.text}</p>
+              {timeExpired && (
+                <div className="session-expired-actions">
+                  <button className="primary-action" type="button" onClick={finishSimulation}>
+                    Continuar al cierre
+                  </button>
+                  <button className="secondary-action" type="button" onClick={startNewPractice}>
+                    Iniciar una nueva práctica
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         <form className="question-form" onSubmit={submitQuestion}>
           <label htmlFor="student-question">Intervención del estudiante</label>
           <p className="writing-support">
@@ -462,11 +500,6 @@ export function SimulationChat({
               {writingSuggestion}
             </p>
           )}
-          {usageNotice && (
-            <p className={`writing-suggestion usage-${usageNotice.tone}`} aria-live="polite">
-              {usageNotice.text}
-            </p>
-          )}
         </form>
       </section>
     </section>
@@ -497,7 +530,7 @@ function resolveUsageNotice({ usedTurns, remainingTurns, remainingMs, timeExpire
   if (timeExpired) {
     return {
       tone: "error",
-      text: "El tiempo de entrevista ha finalizado. Continua con el cierre y la retroalimentacion."
+      text: "La sesión finalizó por tiempo. Puedes continuar al cierre conservando la conversación o iniciar una nueva práctica."
     };
   }
   if (turnLimitReached) {
@@ -508,14 +541,20 @@ function resolveUsageNotice({ usedTurns, remainingTurns, remainingMs, timeExpire
   }
   if (remainingMs <= 60 * 1000) {
     return {
-      tone: "warning",
-      text: "Queda 1 minuto. Formula tu ultima intervención."
+      tone: "danger",
+      text: "Queda 1 minuto. Finaliza tu intervención y continúa con el cierre."
     };
   }
   if (remainingMs <= 5 * 60 * 1000) {
     return {
+      tone: "urgent",
+      text: "Quedan 5 minutos. Prioriza una última intervención y prepara el cierre de la sesión."
+    };
+  }
+  if (remainingMs <= 10 * 60 * 1000) {
+    return {
       tone: "warning",
-      text: "Quedan 5 minutos. Comienza a preparar el cierre de la sesión."
+      text: "Quedan 10 minutos. Comienza a organizar el cierre: resume lo conversado, valida la experiencia y acuerda los próximos pasos."
     };
   }
   if (usedTurns >= TURN_WARNING_THRESHOLD || remainingTurns <= 4) {
@@ -526,7 +565,6 @@ function resolveUsageNotice({ usedTurns, remainingTurns, remainingMs, timeExpire
   }
   return null;
 }
-
 function logSimulationDebug(label, payload) {
   if (import.meta.env.DEV || globalThis.__EV_DEBUG_CONVERSATION__) {
     console.log(label, payload);
