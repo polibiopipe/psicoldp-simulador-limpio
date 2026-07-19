@@ -13,7 +13,9 @@
     "audit:clinical-claudio": "node src/engine/clinicalSimulationEngine.claudioAudit.js",
     "audit:clinical-all": "node src/engine/clinicalSimulationEngine.allAudit.js",
     "audit:phase3a-safety": "node src/engine/phase3aSafetyAudit.js",
-    "audit:adult-avatars": "node src/engine/adultAvatarConsistencyAudit.js"
+    "audit:adult-avatars": "node src/engine/adultAvatarConsistencyAudit.js",
+    "audit:encoding": "node scripts/audit-text-encoding.mjs",
+    "audit:feedback": "node scripts/audit-feedback-evidence.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",

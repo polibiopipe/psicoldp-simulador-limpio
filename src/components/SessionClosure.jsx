@@ -22,6 +22,7 @@ import {
   formatSessionAgreement,
   saveSessionSummary
 } from "../engine/sessionMemory.js";
+import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 import {
   buildContinuityAgreement,
   buildInitialClinicalDecision,
@@ -125,11 +126,22 @@ export function SessionClosure({
   const interviewTurns = history.filter((entry) => !entry.isSessionPrelude);
   const isNotEvaluable = report.evaluationStatus === "not_evaluable";
   const isLimitedEvaluation = report.evaluationStatus === "limited";
-  const achieved = report.criteria.filter((criterion) => criterion.level === "achieved").length;
-  const partial = report.criteria.filter((criterion) => criterion.level === "partial").length;
   const normalizedClinicalDecision = useMemo(
     () => normalizeClinicalDecision(clinicalDecision, sessionPlan, sessionNumber, preSessionPlan),
     [clinicalDecision, sessionPlan, sessionNumber, preSessionPlan]
+  );
+  const sessionFeedback = useMemo(
+    () =>
+      buildSessionFeedback({
+        sessionNumber,
+        selectedCase: caseItem,
+        conversation: history,
+        clinicalDecision: normalizedClinicalDecision,
+        studentPlan: preSessionPlan,
+        selectedApproach: report?.therapeuticApproach,
+        report
+      }),
+    [sessionNumber, caseItem, history, normalizedClinicalDecision, preSessionPlan, report]
   );
   const completedSessionCount = Math.max(
     sessionNumber,
@@ -492,8 +504,8 @@ export function SessionClosure({
     return (
       <section className="session-closure session-closure-empty" aria-labelledby="session-closure-title">
         <header className="session-closure-header">
-          <span className="eyebrow">Cierre de sesiÃ³n</span>
-          <h1 id="session-closure-title">SesiÃ³n sin intervenciones suficientes para evaluar</h1>
+          <span className="eyebrow">Cierre de sesión</span>
+          <h1 id="session-closure-title">Sesión sin intervenciones suficientes para evaluar</h1>
           <p>{report.emptySessionMessage}</p>
         </header>
 
@@ -504,7 +516,7 @@ export function SessionClosure({
               <strong>{caseItem.name}</strong>
             </div>
             <div>
-              <span>SesiÃ³n</span>
+              <span>Sesión</span>
               <strong>{sessionNumber}</strong>
             </div>
             <div>
@@ -517,7 +529,7 @@ export function SessionClosure({
             </div>
           </div>
           <p>
-            Esta sesiÃ³n no entrega evaluaciÃ³n formativa porque no hubo intervenciones
+            Esta sesión no entrega evaluación formativa porque no hubo intervenciones
             observables del estudiante.
           </p>
           <ul>
@@ -542,13 +554,13 @@ export function SessionClosure({
         <span className="eyebrow">Proceso por sesiones</span>
         <h1 id="session-closure-title">{closureTitle}</h1>
         <p>
-          Resumen formativo de la sesiÃ³n simulada. Esta sÃ­ntesis es ficticia y ayuda a
-          ordenar quÃ© se explorÃ³ y quÃ© podrÃ­a retomarse en el proceso.
+          Resumen formativo de la sesión simulada. Esta síntesis es ficticia y ayuda a
+          ordenar qué se exploró y qué podría retomarse en el proceso.
         </p>
         <p>
           Las cuatro sesiones son una ruta formativa base, no un cierre obligatorio.
-          Puedes continuar evaluando, solicitar informaciÃ³n complementaria o iniciar
-          diseÃ±o de intervenciÃ³n si la comprensiÃ³n clÃ­nica ya es suficiente.
+          Puedes continuar evaluando, solicitar información complementaria o iniciar
+          diseño de intervención si la comprensión clínica ya es suficiente.
         </p>
         {draftStatus && (
           <div className={`draft-autosave-status ${draftStatus.type}`} role="status">
@@ -561,14 +573,14 @@ export function SessionClosure({
         <details className="closure-stage" open>
           <summary>
             <span>1</span>
-            <strong>Resumen breve de sesiÃ³n</strong>
-            <small>Paciente, turnos, apertura y senales generales del cierre.</small>
+            <strong>Resumen breve de sesión</strong>
+            <small>Paciente, turnos, apertura y señales generales del cierre.</small>
           </summary>
           <div className="closure-stage-body">
       {interviewTurns.length < 3 && (
         <div className="session-note low-turn-note">
-          Esta sesiÃ³n tuvo pocas intervenciones. Para un mejor aprendizaje, se recomienda
-          profundizar mÃ¡s antes de avanzar, aunque puedes continuar si estÃ¡s probando el flujo.
+          Esta sesión tuvo pocas intervenciones. Para un mejor aprendizaje, se recomienda
+          profundizar más antes de avanzar, aunque puedes continuar si estás probando el flujo.
         </div>
       )}
 
@@ -578,7 +590,7 @@ export function SessionClosure({
           <strong>{caseItem.name}</strong>
         </div>
         <div>
-          <span>SesiÃ³n</span>
+          <span>Sesión</span>
           <strong>{sessionNumber}</strong>
         </div>
         <div>
@@ -589,7 +601,7 @@ export function SessionClosure({
 
             <section className="session-summary-card closure-panel closure-panel-wide">
               <span className="eyebrow">Resumen narrativo</span>
-              <h2>SesiÃ³n {summary.sessionNumber} con {summary.patientName}</h2>
+              <h2>Sesión {summary.sessionNumber} con {summary.patientName}</h2>
               <p>{summary.resumenConversacion}</p>
             </section>
           </div>
@@ -598,18 +610,18 @@ export function SessionClosure({
         <details className="closure-stage">
           <summary>
             <span>2</span>
-            <strong>RetroalimentaciÃ³n formativa</strong>
+            <strong>Retroalimentación formativa</strong>
             <small>Indicadores, fortalezas y aspectos prioritarios.</small>
           </summary>
           <div className="closure-stage-body">
       {isLimitedEvaluation ? (
         <div className="session-note low-turn-note">
-          RetroalimentaciÃ³n limitada: hubo muy pocas intervenciones para sostener
-          porcentajes o logros robustos. Usa esta devoluciÃ³n como orientaciÃ³n para
-          iniciar mejor el prÃ³ximo intento.
+          Retroalimentación limitada: hubo muy pocas intervenciones para sostener
+          juicios robustos. Usa esta devolución como orientación para
+          iniciar mejor el próximo intento.
         </div>
       ) : (
-      <div className="closure-metrics" aria-label="MÃ©tricas de cierre">
+      <div className="closure-metrics" aria-label="Métricas de cierre">
         <article>
           <Clock aria-hidden="true" />
           <strong>{interviewTurns.length}</strong>
@@ -617,18 +629,18 @@ export function SessionClosure({
         </article>
         <article>
           <CheckCircle2 aria-hidden="true" />
-          <strong>{achieved}</strong>
-          <span>logrados</span>
+          <strong>{sessionFeedback.levelLabel}</strong>
+          <span>evidencia</span>
         </article>
         <article>
           <TrendingUp aria-hidden="true" />
-          <strong>{partial}</strong>
-          <span>parciales</span>
+          <strong>{sessionFeedback.pendingAreas.length}</strong>
+          <span>pendientes</span>
         </article>
         <article>
           <MessageSquareText aria-hidden="true" />
-          <strong>{report.trust.final}/100</strong>
-          <span>apertura</span>
+          <strong>{report.trust.label}</strong>
+          <span>apertura simulada</span>
         </article>
       </div>
       )}
@@ -637,7 +649,7 @@ export function SessionClosure({
         <section className="closure-card closure-panel">
           <h2>Fortalezas principales</h2>
           <ul>
-            {report.strengths.slice(0, 3).map((item) => (
+            {sessionFeedback.strengths.slice(0, 3).map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
@@ -646,7 +658,7 @@ export function SessionClosure({
         <section className="closure-card closure-panel">
           <h2>Aspectos por mejorar</h2>
           <ul>
-            {report.improvements.slice(0, 3).map((item) => (
+            {sessionFeedback.priorityImprovements.slice(0, 3).map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
@@ -655,7 +667,7 @@ export function SessionClosure({
         <section className="closure-card closure-panel">
           <h2>Temas pendientes</h2>
           <ul>
-            {summary.temasPendientes.map((item) => (
+            {(sessionFeedback.pendingAreas.length ? sessionFeedback.pendingAreas : summary.temasPendientes).map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
@@ -677,24 +689,24 @@ export function SessionClosure({
         <details className="closure-stage">
           <summary>
             <span>3</span>
-            <strong>PreparaciÃ³n previa y continuidad</strong>
-            <small>SÃ­ntesis compacta del plan inicial utilizado.</small>
+            <strong>Preparación previa y continuidad</strong>
+            <small>Síntesis compacta del plan inicial utilizado.</small>
           </summary>
           <div className="closure-stage-body">
             {summary.preSessionEvaluation ? (
               <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel compact-preparation-summary">
-                <span className="eyebrow">PreparaciÃ³n previa utilizada</span>
+                <span className="eyebrow">Preparación previa utilizada</span>
                 <h2>Plan inicial de entrevista</h2>
                 <ul className="compact-clinical-list">
                   <li>
                     <strong>Modalidad:</strong> {summary.preSessionEvaluation.interviewType || "No registrada"}.
                   </li>
                   <li>
-                    <strong>Ãreas planificadas:</strong>{" "}
+                    <strong>Áreas planificadas:</strong>{" "}
                     {formatClinicalAreaList(summary.preSessionEvaluation.plannedAreas)}.
                   </li>
                   <li>
-                    <strong>Ãreas retomadas:</strong>{" "}
+                    <strong>Áreas retomadas:</strong>{" "}
                     {summary.preSessionEvaluation.coveredAreas.length} de{" "}
                     {summary.preSessionEvaluation.plannedAreas.length}.
                   </li>
@@ -704,7 +716,7 @@ export function SessionClosure({
                   </li>
                 </ul>
                 <details className="closure-inline-detail">
-                  <summary>Ver anÃ¡lisis de preparaciÃ³n</summary>
+                  <summary>Ver análisis de preparación</summary>
                   <div className="session-summary-grid">
                     <div>
                       <h3>Fortalezas del plan</h3>
@@ -726,7 +738,7 @@ export function SessionClosure({
                 </details>
               </section>
             ) : (
-              <div className="session-note">No hay preparaciÃ³n previa registrada para esta sesiÃ³n.</div>
+              <div className="session-note">No hay preparación previa registrada para esta sesión.</div>
             )}
           </div>
         </details>
@@ -734,8 +746,8 @@ export function SessionClosure({
         <details className="closure-stage">
           <summary>
             <span>4</span>
-            <strong>FormulaciÃ³n clÃ­nica e instrumentos</strong>
-            <small>HipÃ³tesis, datos, instrumentos e informe externo.</small>
+            <strong>Formulación clínica e instrumentos</strong>
+            <small>Hipótesis, datos, instrumentos e informe externo.</small>
           </summary>
           <div className="closure-stage-body">
       <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
@@ -814,7 +826,7 @@ export function SessionClosure({
                   checked={(clinicalArtifacts.selectedInstruments || []).includes(instrument.id)}
                   onChange={() => toggleInstrument(instrument.id)}
                 />
-                {instrument.label} Â· {instrument.useCase}
+                {instrument.label} · {instrument.useCase}
               </label>
             ))}
           </div>
@@ -888,11 +900,11 @@ export function SessionClosure({
             </label>
 
             <label>
-              <span>Â¿QuÃ© informaciÃ³n esperas obtener?</span>
+              <span>¿Qué información esperas obtener?</span>
               <textarea
                 value={clinicalArtifacts.complementaryEvaluation?.expectedInformation || ""}
                 onChange={(event) => updateComplementaryEvaluation({ expectedInformation: event.target.value })}
-                placeholder="Nombra informaciÃ³n especÃ­fica que ayudarÃ­a a decidir continuidad, derivaciÃ³n o intervenciÃ³n."
+                placeholder="Nombra información específica que ayudaría a decidir continuidad, derivación o intervención."
                 rows={2}
               />
             </label>
@@ -1001,7 +1013,7 @@ export function SessionClosure({
           {complementaryEvaluation.report && (
             <div className="clinical-plan-form">
               <label>
-                <span>Â¿QuÃ© informaciÃ³n nueva aporta el informe?</span>
+                <span>¿Qué información nueva aporta el informe?</span>
                 <textarea
                   value={clinicalArtifacts.complementaryEvaluation?.integration?.newInformation || ""}
                   onChange={(event) => updateReportIntegration({ newInformation: event.target.value })}
@@ -1017,7 +1029,7 @@ export function SessionClosure({
                 />
               </label>
               <label>
-                <span>Â¿QuÃ© integrarÃ¡s al diseÃ±o de intervenciÃ³n?</span>
+                <span>¿Qué integrarás al diseño de intervención?</span>
                 <textarea
                   value={clinicalArtifacts.complementaryEvaluation?.integration?.interventionUse || ""}
                   onChange={(event) => updateReportIntegration({ interventionUse: event.target.value })}
@@ -1073,7 +1085,7 @@ export function SessionClosure({
 
         {(shouldShowInterventionDesign || normalizedClinicalArtifacts.interventionDesign.caseUnderstanding) && (
           <div className="clinical-plan-subpanel">
-            <span className="eyebrow">DiseÃ±o de intervenciÃ³n aplicado al caso</span>
+            <span className="eyebrow">Diseño de intervención aplicado al caso</span>
             <h3>Construir propuesta clinica situada</h3>
             <p>
               Esta pauta no es generica: debe sostenerse en entrevistas realizadas,
@@ -1083,7 +1095,7 @@ export function SessionClosure({
 
             <div className="clinical-plan-form">
               {[
-                ["caseUnderstanding", "ComprensiÃ³n del caso"],
+                ["caseUnderstanding", "Comprensión del caso"],
                 ["clinicalFormulation", "Formulacion clinica"],
                 ["objectives", "Objetivos de intervencion"],
                 ["treatmentPlan", "Plan de tratamiento o intervencion"],
@@ -1172,8 +1184,8 @@ export function SessionClosure({
         <details className="closure-stage">
           <summary>
             <span>5</span>
-            <strong>DecisiÃ³n clÃ­nica</strong>
-            <small>Continuidad, cierre, derivaciÃ³n o acciÃ³n final.</small>
+            <strong>Decisión clínica</strong>
+            <small>Continuidad, cierre, derivación o acción final.</small>
           </summary>
           <div className="closure-stage-body">
       <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
@@ -1183,7 +1195,7 @@ export function SessionClosure({
             <h2>Decision sobre continuidad del proceso</h2>
             <p>
               Decide si corresponde cerrar, continuar, derivar o activar una respuesta de
-              riesgo. La cantidad de sesiones es una hipÃ³tesis clÃ­nica que puedes sostener,
+              riesgo. La cantidad de sesiones es una hipótesis clínica que puedes sostener,
               ajustar o cuestionar durante el proceso.
             </p>
           </div>
@@ -1192,7 +1204,7 @@ export function SessionClosure({
             <strong>
               {plannedSessionTotal}
             </strong>
-            <span>sesiÃ³n(es)</span>
+            <span>sesión(es)</span>
           </div>
         </div>
 
@@ -1240,20 +1252,20 @@ export function SessionClosure({
             >
               {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
                 <option key={value} value={value}>
-                  {value} sesiÃ³n{value > 1 ? "es" : ""}
+                  {value} sesión{value > 1 ? "es" : ""}
                 </option>
               ))}
             </select>
             {planBelowCompletedSessions && (
               <div className="prep-plan-memory-warning" role="alert">
-                Ya existen {completedSessionCount} sesiones registradas. No se eliminarÃ¡
+                Ya existen {completedSessionCount} sesiones registradas. No se eliminará
                 memoria clinica previa; el plan visual se ajustara sin borrar lo trabajado.
               </div>
             )}
           </label>
 
           <label>
-            <span>Â¿Por quÃ© propones esta cantidad de sesiones?</span>
+            <span>¿Por qué propones esta cantidad de sesiones?</span>
             <textarea
               value={clinicalDecision.justification}
               onChange={(event) => updateDecision({ justification: event.target.value })}
@@ -1263,7 +1275,7 @@ export function SessionClosure({
           </label>
 
           <label>
-            <span>Â¿QuÃ© informaciÃ³n clÃ­nica ya tienes?</span>
+            <span>¿Qué información clínica ya tienes?</span>
             <textarea
               value={clinicalDecision.knownInformation || ""}
               onChange={(event) => updateDecision({ knownInformation: event.target.value })}
@@ -1273,7 +1285,7 @@ export function SessionClosure({
           </label>
 
           <label>
-            <span>Â¿QuÃ© informaciÃ³n consideras que falta?</span>
+            <span>¿Qué información consideras que falta?</span>
             <textarea
               value={clinicalDecision.missingInformation || ""}
               onChange={(event) => updateDecision({ missingInformation: event.target.value })}
@@ -1402,7 +1414,7 @@ export function SessionClosure({
 
       {reachedSessionLimit && (
         <section className="session-summary-card closure-panel closure-panel-wide">
-          <span className="eyebrow">SÃ­ntesis de proceso</span>
+          <span className="eyebrow">Síntesis de proceso</span>
           <h2>Resumen del proceso con {processSummary.patientName}</h2>
           <p>{processSummary.summaryText}</p>
           <div className="session-summary-grid">
@@ -1415,11 +1427,12 @@ export function SessionClosure({
               </ul>
             </div>
             <div>
-              <h3>EvoluciÃ³n de apertura</h3>
+              <h3>Evolución de apertura</h3>
+              <p className="microcopy">Señal cualitativa de apertura simulada, no medición clínica.</p>
               <ul>
                 {processSummary.opennessEvolution.map((item) => (
                   <li key={item.sessionNumber}>
-                    SesiÃ³n {item.sessionNumber}: {item.trustFinal}/100 ({item.label})
+                    Sesión {item.sessionNumber}: {item.label || "sin señal cualitativa registrada"}
                   </li>
                 ))}
               </ul>

@@ -18,8 +18,8 @@ Motivo ficticio: ${caseItem.motive}
 Resumen del desempeño:
 ${report.summary}
 
-Nivel de apertura logrado:
-${report.trust.final}/100 (${report.trust.label}). Cambio durante la sesión: ${report.trust.delta >= 0 ? "+" : ""}${report.trust.delta}.
+Apertura simulada observada:
+${report.trust.label}. Esta es una lectura cualitativa formativa, no una medición clínica.
 
 Criterios logrados:
 ${achieved || "- Sin criterios completamente logrados todavía."}

@@ -80,16 +80,14 @@ export function ResultsSummary({ report, caseItem, history, sessionNumber = 1 })
       {!isLimitedEvaluation && (
         <div className="trust-meter">
           <div>
-            <span>Apertura lograda</span>
-            <strong>{report.trust.final}/100</strong>
+            <span>Apertura simulada</span>
+            <strong>{report.trust.label}</strong>
           </div>
           <div className="progress-track">
             <div style={{ width: `${report.trust.final}%` }} />
           </div>
           <p>
-            Nivel final: {report.trust.label}. Cambio durante la sesión:{" "}
-            {report.trust.delta >= 0 ? "+" : ""}
-            {report.trust.delta}.
+            Indicador cualitativo de cómo respondió el paciente ficticio durante esta simulación.
           </p>
         </div>
       )}

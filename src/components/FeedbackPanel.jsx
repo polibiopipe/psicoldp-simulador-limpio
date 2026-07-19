@@ -81,6 +81,10 @@ export function FeedbackPanel({
     report,
     selectedApproach: report.therapeuticApproach
   });
+  const observedActions = sessionFeedback.observedActions || [];
+  const priorityActions = observedActions
+    .filter((item) => item.boundaryPressure || item.autonomyRespect || item.validation || item.followUp)
+    .slice(0, 4);
 
   return (
     <section className="feedback-panel">
@@ -95,11 +99,11 @@ export function FeedbackPanel({
           <span className="eyebrow">
             {isLimitedEvaluation ? "Retroalimentación limitada" : "Nivel formativo"}
           </span>
-          <strong>{isLimitedEvaluation ? "Sin puntaje robusto" : sessionFeedback.levelLabel}</strong>
+          <strong>{sessionFeedback.levelLabel}</strong>
         </div>
         <p>
           {isLimitedEvaluation
-            ? "Hubo muy poco material conversacional. La devolución orienta el próximo intento, pero no entrega porcentajes robustos."
+            ? "Hubo poco material conversacional. La devolución orienta el próximo intento, sin entregar porcentajes robustos."
             : sessionFeedback.levelDescription}
         </p>
       </section>
@@ -122,7 +126,7 @@ export function FeedbackPanel({
         <section className="feedback-block">
           <h2>Aspecto a mejorar</h2>
           <ul>
-            {sessionFeedback.improvements.map((item) => (
+            {sessionFeedback.priorityImprovements.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
@@ -134,8 +138,42 @@ export function FeedbackPanel({
         </section>
       </div>
 
+      {priorityActions.length > 0 && (
+        <section className="feedback-block feedback-evidence-strip">
+          <h2>Evidencia observada</h2>
+          <ul>
+            {priorityActions.map((item) => (
+              <li key={`${item.index}-${item.quote}`}>
+                <strong>“{item.quote}”</strong>
+                <span>{item.recognizedSkill}. {item.possibleEffect}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <details className="history-details feedback-detail-toggle">
         <summary>Ver detalle formativo</summary>
+
+        <section className="feedback-block">
+          <h2>Lectura de evidencia</h2>
+          <p>{sessionFeedback.evidenceNote}</p>
+          {observedActions.length > 0 && (
+            <ol className="feedback-observed-actions">
+              {observedActions.slice(0, 8).map((item) => (
+                <li key={`${item.index}-${item.quote}`}>
+                  <blockquote>{item.quote}</blockquote>
+                  <p><strong>Habilidad reconocida:</strong> {item.recognizedSkill}</p>
+                  <p><strong>Lectura formativa:</strong> {item.formativeReading}</p>
+                  <p><strong>Efecto posible:</strong> {item.possibleEffect}</p>
+                  <p><strong>Sugerencia:</strong> {item.suggestion}</p>
+                  <p><strong>Reformulación:</strong> {item.reformulation}</p>
+                  <p><strong>Criterio:</strong> {item.criterion}</p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
 
         <div className="feedback-sections">
           <section className="feedback-block">
@@ -214,6 +252,17 @@ export function FeedbackPanel({
                 <span key={item.label}>{item.label}: {item.count}</span>
               ))}
             </div>
+          </section>
+        )}
+
+        {sessionFeedback.nextSessionPriorities?.length > 0 && (
+          <section className="feedback-block">
+            <h2>Prioridades para la próxima sesión</h2>
+            <ul>
+              {sessionFeedback.nextSessionPriorities.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </section>
         )}
       </details>

@@ -29,6 +29,8 @@ export function buildEducationalReport(history, caseItem) {
   const hasJudgment = memory.judgment > 0;
   const hasRushedAdvice = memory.rushedAdvice > 0;
   const hasPrematureInterpretation = memory.prematureInterpretation > 0;
+  const hasBoundaryPressure = memory.boundaryPressure > 0;
+  const facilitativeOpenQuestions = memory.facilitativeOpenQuestions ?? memory.openQuestions;
   const finalTrust = memory.trustLevels.at(-1) ?? 0;
   const initialTrust = memory.trustLevels[0] ?? finalTrust;
   const trustDelta = finalTrust - initialTrust;
@@ -39,17 +41,17 @@ export function buildEducationalReport(history, caseItem) {
     if (text.includes("laborales")) return memory.contextExploration > 0;
     if (text.includes("redes")) return memory.support > 0;
     if (text.includes("familia")) return memory.contextExploration > 0;
-    return memory.openQuestions + memory.validation > 1;
+    return facilitativeOpenQuestions + memory.validation > 1;
   }).length;
 
   const rawScores = {
     encuadre: memory.framing >= 1 ? 2 : memory.initialPresentation || memory.greeting ? 1 : 0,
-    vinculo: !hasJudgment && memory.pressure === 0 && (memory.validation || memory.paceRespect || memory.greeting)
+    vinculo: !hasJudgment && !hasBoundaryPressure && memory.pressure === 0 && (memory.validation || memory.paceRespect || memory.greeting)
       ? 2
-      : !hasJudgment && memory.pressure === 0
+      : !hasJudgment && !hasBoundaryPressure && memory.pressure === 0
         ? 1
         : 0.5,
-    preguntasAbiertas: memory.openQuestions >= 3 ? 2 : memory.openQuestions >= 1 ? 1 : 0,
+    preguntasAbiertas: facilitativeOpenQuestions >= 3 ? 2 : facilitativeOpenQuestions >= 1 ? 1 : 0,
     escuchaValidacion: memory.validation + memory.empathicSummary >= 2
       ? 2
       : memory.validation + memory.empathicSummary >= 1
@@ -102,23 +104,25 @@ export function buildEducationalReport(history, caseItem) {
   const improvements = [];
 
   if (memory.framing) strengths.push("Presentaste algún encuadre o límite para ordenar la entrevista.");
-  if (memory.openQuestions >= 2) strengths.push("Usaste preguntas abiertas que facilitaron mayor elaboración.");
+  if (facilitativeOpenQuestions >= 2) strengths.push("Usaste preguntas abiertas que facilitaron mayor elaboración.");
+  if (memory.autonomyRespect > 0) strengths.push("Respetaste un límite o el ritmo del paciente antes de seguir explorando.");
   if (memory.validation) strengths.push("Incluiste validación emocional y un tono respetuoso.");
   if (memory.contextExploration >= 2) strengths.push("Exploraste dimensiones contextuales relevantes para el caso.");
   if (memory.empathicSummary || memory.followUp) strengths.push("Retomaste contenido del paciente ficticio y usaste seguimiento conversacional, favoreciendo continuidad.");
-  if (trustDelta > 8) strengths.push(`La apertura del paciente aumentó durante la entrevista (+${trustDelta} puntos de confianza simulada).`);
+  if (trustDelta > 8) strengths.push("La apertura simulada del paciente mostró una evolución favorable durante la entrevista.");
   if (!hasJudgment && !isLimitedEvaluation) strengths.push("Evitaste juicios directos o etiquetas sobre el paciente ficticio.");
 
   if (!memory.framing) improvements.push("Inicia con un encuadre más explícito: propósito, límites, ritmo y carácter educativo.");
   if (memory.closedQuestions > memory.openQuestions) improvements.push("Hubo predominio de preguntas cerradas; alterna con preguntas abiertas para favorecer relato.");
-  if (memory.openQuestions < 2) improvements.push("Aumenta el uso de preguntas abiertas y evita una secuencia de preguntas cerradas.");
+  if (facilitativeOpenQuestions < 2) improvements.push("Aumenta preguntas abiertas facilitadoras, cuidando que no presionen límites del paciente.");
   if (!memory.validation) improvements.push("Refleja emociones antes de avanzar a hipótesis o nuevas áreas.");
   if (memory.contextExploration < 2) improvements.push("Explora con más equilibrio familia, estudio/trabajo, redes y vida digital según el caso.");
   if (memory.followUp < 1 && turnCount >= 3) improvements.push("Incluye preguntas de seguimiento sobre palabras del paciente para sostener una conversación más humana.");
   if (hasJudgment) improvements.push("Cuida el lenguaje para evitar moralizar, etiquetar o responsabilizar al paciente ficticio.");
   if (hasRushedAdvice) improvements.push("Evita consejos apresurados; prioriza comprensión del caso y formulación de preguntas.");
   if (hasPrematureInterpretation) improvements.push("Evita interpretaciones cerradas demasiado pronto; formula hipótesis como preguntas tentativas.");
-  if (memory.pressure) improvements.push("Reduce presión o insistencia: respeta silencios y permite que el paciente ficticio marque ritmo.");
+  if (hasBoundaryPressure) improvements.push("Una pregunta abierta puede presionar si insiste sobre información que el paciente prefirió reservar.");
+  else if (memory.pressure) improvements.push("Reduce presión o insistencia: respeta silencios y permite que el paciente ficticio marque ritmo.");
   if (!memory.goodClosure) improvements.push("Cierra con resumen empático, agradecimiento y una pregunta breve sobre cómo queda el paciente.");
   if (!memory.continuityAgreement) improvements.push("Al cerrar, puedes dejar abierta una próxima sesión simulada sin prometer soluciones inmediatas.");
 
@@ -138,7 +142,8 @@ export function buildEducationalReport(history, caseItem) {
       entry.analysis?.categories?.judgment ||
       entry.analysis?.categories?.rushedAdvice ||
       entry.analysis?.categories?.prematureInterpretation ||
-      entry.analysis?.categories?.pressure ||
+        entry.analysis?.categories?.pressure ||
+        entry.analysis?.categories?.boundaryPressure ||
       (entry.analysis?.categories?.repeatedQuestion && !entry.analysis?.categories?.goodClosure) ||
       (entry.analysis?.categories?.prematureClosure && !entry.analysis?.categories?.goodClosure)
     )
@@ -179,7 +184,7 @@ export function buildEducationalReport(history, caseItem) {
     summary:
       isLimitedEvaluation
         ? `Retroalimentación limitada: se registró ${turnCount} intervención con ${caseItem.name}. Se requiere más material conversacional para evaluar habilidades clínicas con solidez.`
-        : `Se realizaron ${turnCount} intervenciones con ${caseItem.name}. La entrevista mostró ${memory.openQuestions} pregunta(s) abierta(s), ${memory.validation} validación(es), ${memory.contextExploration} exploración(es) contextuales, ${memory.followUp} seguimiento(s) conversacionales y una apertura final ${trustLabels[trustStage]}.`,
+        : `Se realizaron ${turnCount} intervenciones con ${caseItem.name}. La entrevista mostró ${facilitativeOpenQuestions} pregunta(s) abierta(s) facilitadora(s), ${memory.validation} validación(es), ${memory.contextExploration} exploración(es) contextuales, ${memory.followUp} seguimiento(s) conversacionales y una apertura final ${trustLabels[trustStage]}.`,
     nextSuggestions: [
       "Ensaya un encuadre inicial breve antes de explorar el motivo de consulta.",
       "Formula una hipótesis solo como pregunta tentativa, no como conclusión.",
@@ -279,7 +284,7 @@ function scoreObjective(objective, memory, history) {
     checks.push(memory.validation >= 1 && memory.judgment === 0);
   }
   if (includesAnyObjective(text, ["preguntas abiertas", "seguimiento", "retomar", "profundizar"])) {
-    checks.push(memory.openQuestions >= 1 || memory.followUp >= 1);
+    checks.push((memory.facilitativeOpenQuestions ?? memory.openQuestions) >= 1 || memory.followUp >= 1);
   }
   if (includesAnyObjective(text, ["familia", "familiar", "red", "apoyo", "recursos", "contexto", "responsabilidades", "pares"])) {
     checks.push(memory.contextExploration >= 1 || memory.family >= 1 || memory.support >= 1);
@@ -299,18 +304,18 @@ function scoreObjective(objective, memory, history) {
   if (includesAnyObjective(text, ["limites", "sobrecarga relacional", "disponibilidad"])) {
     checks.push(memory.emotion >= 1 || memory.support >= 1 || memory.contextExploration >= 1);
   }
-  if (includesAnyObjective(text, ["cerrar", "cierre", "continuidad", "proxima"])) {
+  if (includesAnyObjective(text, ["cerrar", "cierre", "continuidad", "próxima"])) {
     checks.push(memory.closure >= 1 || memory.continuityAgreement >= 1);
   }
   if (includesAnyObjective(text, ["evitar", "no entregar", "no idealizar", "no patologizar", "sin apresurar"])) {
     checks.push(memory.rushedAdvice === 0 && memory.prematureInterpretation === 0 && memory.judgment === 0);
   }
-  if (includesAnyObjective(text, ["riesgo", "etica", "derivacion"])) {
+  if (includesAnyObjective(text, ["riesgo", "ética", "derivación"])) {
     checks.push(memory.riskExploration >= 1 || memory.framing >= 1);
   }
 
   if (!checks.length) {
-    checks.push(memory.openQuestions >= 1 || memory.validation >= 1 || memory.contextExploration >= 1);
+    checks.push((memory.facilitativeOpenQuestions ?? memory.openQuestions) >= 1 || memory.validation >= 1 || memory.contextExploration >= 1);
   }
 
   const hits = checks.filter(Boolean).length;
@@ -365,7 +370,9 @@ function buildSkillClassification(memory) {
   return [
     ["Saludo", memory.greeting],
     ["Encuadre", memory.framing],
-    ["Pregunta abierta", memory.openQuestions],
+    ["Pregunta abierta facilitadora", memory.facilitativeOpenQuestions ?? memory.openQuestions],
+    ["Respeto de límites", memory.autonomyRespect],
+    ["Presión sobre límite", memory.boundaryPressure],
     ["Pregunta cerrada", memory.closedQuestions],
     ["Validación", memory.validation],
     ["Reflejo o resumen", memory.empathicSummary],
