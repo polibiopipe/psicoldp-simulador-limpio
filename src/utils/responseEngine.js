@@ -241,6 +241,11 @@ async function requestGeminiPatientResponse({
     const data = await readResponseJson(response);
     if (!response.ok) {
       if (data?.code || data?.errorType) {
+        console.warn("[responseEngine] api validation failed", {
+          status: response.status,
+          code: data?.code || data?.errorType || "",
+          message: data?.message || ""
+        });
         return {
           source: "error",
           text: "",
