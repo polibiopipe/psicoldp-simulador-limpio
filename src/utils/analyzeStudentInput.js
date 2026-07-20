@@ -1,3 +1,9 @@
+import {
+  hasAutonomyRespect,
+  hasPatientBoundarySignal,
+  isBoundaryPressure
+} from "../engine/sessionFeedback.js";
+
 const lexicon = {
   greeting: [
     "hola", "buenos dias", "buenos días", "buen dia", "buen día", "buenas tardes",
@@ -29,14 +35,14 @@ const lexicon = {
     "por que viniste", "por qué viniste"
   ],
   framing: [
-    "confidencial", "objetivo", "propósito", "proposito", "encuadre", "sesión", "sesion",
+    "confidencial", "objetivo", "propósito", "proposito", "encuadre", "sesión", "sesión",
     "puedes no responder", "a tu ritmo", "límites", "limites", "espacio educativo", "simulación", "simulacion"
   ],
   validation: [
     "entiendo", "tiene sentido", "suena", "imagino", "debe ser", "gracias por contar",
     "me parece importante", "comprendo", "no debe ser fácil", "no debe ser facil",
     "puede ser difícil", "puede ser dificil", "es comprensible", "no quiero juzgar",
-    "no son solo", "no es solo", "lugar seguro", "más seguro", "mas seguro", "pueden cumplir una función", "pueden cumplir una funcion"
+    "no son solo", "no es solo", "lugar seguro", "más seguro", "más seguro", "pueden cumplir una función", "pueden cumplir una funcion"
   ],
   emotion: [
     "sientes", "sentir", "emoción", "emocion", "ansiedad", "miedo", "pena", "rabia",
@@ -62,7 +68,7 @@ const lexicon = {
   ],
   prematureInterpretation: [
     "lo que te pasa es", "claramente", "eso significa", "en realidad tú", "en realidad tu",
-    "seguro que", "el problema es que", "parece que tienes", "diagnóstico", "diagnostico"
+    "seguro que", "el problema es que", "parece que tienes", "diagnóstico", "diagnóstico"
   ],
   pressure: [
     "respóndeme", "respondeme", "responde ahora", "dime ahora", "tienes que hablar", "sé claro", "se claro", "no evadas",
@@ -80,22 +86,22 @@ const lexicon = {
   followUp: [
     "me dijiste que", "dijiste que", "mencionaste", "cuando dices", "cuando dijiste",
     "a que te refieres", "a qué te refieres", "que quieres decir", "qué quieres decir",
-    "cuentame mas", "cuéntame más", "en que sentido", "en qué sentido", "retomando"
+    "cuentame más", "cuéntame más", "en que sentido", "en qué sentido", "retomando"
   ]
 };
 
 const abruptTopicShifts = ["cambiando de tema", "dejando eso", "pasemos a otra cosa", "otra pregunta"];
 
 const continuityTerms = [
-  "proxima sesion",
   "próxima sesión",
-  "siguiente sesion",
+  "próxima sesión",
+  "siguiente sesión",
   "siguiente sesión",
   "retomar esto",
   "podemos retomar",
   "continuar profundizando",
   "continuar con calma",
-  "otra sesion",
+  "otra sesión",
   "otra sesión",
   "volver a conversar",
   "seguir hablando"
@@ -190,6 +196,10 @@ function isClosedQuestion(text) {
 
 export function analyzeStudentInput(input, history = []) {
   const text = normalize(input);
+  const previousPatientResponse = String(history.at(-1)?.answer || history.at(-1)?.patientResponse || "");
+  const boundarySignalBefore = hasPatientBoundarySignal(previousPatientResponse);
+  const boundaryPressure = isBoundaryPressure(input, previousPatientResponse);
+  const autonomyRespect = hasAutonomyRespect(input);
   const categories = {
     greeting: detectsGreeting(text),
     name: detectsNameRequest(text),
@@ -219,13 +229,16 @@ export function analyzeStudentInput(input, history = []) {
     judgment: includesAny(text, lexicon.judgment),
     rushedAdvice: includesAny(text, lexicon.rushedAdvice),
     prematureInterpretation: includesAny(text, lexicon.prematureInterpretation),
-    pressure: includesAny(text, lexicon.pressure),
+    pressure: includesAny(text, lexicon.pressure) || boundaryPressure,
     empathicSummary: includesAny(text, lexicon.empathicSummary),
     followUp: includesAny(text, lexicon.followUp),
     riskExploration: includesAny(text, lexicon.risk),
     closure: includesAny(text, lexicon.closure),
     continuityAgreement: includesAny(text, continuityTerms),
-    abruptShift: includesAny(text, abruptTopicShifts)
+    abruptShift: includesAny(text, abruptTopicShifts),
+    boundarySignalBefore,
+    boundaryPressure,
+    autonomyRespect
   };
 
   categories.contextExploration =
@@ -245,6 +258,12 @@ export function analyzeStudentInput(input, history = []) {
     categories.videogamesConcrete ||
     categories.relationalConcrete;
   categories.paceRespect = categories.framing || includesAny(text, ["si quieres", "a tu ritmo", "puedes no", "no tienes que", "sin apurarte"]);
+  categories.facilitativeOpenQuestion =
+    categories.openQuestion &&
+    !categories.boundaryPressure &&
+    !categories.judgment &&
+    !categories.rushedAdvice &&
+    !categories.prematureInterpretation;
   categories.goodClosure =
     categories.closure && (categories.empathicSummary || categories.validation || includesAny(text, ["gracias", "agradezco", "cómo quedas", "como quedas"]));
   categories.prematureClosure = categories.closure && history.length < 4;
@@ -260,11 +279,69 @@ export function analyzeStudentInput(input, history = []) {
 }
 
 export function summarizeConversationMemory(history) {
-  return history.reduce(
-    (memory, turn) => {
-      const inferredCategories = analyzeStudentInput(turn.question).categories;
+  const memory = {
+    framing: 0,
+    greeting: 0,
+    name: 0,
+    age: 0,
+    initialPresentation: 0,
+    consultationReason: 0,
+    concreteQuestions: 0,
+    openQuestions: 0,
+    facilitativeOpenQuestions: 0,
+    closedQuestions: 0,
+    validation: 0,
+    emotion: 0,
+    coping: 0,
+    contextExploration: 0,
+    family: 0,
+    academic: 0,
+    work: 0,
+    digital: 0,
+    support: 0,
+    judgment: 0,
+    rushedAdvice: 0,
+    prematureInterpretation: 0,
+    pressure: 0,
+    boundaryPressure: 0,
+    autonomyRespect: 0,
+    empathicSummary: 0,
+    followUp: 0,
+    riskExploration: 0,
+    preferences: 0,
+    paceRespect: 0,
+    closure: 0,
+    continuityAgreement: 0,
+    goodClosure: 0,
+    trustLevels: []
+  };
+
+  for (let index = 0; index < history.length; index += 1) {
+      const turn = history[index];
+      const previousPatientResponse = String(history[index - 1]?.answer || "");
+      const inferredCategories = analyzeStudentInput(
+        turn.question,
+        previousPatientResponse ? [{ answer: previousPatientResponse }] : []
+      ).categories;
       const engineCategories = turn.analysis?.categories || {};
       const categories = mergeCategories(inferredCategories, engineCategories);
+      categories.boundarySignalBefore = Boolean(
+        categories.boundarySignalBefore || hasPatientBoundarySignal(previousPatientResponse)
+      );
+      categories.boundaryPressure = Boolean(
+        categories.boundaryPressure || isBoundaryPressure(turn.question, previousPatientResponse)
+      );
+      categories.autonomyRespect = Boolean(categories.autonomyRespect || hasAutonomyRespect(turn.question));
+      categories.facilitativeOpenQuestion = Boolean(
+        categories.facilitativeOpenQuestion ||
+          (categories.openQuestion &&
+            !categories.boundaryPressure &&
+            !categories.judgment &&
+            !categories.rushedAdvice &&
+            !categories.prematureInterpretation)
+      );
+      if (categories.boundaryPressure) categories.pressure = true;
+
       if (categories.greeting) memory.greeting += 1;
       if (categories.name) memory.name += 1;
       if (categories.age) memory.age += 1;
@@ -273,6 +350,7 @@ export function summarizeConversationMemory(history) {
       if (categories.concreteQuestion) memory.concreteQuestions += 1;
       if (categories.framing) memory.framing += 1;
       if (categories.openQuestion) memory.openQuestions += 1;
+      if (categories.facilitativeOpenQuestion) memory.facilitativeOpenQuestions += 1;
       if (categories.closedQuestion) memory.closedQuestions += 1;
       if (categories.validation) memory.validation += 1;
       if (categories.emotionalExploration) memory.emotion += 1;
@@ -287,6 +365,8 @@ export function summarizeConversationMemory(history) {
       if (categories.rushedAdvice) memory.rushedAdvice += 1;
       if (categories.prematureInterpretation) memory.prematureInterpretation += 1;
       if (categories.pressure) memory.pressure += 1;
+      if (categories.boundaryPressure) memory.boundaryPressure += 1;
+      if (categories.autonomyRespect) memory.autonomyRespect += 1;
       if (categories.empathicSummary) memory.empathicSummary += 1;
       if (categories.followUp) memory.followUp += 1;
       if (categories.riskExploration) memory.riskExploration += 1;
@@ -296,42 +376,9 @@ export function summarizeConversationMemory(history) {
       if (categories.continuityAgreement) memory.continuityAgreement += 1;
       if (categories.goodClosure) memory.goodClosure += 1;
       if (turn.patientState?.trustLevel != null) memory.trustLevels.push(turn.patientState.trustLevel);
-      return memory;
-    },
-    {
-      framing: 0,
-      greeting: 0,
-      name: 0,
-      age: 0,
-      initialPresentation: 0,
-      consultationReason: 0,
-      concreteQuestions: 0,
-      openQuestions: 0,
-      closedQuestions: 0,
-      validation: 0,
-      emotion: 0,
-      coping: 0,
-      contextExploration: 0,
-      family: 0,
-      academic: 0,
-      work: 0,
-      digital: 0,
-      support: 0,
-      judgment: 0,
-      rushedAdvice: 0,
-      prematureInterpretation: 0,
-      pressure: 0,
-      empathicSummary: 0,
-      followUp: 0,
-      riskExploration: 0,
-      preferences: 0,
-      paceRespect: 0,
-      closure: 0,
-      continuityAgreement: 0,
-      goodClosure: 0,
-      trustLevels: []
-    }
-  );
+  }
+
+  return memory;
 }
 
 function mergeCategories(...categorySets) {

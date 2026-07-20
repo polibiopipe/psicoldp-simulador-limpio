@@ -145,8 +145,8 @@ export function buildProcessSummary({ caseItem, summaries = [] }) {
     .filter(Boolean);
   const processMemory = mergeProcessMemories(orderedSummaries);
   const summaryText = orderedSummaries.length >= 2
-    ? `Proceso formativo de ${orderedSummaries.length} sesion(es) con ${caseItem.name}. Se trabajaron objetivos, continuidad y decisiones clinicas segun el plan del estudiante.`
-    : `Proceso formativo parcial con ${caseItem.name}. Hay ${orderedSummaries.length} sesion(es) registrada(s).`;
+    ? `Proceso formativo de ${orderedSummaries.length} sesión(es) con ${caseItem.name}. Se trabajaron objetivos, continuidad y decisiones clínicas segun el plan del estudiante.`
+    : `Proceso formativo parcial con ${caseItem.name}. Hay ${orderedSummaries.length} sesión(es) registrada(s).`;
 
   return {
     caseId: caseItem.id,
@@ -178,7 +178,10 @@ export function formatProcessSummary(processSummary) {
     ...withEmptyFallback(processSummary.workedTopics).map((item) => `- ${item}`),
     "",
     "Evolución de apertura:",
-    ...processSummary.opennessEvolution.map((item) => `- Sesión ${item.sessionNumber}: ${item.trustFinal}/100 (${item.label})`),
+    "Señal cualitativa de apertura simulada, no medición clínica.",
+    ...processSummary.opennessEvolution.map(
+      (item) => `- Sesión ${item.sessionNumber}: ${item.label || "sin señal cualitativa registrada"}`
+    ),
     "",
     "Habilidades logradas por el estudiante:",
     ...withEmptyFallback(processSummary.studentStrengths).map((item) => `- ${item}`),
@@ -189,14 +192,14 @@ export function formatProcessSummary(processSummary) {
     "Decisiones de continuidad:",
     ...withEmptyFallback(
       (processSummary.clinicalDecisions || []).map((item) =>
-        `Sesion ${item.sessionNumber}: ${item.action} (${item.proposedSessions} sesion(es)). ${item.justification || ""}`.trim()
+        `Sesión ${item.sessionNumber}: ${item.action} (${item.proposedSessions} sesión(es)). ${item.justification || ""}`.trim()
       )
     ).map((item) => `- ${item}`),
     "",
     "Informes externos recibidos:",
     ...withEmptyFallback(
       (processSummary.externalReports || []).map((item) =>
-        `Sesion ${item.sessionNumber}: ${item.instrument || item.title} (${item.area || "area no especificada"})`
+        `Sesión ${item.sessionNumber}: ${item.instrument || item.title} (${item.area || "área no especificada"})`
       )
     ).map((item) => `- ${item}`),
     "",

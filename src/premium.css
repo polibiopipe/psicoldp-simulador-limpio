@@ -8824,6 +8824,64 @@ body,
   justify-content: flex-end;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.session-usage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: fit-content;
+  white-space: nowrap;
+}
+
+.session-usage-chip .usage-counter,
+.session-usage-chip .usage-clock {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.session-usage-chip .usage-clock {
+  padding-left: 8px;
+  border-left: 1px solid color-mix(in srgb, var(--brand-primary, #1e3a5f) 18%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.feedback-evidence-strip ul,
+.feedback-observed-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.feedback-evidence-strip li {
+  display: grid;
+  gap: 4px;
+}
+
+.feedback-evidence-strip li span,
+.feedback-observed-actions p {
+  margin: 0;
+  color: var(--muted, #5b6b76);
+}
+
+.feedback-observed-actions blockquote {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--brand-secondary, #3a8f8a);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--brand-secondary, #3a8f8a) 8%, #fff);
+}
+
 @media (max-width: 1020px) {
   .interview-antechamber-screen .preparation-brief-layout {
     grid-template-columns: 1fr;

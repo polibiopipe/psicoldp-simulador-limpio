@@ -130,7 +130,7 @@ export function SimulationChat({
       setValidationFeedback(
         timeExpired
           ? "El tiempo de entrevista ha finalizado. Continua con el cierre y la retroalimentacion."
-          : "Alcanzaste el maximo de intervenciones de esta sesion. Continua con el cierre."
+          : "Alcanzaste el maximo de intervenciones de esta sesión. Continua con el cierre."
       );
       return;
     }
@@ -252,15 +252,25 @@ export function SimulationChat({
               <h1>{caseItem.name}</h1>
               <span className="session-context">
                 {sessionNumber === 1
-                  ? `Entrevista inicial simulada · Sesion 1 de ${totalSessions}`
-                  : `Sesion ${sessionNumber} de ${totalSessions}`}
+                  ? `Entrevista inicial simulada · Sesión 1 de ${totalSessions}`
+                  : `Sesión ${sessionNumber} de ${totalSessions}`}
               </span>
             </div>
           </div>
           <div className="chat-actions">
-            <div className="session-usage-chip" title="Control formativo de tiempo e intervenciones">
-              <span>{usedTurns} de {MAX_STUDENT_TURNS} intervenciones</span>
-              <strong>{formatRemainingTime(remainingMs)}</strong>
+            <div
+              className="session-usage-chip"
+              title="Control formativo de tiempo e intervenciones"
+              aria-label={`${usedTurns} de ${MAX_STUDENT_TURNS} intervenciones. Tiempo restante ${formatRemainingTime(remainingMs)}.`}
+            >
+              <span className="usage-counter">
+                <span className="sr-only">Intervenciones usadas: </span>
+                {usedTurns} de {MAX_STUDENT_TURNS} intervenciones
+              </span>
+              <strong className="usage-clock">
+                <span className="sr-only">Tiempo restante: </span>
+                {formatRemainingTime(remainingMs)}
+              </strong>
             </div>
             <button
               className="secondary-action video-view-toggle"
@@ -493,19 +503,19 @@ function resolveUsageNotice({ usedTurns, remainingTurns, remainingMs, timeExpire
   if (turnLimitReached) {
     return {
       tone: "error",
-      text: "Alcanzaste el maximo de intervenciones. Continua con el cierre de la sesion."
+      text: "Alcanzaste el maximo de intervenciones. Continua con el cierre de la sesión."
     };
   }
   if (remainingMs <= 60 * 1000) {
     return {
       tone: "warning",
-      text: "Queda 1 minuto. Formula tu ultima intervencion."
+      text: "Queda 1 minuto. Formula tu ultima intervención."
     };
   }
   if (remainingMs <= 5 * 60 * 1000) {
     return {
       tone: "warning",
-      text: "Quedan 5 minutos. Comienza a preparar el cierre de la sesion."
+      text: "Quedan 5 minutos. Comienza a preparar el cierre de la sesión."
     };
   }
   if (usedTurns >= TURN_WARNING_THRESHOLD || remainingTurns <= 4) {
