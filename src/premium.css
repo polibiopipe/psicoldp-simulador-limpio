@@ -8857,6 +8857,60 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
+.session-time-alert {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: flex-start;
+  margin: 14px 0 0;
+  padding: 13px 15px;
+  border: 1px solid #ead7a6;
+  border-radius: 14px;
+  background: #fff8e4;
+  color: #4f3d0d;
+  box-shadow: 0 10px 22px rgba(103, 78, 18, 0.08);
+}
+
+.session-time-alert svg {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: currentColor;
+}
+
+.session-time-alert p {
+  margin: 0;
+  color: inherit;
+  font-size: 0.94rem;
+  line-height: 1.45;
+  font-weight: 750;
+}
+
+.session-time-alert.usage-urgent {
+  border-color: #f0bf83;
+  background: #fff0dc;
+  color: #693b07;
+}
+
+.session-time-alert.usage-danger,
+.session-time-alert.usage-error {
+  border-color: #e5a4a4;
+  background: #fff0f0;
+  color: #7a1f1f;
+}
+
+.session-expired-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.session-expired-actions .primary-action,
+.session-expired-actions .secondary-action {
+  min-height: 38px;
+}
+
 .feedback-evidence-strip ul,
 .feedback-observed-actions {
   display: grid;

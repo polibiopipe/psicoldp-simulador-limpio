@@ -67,7 +67,7 @@ export function canStartSession(user, appointment, appointments = [], now = new 
   }
 
   const remainingMs = getRemainingSessionTime(appointment, now);
-  if (appointment.startedAt && remainingMs <= 0) {
+  if (isSessionTimeExpired(appointment, now)) {
     return {
       ok: false,
       reason: "SESSION_TIME_EXPIRED",
@@ -85,6 +85,40 @@ export function getRemainingSessionTime(sessionOrAppointment, now = new Date()) 
   const duration = Number(sessionOrAppointment.durationMinutes) || SESSION_DURATION_MINUTES;
   const endsAt = new Date(startedAt.getTime() + duration * 60 * 1000);
   return Math.max(0, endsAt.getTime() - new Date(now).getTime());
+}
+
+export function isSessionTimeExpired(sessionOrAppointment = null, now = new Date()) {
+  return Boolean(sessionOrAppointment?.startedAt) && getRemainingSessionTime(sessionOrAppointment, now) <= 0;
+}
+
+export function isSessionUsableForPractice(sessionOrAppointment = null, now = new Date()) {
+  if (!sessionOrAppointment) return false;
+  if (!["scheduled", "in_progress"].includes(sessionOrAppointment.status)) return false;
+  return !isSessionTimeExpired(sessionOrAppointment, now);
+}
+
+export function startSessionUsageWindow(sessionOrAppointment = null, now = new Date()) {
+  if (!sessionOrAppointment) return null;
+  if (isSessionTimeExpired(sessionOrAppointment, now)) return null;
+
+  const currentStartedAt = sessionOrAppointment.startedAt || "";
+  const startedAt = currentStartedAt || now.toISOString();
+  const startTime = new Date(startedAt);
+  const durationMinutes = Number(sessionOrAppointment.durationMinutes) || SESSION_DURATION_MINUTES;
+  const endsAt = sessionOrAppointment.endsAt || (
+    Number.isNaN(startTime.getTime())
+      ? ""
+      : new Date(startTime.getTime() + durationMinutes * 60 * 1000).toISOString()
+  );
+
+  return {
+    ...sessionOrAppointment,
+    status: "in_progress",
+    startedAt,
+    endsAt,
+    durationMinutes,
+    updatedAt: now.toISOString()
+  };
 }
 
 export function getRemainingTurns(sessionOrHistory) {

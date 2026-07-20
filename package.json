@@ -15,7 +15,8 @@
     "audit:phase3a-safety": "node src/engine/phase3aSafetyAudit.js",
     "audit:adult-avatars": "node src/engine/adultAvatarConsistencyAudit.js",
     "audit:encoding": "node scripts/audit-text-encoding.mjs",
-    "audit:feedback": "node scripts/audit-feedback-evidence.mjs"
+    "audit:feedback": "node scripts/audit-feedback-evidence.mjs",
+    "audit:session-expiration": "node scripts/audit-session-expiration.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",
