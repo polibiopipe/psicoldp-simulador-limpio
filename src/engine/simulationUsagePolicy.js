@@ -1,12 +1,19 @@
 export const SIMULATION_TIMEZONE = "America/Santiago";
 export const SESSION_DURATION_MINUTES = 45;
-export const MAX_STUDENT_TURNS = 24;
+export const MAX_STUDENT_TURNS = 60;
 export const MAX_CONTEXT_TURNS = 10;
-export const TURN_WARNING_THRESHOLD = 20;
+export const TURN_WARNING_THRESHOLD = 24;
 export const TIME_WARNING_MINUTES = {
-  closing: 5,
+  suggestClosing: 10,
+  beginClosing: 5,
   final: 1
 };
+
+export const SESSION_END_REASONS = Object.freeze({
+  VOLUNTARY: "voluntary_closure",
+  MAXIMUM_TIME: "maximum_time",
+  TECHNICAL_TURN_LIMIT: "technical_turn_limit"
+});
 
 export const ACTIVE_APPOINTMENT_STATUSES = new Set([
   "scheduled",
@@ -87,6 +94,27 @@ export function getRemainingSessionTime(sessionOrAppointment, now = new Date()) 
   return Math.max(0, endsAt.getTime() - new Date(now).getTime());
 }
 
+export function getSessionTimingState(sessionOrAppointment = null, now = new Date()) {
+  const durationMinutes = Number(sessionOrAppointment?.durationMinutes) || SESSION_DURATION_MINUTES;
+  const durationMs = durationMinutes * 60 * 1000;
+  const remainingMs = getRemainingSessionTime(sessionOrAppointment, now);
+  const elapsedMs = sessionOrAppointment?.startedAt
+    ? Math.max(0, Math.min(durationMs, durationMs - remainingMs))
+    : 0;
+  const elapsedMinutes = elapsedMs / (60 * 1000);
+
+  return {
+    durationMinutes,
+    elapsedMs,
+    elapsedMinutes,
+    remainingMs,
+    canContinueInterview: remainingMs > 0,
+    closureSuggested: elapsedMinutes >= 35,
+    closureUrgent: elapsedMinutes >= 40,
+    timeExpired: Boolean(sessionOrAppointment?.startedAt) && remainingMs <= 0
+  };
+}
+
 export function isSessionTimeExpired(sessionOrAppointment = null, now = new Date()) {
   return Boolean(sessionOrAppointment?.startedAt) && getRemainingSessionTime(sessionOrAppointment, now) <= 0;
 }
@@ -126,6 +154,59 @@ export function getRemainingTurns(sessionOrHistory) {
     ? countCompletedStudentTurns(sessionOrHistory)
     : Number(sessionOrHistory?.studentTurnCount) || countCompletedStudentTurns(sessionOrHistory?.conversationHistory || []);
   return Math.max(0, MAX_STUDENT_TURNS - usedTurns);
+}
+
+export function resolveSessionEndReason({
+  requestedReason = "",
+  sessionOrAppointment = null,
+  history = [],
+  now = new Date()
+} = {}) {
+  if (Object.values(SESSION_END_REASONS).includes(requestedReason)) return requestedReason;
+  if (isSessionTimeExpired(sessionOrAppointment, now)) return SESSION_END_REASONS.MAXIMUM_TIME;
+  if (countCompletedStudentTurns(history) >= MAX_STUDENT_TURNS) {
+    return SESSION_END_REASONS.TECHNICAL_TURN_LIMIT;
+  }
+  return SESSION_END_REASONS.VOLUNTARY;
+}
+
+export function buildSessionUsageMetrics({
+  startedAt = "",
+  endedAt = "",
+  durationMinutes = SESSION_DURATION_MINUTES,
+  history = [],
+  endReason = "",
+  now = new Date()
+} = {}) {
+  const safeDurationMinutes = Number(durationMinutes) || SESSION_DURATION_MINUTES;
+  const startedTime = new Date(startedAt).getTime();
+  const requestedEndTime = new Date(endedAt || now).getTime();
+  const hasValidStart = Boolean(startedAt) && Number.isFinite(startedTime);
+  const hasValidEnd = Number.isFinite(requestedEndTime);
+  const maximumEndTime = hasValidStart
+    ? startedTime + safeDurationMinutes * 60 * 1000
+    : 0;
+  const resolvedReason = Object.values(SESSION_END_REASONS).includes(endReason) ? endReason : "";
+  let effectiveEndTime = hasValidEnd ? requestedEndTime : new Date(now).getTime();
+
+  if (hasValidStart) {
+    effectiveEndTime = resolvedReason === SESSION_END_REASONS.MAXIMUM_TIME
+      ? maximumEndTime
+      : Math.min(Math.max(effectiveEndTime, startedTime), maximumEndTime);
+  }
+
+  const elapsedMs = hasValidStart
+    ? Math.max(0, effectiveEndTime - startedTime)
+    : 0;
+
+  return {
+    configuredDurationMinutes: safeDurationMinutes,
+    elapsedSeconds: Math.round(elapsedMs / 1000),
+    elapsedMinutes: Number((elapsedMs / (60 * 1000)).toFixed(2)),
+    studentTurnCount: countCompletedStudentTurns(history),
+    endReason: resolvedReason,
+    endedAt: endedAt && hasValidEnd ? new Date(effectiveEndTime).toISOString() : ""
+  };
 }
 
 export function countCompletedStudentTurns(history = []) {

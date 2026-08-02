@@ -114,11 +114,16 @@ check("expired in_progress session is rejected", () =>
   ).reason === "SESSION_TIME_EXPIRED"
 );
 
-check("turn 24 is allowed before max is reached", () =>
-  23 < MAX_STUDENT_TURNS
-);
+check("turn 24 can continue while interview time remains", () => {
+  const history = Array.from({ length: 24 }, (_, index) => ({
+    id: `turn-${index}`,
+    question: "Pregunta",
+    answer: "Respuesta"
+  }));
+  return MAX_STUDENT_TURNS === 60 && getRemainingTurns(history) === 36;
+});
 
-check("turn 25 is rejected at max completed interventions", () => {
+check("technical turn limit is reached at 60 completed interventions", () => {
   const history = Array.from({ length: MAX_STUDENT_TURNS }, (_, index) => ({
     id: `turn-${index}`,
     question: "Pregunta",
@@ -503,10 +508,8 @@ check("client cannot write simulation_interventions directly", () =>
 );
 
 check("completed or closure_pending session cannot return to chat", () =>
-  endpoint.includes("[\"cancelled\", \"completed\"].includes(appointment.status)") &&
-  endpoint.includes("appointment.status === \"closure_pending\"") &&
-  endpoint.includes("sessionData.status === \"closure_pending\"") &&
-  endpoint.includes("sessionData.status === \"completed\"")
+  endpoint.includes("![\"in_progress\"].includes(appointment.status)") &&
+  endpoint.includes("APPOINTMENT_NOT_ACTIVE")
 );
 
 const failed = checks.filter((item) => !item.ok);

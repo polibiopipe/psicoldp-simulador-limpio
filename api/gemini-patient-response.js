@@ -8,6 +8,8 @@ import { getNarrativeDisclosureContext } from "../src/engine/narrativeDisclosure
 import { createClient } from "@supabase/supabase-js";
 import {
   MAX_CONTEXT_TURNS,
+  MAX_STUDENT_TURNS,
+  countCompletedStudentTurns,
   getRemainingSessionTime,
   getSimulationUsagePolicy
 } from "../src/engine/simulationUsagePolicy.js";
@@ -454,7 +456,7 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
   if (sessionRecordId) {
     const { data: recordData, error: recordError } = await serviceClient
       .from("simulation_sessions")
-      .select("id,user_id,case_id,session_number,status,appointment_id,started_at")
+      .select("id,user_id,case_id,session_number,status,appointment_id,started_at,conversation")
       .eq("id", sessionRecordId)
       .maybeSingle();
 
@@ -478,6 +480,13 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
       }
       if (sessionRecord.appointment_id && sessionRecord.appointment_id !== appointmentId) {
         return usageError("SESSION_APPOINTMENT_MISMATCH", "La sesion guardada no corresponde a la cita activa.", 409);
+      }
+      if (countCompletedStudentTurns(sessionRecord.conversation || []) >= MAX_STUDENT_TURNS) {
+        return usageError(
+          "TECHNICAL_TURN_LIMIT_REACHED",
+          "La sesion alcanzo el limite tecnico de intervenciones. Continua con el cierre.",
+          409
+        );
       }
     }
   }

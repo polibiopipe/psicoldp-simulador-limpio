@@ -1,5 +1,6 @@
 import { buildSessionSummary } from "./sessionMemory.js";
 import { buildSessionFeedback } from "./sessionFeedback.js";
+import { buildSessionUsageMetrics } from "./simulationUsagePolicy.js";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 
 const HISTORY_STORAGE_KEY = "simuladorClinicoLdp.sessionHistory.v1";
@@ -19,6 +20,8 @@ export function buildSessionHistoryRecord({
   appointmentId = "",
   startedAt = "",
   endsAt = "",
+  endedAt = "",
+  endReason = "",
   status = "completed"
 }) {
   const sessionSummary = buildSessionSummary({
@@ -58,6 +61,19 @@ export function buildSessionHistoryRecord({
       patientState: entry.patientState,
       createdAt: entry.createdAt
     }));
+  const sessionMetrics = buildSessionUsageMetrics({
+    startedAt,
+    endedAt,
+    durationMinutes: startedAt && endsAt
+      ? Math.max(1, (new Date(endsAt).getTime() - new Date(startedAt).getTime()) / (60 * 1000))
+      : undefined,
+    history: visibleHistory,
+    endReason
+  });
+  const enrichedSessionSummary = {
+    ...sessionSummary,
+    sessionMetrics
+  };
 
   return {
     id: id || createHistoryId(caseItem.id, sessionNumber),
@@ -74,6 +90,8 @@ export function buildSessionHistoryRecord({
     updatedAt: new Date().toISOString(),
     startedAt,
     endsAt,
+    endedAt: sessionMetrics.endedAt,
+    sessionMetrics,
     conversationHistory: visibleHistory,
     summary: {
       brief: sessionFeedback.briefSummary,
@@ -87,7 +105,8 @@ export function buildSessionHistoryRecord({
       clinicalDecision: sessionSummary.clinicalDecision,
       clinicalPlanEvaluation: sessionSummary.clinicalPlanEvaluation,
       agreement: sessionSummary.acuerdoContinuidad || agreement,
-      ethicalNotice: sessionSummary.ethicalNotice
+      ethicalNotice: sessionSummary.ethicalNotice,
+      sessionMetrics
     },
     feedback: {
       generalScore: report.generalScore,
@@ -116,7 +135,7 @@ export function buildSessionHistoryRecord({
       level: sessionSummary.nivelApertura
     },
     continuityAgreement: sessionSummary.acuerdoContinuidad || agreement || "",
-    sessionSummary
+    sessionSummary: enrichedSessionSummary
   };
 }
 
@@ -342,7 +361,8 @@ function mapRecordToSupabasePayload(record, user) {
     summary: record.summary,
     patientOpenness: record.patientOpenness,
     continuityAgreement: record.continuityAgreement,
-    sessionSummary: record.sessionSummary
+    sessionSummary: record.sessionSummary,
+    sessionMetrics: record.sessionMetrics
   };
 
   return {
@@ -381,6 +401,8 @@ function mapSupabaseRowToRecord(row) {
     updatedAt: row.updated_at || row.created_at,
     startedAt: row.started_at || "",
     endsAt: row.ends_at || "",
+    endedAt: row.feedback?.sessionMetrics?.endedAt || "",
+    sessionMetrics: row.feedback?.sessionMetrics || row.feedback?.summary?.sessionMetrics || null,
     conversationHistory: row.conversation || [],
     summary: row.feedback?.summary || {
       brief: "Sesion guardada en Supabase.",

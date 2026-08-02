@@ -22,18 +22,30 @@ export function AvatarSessionView({
   sessionNumber = 1,
   totalSessions = 4,
   turnCount = 0,
+  sessionStartedAt = "",
+  sessionDurationMinutes = 45,
   onFinish
 }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
-    setElapsedSeconds(0);
+    const mountedAt = Date.now();
+    const configuredStart = new Date(sessionStartedAt).getTime();
+    const hasPersistedStart = Boolean(sessionStartedAt) && Number.isFinite(configuredStart);
+    const durationSeconds = Math.max(1, Number(sessionDurationMinutes) || 45) * 60;
+    const updateElapsed = () => {
+      const startTime = hasPersistedStart ? configuredStart : mountedAt;
+      const nextElapsed = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+      setElapsedSeconds(Math.min(durationSeconds, nextElapsed));
+    };
+
+    updateElapsed();
     const intervalId = window.setInterval(() => {
-      setElapsedSeconds((current) => current + 1);
+      updateElapsed();
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [caseItem.id, sessionNumber]);
+  }, [caseItem.id, sessionNumber, sessionStartedAt, sessionDurationMinutes]);
 
   return (
     <section

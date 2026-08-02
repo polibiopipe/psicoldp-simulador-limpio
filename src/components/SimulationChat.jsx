@@ -58,9 +58,15 @@ export function SimulationChat({
   const remainingTurns = Math.max(0, sessionUsage?.remainingTurns ?? (MAX_STUDENT_TURNS - usedTurns));
   const remainingMs = calculateRemainingMs(sessionUsage, clockTick);
   const timeExpired = Boolean(usageStartedAt) && remainingMs <= 0;
-  const turnLimitReached = remainingTurns <= 0;
-  const usageBlocked = timeExpired || turnLimitReached;
-  const usageNotice = resolveUsageNotice({ usedTurns, remainingTurns, remainingMs, timeExpired, turnLimitReached });
+  const technicalTurnLimitReached = remainingTurns <= 0;
+  const usageBlocked = timeExpired || technicalTurnLimitReached;
+  const usageNotice = resolveUsageNotice({
+    usedTurns,
+    remainingTurns,
+    remainingMs,
+    timeExpired,
+    technicalTurnLimitReached
+  });
   const currentStage = resolveConversationStage({
     sessionNumber,
     history: interviewTurns,
@@ -131,7 +137,7 @@ export function SimulationChat({
       setValidationFeedback(
         timeExpired
           ? "El tiempo de entrevista ha finalizado. Continua con el cierre y la retroalimentacion."
-          : "Alcanzaste el maximo de intervenciones de esta sesión. Continua con el cierre."
+          : "Alcanzaste el límite técnico de intervenciones. Continúa con el cierre de la sesión."
       );
       return;
     }
@@ -201,7 +207,9 @@ export function SimulationChat({
     setCanRetryLastMessage(false);
     setAvatarState("idle");
     if (typeof onStartNewPractice === "function") {
-      onStartNewPractice();
+      onStartNewPractice(
+        timeExpired ? "maximum_time" : technicalTurnLimitReached ? "technical_turn_limit" : "voluntary_closure"
+      );
       return;
     }
     onRestart?.();
@@ -215,12 +223,16 @@ export function SimulationChat({
     setAvatarState("listening");
   }
 
-  function finishSimulation() {
+  function finishSimulation(requestedReason = "") {
     if (avatarState === "closed") return;
+    const explicitReason = typeof requestedReason === "string" ? requestedReason : "";
+    const endReason = explicitReason || (
+      timeExpired ? "maximum_time" : technicalTurnLimitReached ? "technical_turn_limit" : "voluntary_closure"
+    );
     window.clearTimeout(avatarIdleTimerRef.current);
     window.clearTimeout(responseTimerRef.current);
     setAvatarState("closed");
-    closeTimerRef.current = window.setTimeout(onFinish, 520);
+    closeTimerRef.current = window.setTimeout(() => onFinish?.(endReason), 520);
   }
 
   return (
@@ -300,9 +312,9 @@ export function SimulationChat({
               <Users aria-hidden="true" />
               Caso
             </button>
-            <button className="secondary-action" type="button" onClick={timeExpired ? startNewPractice : onRestart}>
+            <button className="secondary-action" type="button" onClick={usageBlocked ? startNewPractice : onRestart}>
               <RotateCcw aria-hidden="true" />
-              {timeExpired ? "Nueva práctica" : "Reiniciar"}
+              {usageBlocked ? "Nueva práctica" : "Reiniciar"}
             </button>
             <button
               className="primary-action"
@@ -339,6 +351,8 @@ export function SimulationChat({
               sessionNumber={sessionNumber}
               totalSessions={totalSessions}
               turnCount={interviewTurns.length}
+              sessionStartedAt={usageStartedAt}
+              sessionDurationMinutes={sessionUsage?.durationMinutes || SESSION_DURATION_MINUTES}
               onFinish={finishSimulation}
             />
           )}
@@ -404,15 +418,19 @@ export function SimulationChat({
         {usageNotice && (
           <section
             className={`session-time-alert usage-${usageNotice.tone}`}
-            role={timeExpired ? "alert" : "status"}
+            role={usageBlocked ? "alert" : "status"}
             aria-live="polite"
           >
             <TriangleAlert aria-hidden="true" />
             <div>
               <p>{usageNotice.text}</p>
-              {timeExpired && (
+              {usageBlocked && (
                 <div className="session-expired-actions">
-                  <button className="primary-action" type="button" onClick={finishSimulation}>
+                  <button
+                    className="primary-action"
+                    type="button"
+                    onClick={() => finishSimulation(timeExpired ? "maximum_time" : "technical_turn_limit")}
+                  >
                     Continuar al cierre
                   </button>
                   <button className="secondary-action" type="button" onClick={startNewPractice}>
@@ -526,17 +544,17 @@ function formatRemainingTime(ms) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function resolveUsageNotice({ usedTurns, remainingTurns, remainingMs, timeExpired, turnLimitReached }) {
+function resolveUsageNotice({ usedTurns, remainingTurns, remainingMs, timeExpired, technicalTurnLimitReached }) {
   if (timeExpired) {
     return {
       tone: "error",
       text: "La sesión finalizó por tiempo. Puedes continuar al cierre conservando la conversación o iniciar una nueva práctica."
     };
   }
-  if (turnLimitReached) {
+  if (technicalTurnLimitReached) {
     return {
       tone: "error",
-      text: "Alcanzaste el maximo de intervenciones. Continua con el cierre de la sesión."
+      text: "Alcanzaste el límite técnico de 60 intervenciones. Continúa con el cierre de la sesión."
     };
   }
   if (remainingMs <= 60 * 1000) {
@@ -560,7 +578,7 @@ function resolveUsageNotice({ usedTurns, remainingTurns, remainingMs, timeExpire
   if (usedTurns >= TURN_WARNING_THRESHOLD || remainingTurns <= 4) {
     return {
       tone: "warning",
-      text: `${usedTurns} de ${MAX_STUDENT_TURNS} intervenciones. Prioriza las preguntas necesarias para el cierre.`
+      text: `${usedTurns} intervenciones realizadas. Puedes continuar mientras quede tiempo; procura reservar espacio para sintetizar y cerrar.`
     };
   }
   return null;
