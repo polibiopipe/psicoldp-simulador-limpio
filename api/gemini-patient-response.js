@@ -8,6 +8,7 @@ import { getNarrativeDisclosureContext } from "../src/engine/narrativeDisclosure
 import { createClient } from "@supabase/supabase-js";
 import {
   MAX_CONTEXT_TURNS,
+  getRemainingSessionTime,
   getSimulationUsagePolicy
 } from "../src/engine/simulationUsagePolicy.js";
 
@@ -389,7 +390,7 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
   const { data: userData, error: userError } = await serviceClient.auth.getUser(accessToken);
   const user = userData?.user || null;
   if (userError || !user) {
-    return usageError("AUTH_INVALID", "No pudimos validar tu sesion. Vuelve a iniciar sesion.", 401);
+    return usageError("AUTH_INVALID", "No pudimos validar tu sesion. Vuelve a iniciar sesion.", 401, true);
   }
 
   const { data: profile, error: profileError } = await serviceClient
@@ -405,11 +406,92 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
     return usageError("ACCESS_NOT_APPROVED", "Tu acceso aun no esta aprobado para iniciar sesiones.", 403);
   }
 
+  const appointmentId = sanitizeId(payload.appointmentId);
+  const sessionRecordId = sanitizeId(payload.sessionRecordId);
+  const sessionNumber = Math.max(1, Number(payload.sessionNumber) || 1);
+  if (!appointmentId) {
+    return usageError("APPOINTMENT_REQUIRED", "No pudimos validar la cita de esta entrevista. Vuelve a retomarla desde el panel.", 409);
+  }
+
+  const { data: appointment, error: appointmentError } = await serviceClient
+    .from("simulation_appointments")
+    .select("id,user_id,case_id,case_name,session_number,status,started_at,ends_at,duration_minutes,scheduled_local_date,updated_at")
+    .eq("id", appointmentId)
+    .maybeSingle();
+
+  if (appointmentError) {
+    console.warn("[usage] appointment lookup error", {
+      code: appointmentError.code || null,
+      message: safeErrorMessage(appointmentError)
+    });
+    return usageError("APPOINTMENT_LOOKUP_FAILED", "No pudimos verificar la cita de esta entrevista.", 500, true);
+  }
+  if (!appointment || appointment.user_id !== user.id) {
+    return usageError("APPOINTMENT_NOT_FOUND", "No encontramos una cita vigente asociada a tu usuario.", 404);
+  }
+  if (appointment.case_id !== caseId) {
+    return usageError("APPOINTMENT_CASE_MISMATCH", "La cita no corresponde al caso que estas retomando.", 409);
+  }
+  if (Number(appointment.session_number) !== sessionNumber) {
+    return usageError("APPOINTMENT_SESSION_MISMATCH", "La cita no corresponde al numero de sesion actual.", 409);
+  }
+  if (!["in_progress"].includes(appointment.status)) {
+    return usageError("APPOINTMENT_NOT_ACTIVE", "La cita no esta activa para continuar la entrevista.", 409);
+  }
+  if (!appointment.started_at) {
+    return usageError("APPOINTMENT_NOT_STARTED", "La cita guardada no tiene una hora de inicio valida.", 409);
+  }
+
+  const remainingMs = getRemainingSessionTime({
+    startedAt: appointment.started_at,
+    durationMinutes: appointment.duration_minutes
+  }, new Date());
+  if (remainingMs <= 0) {
+    return usageError("SESSION_TIME_EXPIRED", "El tiempo de entrevista ha finalizado. Continua con el cierre y la retroalimentacion.", 409);
+  }
+
+  let sessionRecord = null;
+  if (sessionRecordId) {
+    const { data: recordData, error: recordError } = await serviceClient
+      .from("simulation_sessions")
+      .select("id,user_id,case_id,session_number,status,appointment_id,started_at")
+      .eq("id", sessionRecordId)
+      .maybeSingle();
+
+    if (recordError) {
+      console.warn("[usage] session lookup error", {
+        code: recordError.code || null,
+        message: safeErrorMessage(recordError)
+      });
+      return usageError("SESSION_LOOKUP_FAILED", "No pudimos verificar el registro de esta entrevista.", 500, true);
+    }
+    sessionRecord = recordData || null;
+    if (sessionRecord) {
+      if (sessionRecord.user_id !== user.id) {
+        return usageError("SESSION_USER_MISMATCH", "La sesion guardada no corresponde a tu usuario.", 409);
+      }
+      if (sessionRecord.case_id !== caseId) {
+        return usageError("SESSION_CASE_MISMATCH", "La sesion guardada no corresponde al caso actual.", 409);
+      }
+      if (Number(sessionRecord.session_number) !== sessionNumber) {
+        return usageError("SESSION_NUMBER_MISMATCH", "La sesion guardada no corresponde al numero de sesion actual.", 409);
+      }
+      if (sessionRecord.appointment_id && sessionRecord.appointment_id !== appointmentId) {
+        return usageError("SESSION_APPOINTMENT_MISMATCH", "La sesion guardada no corresponde a la cita activa.", 409);
+      }
+    }
+  }
+
   console.info("[usage] validation ok", {
     userId: user.id,
     caseId,
     role: profile.role,
-    bypassAllUsageValidation: true
+    appointmentId,
+    sessionRecordId,
+    appointmentStatus: appointment.status,
+    hasStartedAt: Boolean(appointment.started_at),
+    remainingMs,
+    sessionRecordFound: Boolean(sessionRecord)
   });
 
   return {
@@ -417,9 +499,12 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
     serviceClient,
     user,
     profile,
+    appointment,
+    sessionRecord,
+    remainingMs,
     policy: getSimulationUsagePolicy({ role: profile.role }),
     reservedIntervention: false,
-    bypassAllUsageValidation: true
+    bypassAllUsageValidation: false
   };
 }
 

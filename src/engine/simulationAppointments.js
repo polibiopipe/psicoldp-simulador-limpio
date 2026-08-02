@@ -32,6 +32,27 @@ export async function getSimulationAppointments(authSession = null) {
   return records;
 }
 
+export async function getSimulationAppointmentById(authSession = null, appointmentId = "") {
+  if (!appointmentId || !isSupabaseConfigured || !supabase || !authSession?.user) return null;
+
+  const { data, error } = await supabase
+    .from("simulation_appointments")
+    .select("*")
+    .eq("id", appointmentId)
+    .eq("user_id", authSession.user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[appointments] single load error message", error.message);
+    console.warn("[appointments] single load error code", error.code || null);
+    return null;
+  }
+
+  const record = mapAppointmentRowToRecord(data);
+  if (record) cacheAppointmentsForReadOnlyDisplay([record, ...getReadOnlyCachedAppointments()]);
+  return record;
+}
+
 export async function saveSimulationAppointment(authSession = null, appointment = {}) {
   const normalized = normalizeAppointmentInput(authSession, appointment);
   if (!normalized) {
