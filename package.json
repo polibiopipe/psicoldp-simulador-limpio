@@ -17,7 +17,8 @@
     "audit:encoding": "node scripts/audit-text-encoding.mjs",
     "audit:feedback": "node scripts/audit-feedback-evidence.mjs",
     "audit:session-expiration": "node scripts/audit-session-expiration.mjs",
-    "audit:session-resume-auth": "node scripts/audit-session-resume-auth.mjs"
+    "audit:session-resume-auth": "node scripts/audit-session-resume-auth.mjs",
+    "audit:session-duration-policy": "node scripts/audit-session-duration-policy.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",

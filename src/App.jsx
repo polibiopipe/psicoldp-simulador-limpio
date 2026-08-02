@@ -27,9 +27,11 @@ import {
 import {
   SESSION_DURATION_MINUTES,
   MAX_STUDENT_TURNS,
+  SESSION_END_REASONS,
   getRemainingSessionTime,
   getRemainingTurns,
-  getZonedDateKey
+  getZonedDateKey,
+  resolveSessionEndReason
 } from "./engine/simulationUsagePolicy.js";
 import {
   SESSION_COUNT_LIMITS,
@@ -104,6 +106,8 @@ export default function App() {
   const [activeAppointmentSnapshot, setActiveAppointmentSnapshot] = useState(null);
   const activeSessionRecordIdRef = useRef("");
   const activeAppointmentIdRef = useRef("");
+  const sessionEndedAtRef = useRef("");
+  const sessionEndReasonRef = useRef("");
   const approvalStateRef = useRef(approvalState);
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
@@ -142,6 +146,16 @@ export default function App() {
     const nextId = crypto.randomUUID();
     updateActiveSessionRecordId(nextId);
     return nextId;
+  }
+
+  function clearSessionEndTracking() {
+    sessionEndedAtRef.current = "";
+    sessionEndReasonRef.current = "";
+  }
+
+  function restoreSessionEndTracking(record = null) {
+    sessionEndedAtRef.current = record?.sessionMetrics?.endedAt || "";
+    sessionEndReasonRef.current = record?.sessionMetrics?.endReason || "";
   }
 
   useEffect(() => {
@@ -381,6 +395,7 @@ export default function App() {
     setHistory(sessionNumber > 1 ? [createSessionPrelude(selectedCase, sessionNumber, sessionSummary, sessionTotal)] : []);
     updateActiveSessionRecordId("");
     updateActiveAppointmentId("");
+    clearSessionEndTracking();
     setClosureSaveState("idle");
     setScreen(nextScreen);
   }
@@ -417,6 +432,7 @@ export default function App() {
     setHistory([]);
     updateActiveSessionRecordId("");
     updateActiveAppointmentId("");
+    clearSessionEndTracking();
     setClosureSaveState("idle");
     setScreen(screens.brief);
   }
@@ -471,6 +487,7 @@ export default function App() {
       processTotal,
       resumeRecord
     }));
+    clearSessionEndTracking();
     setScreen(nextScreen);
   }
 
@@ -512,6 +529,7 @@ export default function App() {
     );
     setSaveStatus(null);
     setClosureSaveState("idle");
+    clearSessionEndTracking();
     setScreen(screens.simulation);
   }
 
@@ -583,6 +601,11 @@ export default function App() {
     setSessionRecords((current) => mergeSessionRecordList(current, resumeRecord));
     setClosureSaveState(resumeRecord.status === "closure_pending" ? "pending" : "idle");
     if (resumeRecord.status === "closure_pending") {
+      restoreSessionEndTracking(resumeRecord);
+    } else {
+      clearSessionEndTracking();
+    }
+    if (resumeRecord.status === "closure_pending") {
       setScreen(screens.results);
       return;
     }
@@ -644,6 +667,7 @@ export default function App() {
     setHistory([createSessionPrelude(selectedCase, nextSession, summary, processTotal)]);
     updateActiveSessionRecordId("");
     updateActiveAppointmentId("");
+    clearSessionEndTracking();
     setScreen(screens.simulation);
   }
 
@@ -660,6 +684,7 @@ export default function App() {
     setHistory([]);
     updateActiveSessionRecordId("");
     updateActiveAppointmentId("");
+    clearSessionEndTracking();
     setSessionNumber(1);
     setSessionSummary(null);
     setSessionSummaries(summaries);
@@ -884,15 +909,31 @@ export default function App() {
     }
   }
 
-  async function finishSession() {
+  async function finishSession(requestedReason = "") {
+    const endedAt = new Date();
+    const appointment = getCurrentAppointmentForSession({ includeExpired: true });
+    sessionEndReasonRef.current = resolveSessionEndReason({
+      requestedReason,
+      sessionOrAppointment: appointment,
+      history,
+      now: endedAt
+    });
+    sessionEndedAtRef.current = endedAt.toISOString();
     setSaveStatus(null);
     setClosureSaveState("open");
     setScreen(screens.results);
   }
 
-  async function startNewPracticeAfterExpiration() {
+  async function startNewPracticeAfterExpiration(requestedReason = SESSION_END_REASONS.MAXIMUM_TIME) {
     const expiredAppointment = getCurrentAppointmentForSession({ includeExpired: true });
     const expiredRecordId = activeSessionRecordIdRef.current;
+    const endedAt = new Date();
+    const endReason = resolveSessionEndReason({
+      requestedReason,
+      sessionOrAppointment: expiredAppointment,
+      history,
+      now: endedAt
+    });
 
     if (history.length > 0 && expiredRecordId) {
       const pendingRecord = buildSessionHistoryRecord({
@@ -905,6 +946,8 @@ export default function App() {
         appointmentId: expiredAppointment?.id || activeAppointmentIdRef.current || "",
         startedAt: expiredAppointment?.startedAt || "",
         endsAt: expiredAppointment?.endsAt || "",
+        endedAt: endedAt.toISOString(),
+        endReason,
         status: "closure_pending"
       });
       const saveResult = await saveSessionHistory(pendingRecord);
@@ -929,6 +972,7 @@ export default function App() {
     setHistory(sessionNumber > 1 ? [createSessionPrelude(selectedCase, sessionNumber, sessionSummary, sessionTotal)] : []);
     updateActiveSessionRecordId("");
     updateActiveAppointmentId("");
+    clearSessionEndTracking();
     setSaveStatus(null);
     setClosureSaveState("idle");
     setScreen(screens.simulation);
@@ -944,6 +988,13 @@ export default function App() {
       type: "saving",
       message: "Guardando sesion..."
     });
+    const appointment = getCurrentAppointmentForSession({ includeExpired: true });
+    const endedAt = sessionEndedAtRef.current || new Date().toISOString();
+    const endReason = sessionEndReasonRef.current || resolveSessionEndReason({
+      sessionOrAppointment: appointment,
+      history,
+      now: new Date(endedAt)
+    });
     const sessionRecord = buildSessionHistoryRecord({
       id: activeSessionRecordIdRef.current || "",
       caseItem: selectedCase,
@@ -952,8 +1003,10 @@ export default function App() {
       sessionNumber,
       preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
       appointmentId: activeAppointmentIdRef.current || "",
-      startedAt: getCurrentAppointmentForSession({ includeExpired: true })?.startedAt || "",
-      endsAt: getCurrentAppointmentForSession({ includeExpired: true })?.endsAt || "",
+      startedAt: appointment?.startedAt || "",
+      endsAt: appointment?.endsAt || "",
+      endedAt,
+      endReason,
       clinicalArtifacts,
       clinicalDecision,
       clinicalPlanEvaluation,
@@ -964,6 +1017,7 @@ export default function App() {
     await updateAppointmentStatusForClosure(status);
     updateActiveSessionRecordId("");
     updateActiveAppointmentId("");
+    clearSessionEndTracking();
     setClosureSaveState(status === "closure_pending" ? "pending" : "saved");
     if (saveResult.cloudSaved) {
       setSaveStatus({
