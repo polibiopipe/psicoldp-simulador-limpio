@@ -1,0 +1,45 @@
+.research-dashboard { max-width: 100%; min-width: 0; color: var(--nv-text); }
+.research-heading { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.5rem; }
+.research-heading h1 { font-size: clamp(1.7rem, 3vw, 2.35rem); margin: .25rem 0 .6rem; color: var(--nv-navy); }
+.research-dashboard p { font-size: 1rem; line-height: 1.6; margin: .6rem 0; }
+.research-heading p { max-width: 42rem; }
+.research-actions, .research-scopes, .research-pagination { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+.research-actions svg { width: 1.1rem; height: 1.1rem; }
+.research-dashboard button { min-height: 44px; font-size: .9rem; white-space: normal; }
+.research-scopes { margin: 1rem 0; }
+.research-scopes button { border: 1px solid var(--nv-border); padding: .7rem 1rem; border-radius: 8px; background: #fff; color: var(--nv-navy); }
+.research-scopes button[aria-pressed="true"] { background: var(--nv-navy); color: white; }
+.research-filters { display: flex; flex-wrap: wrap; gap: 1rem; padding: 1.25rem; border: 1px solid var(--nv-border); background: var(--nv-surface); border-radius: 10px; align-items: end; }
+.research-filters label { flex: 1 1 140px; min-width: 0; display: grid; gap: .5rem; font-size: .9rem; font-weight: 650; }
+.research-filters select, .research-filters input { width: 100%; max-width: 100%; min-width: 0; min-height: 44px; padding: .65rem; border: 1px solid var(--nv-border); border-radius: 6px; color: var(--nv-text); background: white; font: inherit; }
+.research-dashboard .research-caption { color: var(--nv-muted); font-size: .875rem; }
+.research-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.research-metrics article { border-top: 3px solid var(--nv-primary); background: var(--nv-surface); padding: 1.1rem; border-radius: 0 0 8px 8px; }
+.research-metrics h2 { font-size: .9rem; font-weight: 600; margin: 0 0 .85rem; }
+.research-metrics strong { color: var(--nv-navy); font-size: clamp(1.5rem, 2.6vw, 2.1rem); overflow-wrap: anywhere; }
+.research-metrics p { color: var(--nv-muted); font-size: .875rem; }
+.research-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--nv-border); border-radius: 8px; background: var(--nv-surface); margin-top: 1.5rem; }
+.research-table-wrap table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.research-table-wrap caption { text-align: left; font-weight: 700; padding: 1.2rem; color: var(--nv-navy); }
+.research-table-wrap th, .research-table-wrap td { padding: .85rem 1rem; border-top: 1px solid var(--nv-border); text-align: left; vertical-align: top; }
+.research-table-wrap thead { background: var(--nv-bg-secondary); }
+.research-table-wrap tbody th { font-weight: 500; }
+.research-code { max-width: 20rem; overflow-wrap: anywhere; }
+.research-pagination { justify-content: end; margin: 1rem 0; font-size: .9rem; }
+.research-notice, .research-empty, .research-method, .research-participation { padding: 1.4rem; border: 1px solid var(--nv-border); border-radius: 10px; margin-top: 1.5rem; background: var(--nv-surface); }
+.research-notice { border-left: 4px solid var(--nv-accent); }
+.research-method { background: var(--nv-bg-secondary); }
+.research-dashboard h2 { font-size: 1.1rem; line-height: 1.4; }
+.research-dashboard .research-metrics h2 { font-size: .9rem; }
+.research-information { white-space: pre-wrap; line-height: 1.7; overflow-wrap: anywhere; font-size: 1rem; margin: 1rem 0; }
+.research-check { display: flex; gap: .75rem; align-items: start; font-size: 1rem; line-height: 1.5; margin: 1rem 0; }
+.research-check input { flex: 0 0 20px; width: 20px; height: 20px; margin-top: 2px; }
+.research-dashboard :focus-visible { outline: 3px solid var(--nv-primary); outline-offset: 3px; }
+@media (max-width: 1000px) { .research-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .research-metrics { grid-template-columns: 1fr; }
+  .research-actions, .research-actions button, .research-scopes button { width: 100%; }
+  .research-filters { padding: 1rem; }
+  .research-filters label { flex-basis: 100%; }
+  .research-heading { gap: .75rem; }
+}

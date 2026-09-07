@@ -16,7 +16,7 @@ const navItems = [
   { id: "clinicalAgenda", label: "Agenda", icon: CalendarClock },
   { id: "savedSessions", label: "Sesiones", icon: FileText },
   { id: "results", label: "Evaluacion", icon: ClipboardCheck },
-  { id: "progress", label: "Progreso", icon: BarChart3 },
+  { id: "progress", label: "Estadísticas", icon: BarChart3 },
   { id: "trustCenter", label: "Confianza", icon: ShieldCheck }
 ];
 
@@ -43,9 +43,7 @@ export function AuthenticatedLayout({
           {navItems.map((item) => {
             const Icon = item.icon;
             const isDisabled = item.id === "results" && !hasEvaluation;
-            const isActive =
-              currentScreen === item.id ||
-              (item.id === "progress" && currentScreen === "savedSessions");
+            const isActive = currentScreen === item.id;
             return (
               <button
                 key={item.id}
