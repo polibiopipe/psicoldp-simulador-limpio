@@ -60,6 +60,7 @@ import { AppFooter } from "./components/AppFooter.jsx";
 import { ClinicalAgenda } from "./components/ClinicalAgenda.jsx";
 import { AuthenticatedLayout } from "./components/AuthenticatedLayout.jsx";
 import { ClinicalDashboard } from "./components/ClinicalDashboard.jsx";
+import { StatisticsDashboard } from "./components/StatisticsDashboard.jsx";
 import { isAccessGateRequired, isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
 import { getOrCreateUserApproval } from "./lib/userApproval.js";
 
@@ -71,6 +72,7 @@ const screens = {
   results: "results",
   savedSessions: "savedSessions",
   clinicalAgenda: "clinicalAgenda",
+  progress: "progress",
   trustCenter: "trustCenter"
 };
 
@@ -1105,10 +1107,6 @@ export default function App() {
   }
 
   function performWorkspaceNavigation(targetScreen) {
-    if (targetScreen === "progress") {
-      setScreen(screens.savedSessions);
-      return;
-    }
     if (targetScreen === screens.results && history.length === 0) {
       setScreen(screens.savedSessions);
       return;
@@ -1249,6 +1247,10 @@ export default function App() {
 
       {screen === screens.savedSessions && (
         <SavedSessions authSession={authSession} onBackHome={goHome} />
+      )}
+
+      {screen === screens.progress && (
+        <StatisticsDashboard key={authSession?.user?.id || "signed-out"} authSession={authSession} cases={cases} />
       )}
 
       {screen === screens.clinicalAgenda && (

@@ -1,0 +1,40 @@
+import assert from "node:assert/strict";
+import { chileDateKey, filterStatistics, median, normalizeStatisticsRow, statisticsCsv, summarizeStatistics } from "../src/engine/researchStatistics.js";
+
+const raw = { id: "session-1", participant_code: "EV-01", case_id: "claudio", session_number: 1,
+  status: "completed", started_at: "2026-09-07T15:00:00Z", general_score: 0, openness: 65,
+  metrics: { elapsedSeconds: 1200, studentTurnCount: 18, endReason: "voluntary_closure" } };
+const row = normalizeStatisticsRow(raw);
+assert.equal(row.durationSeconds, 1200);
+assert.equal(row.automatedScore, 0, "A measured zero must remain zero");
+assert.equal(normalizeStatisticsRow({ ...raw, general_score: null, score: 80 }).automatedScore, null, "No fallback to the mixed legacy score/openness column");
+assert.equal(normalizeStatisticsRow({ ...raw, metrics: null }).turns, null);
+assert.equal(normalizeStatisticsRow({ ...raw, started_at: "" }).durationSeconds, null);
+assert.equal(normalizeStatisticsRow({ ...raw, status: "in_progress" }).durationSeconds, null);
+assert.equal(normalizeStatisticsRow({ ...raw, status: "in_progress" }).automatedScore, null);
+assert.equal(normalizeStatisticsRow({ ...raw, status: "closure_pending" }).durationSeconds, 1200);
+assert.equal(normalizeStatisticsRow({ ...raw, metrics: { ...raw.metrics, endReason: "" } }).durationSeconds, null);
+assert.equal(normalizeStatisticsRow({ ...raw, general_score: 101 }).automatedScore, null);
+assert.equal(normalizeStatisticsRow({ ...raw, general_score: "   " }).automatedScore, null);
+assert.equal(normalizeStatisticsRow({ ...raw, general_score: [] }).automatedScore, null);
+assert.equal(chileDateKey("2026-09-07T01:00:00Z"), "2026-09-06");
+assert.equal(chileDateKey("invalid"), "");
+assert.equal(median([0, 5, null, 10, 15]), 7.5);
+assert.equal(median([]), null);
+const missing = normalizeStatisticsRow({ ...raw, id: "session-2", participant_code: "EV-02", metrics: null, general_score: null });
+const summary = summarizeStatistics([row, row, missing]);
+assert.equal(summary.total, 2, "Re-saves do not inflate observations");
+assert.equal(summary.participants, 2);
+assert.equal(summary.durationN, 1);
+assert.equal(summary.medianDurationMinutes, 20);
+assert.equal(summary.scoreN, 1);
+assert.equal(summary.medianAutomatedScore, 0);
+assert.equal(summarizeStatistics([]).completionPercent, null);
+assert.equal(filterStatistics([row, missing], { participant: "EV-01", from: "2026-09-07", to: "2026-09-07", sessionNumber: "1" }).length, 1);
+assert.equal(filterStatistics([row], { from: "2026-09-08" }).length, 0);
+const csv = statisticsCsv([{ ...row, caseId: "=HYPERLINK(\"bad\")", user_email: "private@example.test", conversation: "private conversation" }, missing]);
+assert.ok(csv.startsWith("\uFEFF"));
+assert.ok(csv.includes("'=HYPERLINK"), "Spreadsheet formulas must be neutralized");
+assert.ok(!csv.includes("private@example.test") && !csv.includes("private conversation"), "Only allowlisted fields leave the exporter");
+assert.ok(csv.includes('"";"";""'), "Missing values remain empty cells");
+console.log("Research statistics: missingness, durations, denominators, deduplication, Chile dates, filtering and CSV privacy checks passed.");
