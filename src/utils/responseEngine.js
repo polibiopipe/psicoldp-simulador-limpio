@@ -1,35 +1,7 @@
+import { isIncompletePatientResponse as isIncompleteGeminiText } from "./patientResponseValidation.js";
 import { generateLocalPatientResponse } from "../engine/localMiniAI.js";
 import { MAX_CONTEXT_TURNS } from "../engine/simulationUsagePolicy.js";
 
-const INVALID_FINAL_WORDS = new Set([
-  "a",
-  "al",
-  "de",
-  "del",
-  "en",
-  "con",
-  "por",
-  "para",
-  "un",
-  "una",
-  "el",
-  "la",
-  "los",
-  "las",
-  "lo",
-  "que",
-  "como",
-  "cuando",
-  "porque",
-  "pero",
-  "aunque",
-  "desde",
-  "hacia",
-  "sobre",
-  "entre",
-  "unos",
-  "unas"
-]);
 
 export async function createPatientResponse({
   caseItem,
@@ -306,43 +278,6 @@ async function requestGeminiPatientResponse({
   } finally {
     globalThis.clearTimeout(timeout);
   }
-}
-
-function isIncompleteGeminiText(text, finishReason) {
-  const normalizedReason = String(finishReason || "").toUpperCase();
-  if (normalizedReason === "MAX_TOKENS") return true;
-
-  const trimmed = normalizeTerminalText(text);
-  if (!trimmed || trimmed.length < 16) return true;
-
-  const words = trimmed.split(/\s+/).filter(Boolean);
-  if (words.length < 5) return true;
-
-  const hasCompletePunctuation = /(?:[.!?]|\.{3}|…)$/.test(trimmed);
-  const finalWord = getFinalWord(trimmed);
-  const endsWithInvalidWord = INVALID_FINAL_WORDS.has(finalWord);
-
-  if (!hasCompletePunctuation && endsWithInvalidWord) return true;
-  if (!hasCompletePunctuation && words.length < 12) return true;
-  if (!hasCompletePunctuation && trimmed.length < 80) return true;
-
-  return false;
-}
-
-function normalizeTerminalText(text) {
-  return String(text || "")
-    .trim()
-    .replace(/[)"'”’»\]]+$/g, "")
-    .trim();
-}
-
-function getFinalWord(text) {
-  const match = normalizeTerminalText(text)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .match(/[a-zñáéíóúü]+$/i);
-  return match ? match[0] : "";
 }
 
 async function readResponseJson(response) {

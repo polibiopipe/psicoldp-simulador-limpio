@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MonitorPlay, RotateCcw, Send, ShieldCheck, SquareCheckBig, TriangleAlert, Users } from "lucide-react";
+import { UserRound, RotateCcw, Send, ShieldCheck, SquareCheckBig, TriangleAlert, Users } from "lucide-react";
 import { PatientCard } from "./PatientCard.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
@@ -36,19 +36,13 @@ export function SimulationChat({
   const [question, setQuestion] = useState("");
   const [selectedInterventionType, setSelectedInterventionType] = useState("");
   const [showStageSuggestions, setShowStageSuggestions] = useState(false);
-  const [showVideoSession, setShowVideoSession] = useState(() =>
-    typeof window === "undefined" || typeof window.matchMedia !== "function"
-      ? true
-      : window.matchMedia("(min-width: 761px)").matches
-  );
+  const [showPortrait, setShowPortrait] = useState(false);
   const [avatarState, setAvatarState] = useState("idle");
   const [validationFeedback, setValidationFeedback] = useState("");
   const [canRetryLastMessage, setCanRetryLastMessage] = useState(false);
   const [failedTurn, setFailedTurn] = useState(null);
   const [clockTick, setClockTick] = useState(0);
   const conversationRef = useRef(null);
-  const previousHistoryLengthRef = useRef(history.length);
-  const avatarIdleTimerRef = useRef(null);
   const responseTimerRef = useRef(null);
   const closeTimerRef = useRef(null);
   const visibleHistory = history.filter(isDisplayableEntry);
@@ -90,29 +84,14 @@ export function SimulationChat({
     });
   }, [history.length]);
 
-  useEffect(() => {
-    if (history.length <= previousHistoryLengthRef.current) {
-      previousHistoryLengthRef.current = history.length;
-      return;
-    }
-
-    previousHistoryLengthRef.current = history.length;
-    window.clearTimeout(avatarIdleTimerRef.current);
-    setAvatarState("speaking");
-    avatarIdleTimerRef.current = window.setTimeout(() => {
-      setAvatarState((current) => current === "speaking" ? "idle" : current);
-    }, 1800);
-  }, [history.length]);
-
   useEffect(() => () => {
-    window.clearTimeout(avatarIdleTimerRef.current);
     window.clearTimeout(responseTimerRef.current);
     window.clearTimeout(closeTimerRef.current);
   }, []);
 
   useEffect(() => {
     if (!usageStartedAt) return undefined;
-    const interval = window.setInterval(() => setClockTick((current) => current + 1), 30000);
+    const interval = window.setInterval(() => setClockTick((current) => current + 1), 1000);
     return () => window.clearInterval(interval);
   }, [usageStartedAt]);
 
@@ -165,6 +144,7 @@ export function SimulationChat({
           studentMessage,
           patientResponse
         });
+        setAvatarState("idle");
         setQuestion("");
         setValidationFeedback("");
         setFailedTurn(null);
@@ -200,6 +180,7 @@ export function SimulationChat({
   }
 
   function startNewPractice() {
+    if (avatarState === "thinking" || avatarState === "closed") return;
     setQuestion("");
     setSelectedInterventionType("");
     setValidationFeedback("");
@@ -224,12 +205,11 @@ export function SimulationChat({
   }
 
   function finishSimulation(requestedReason = "") {
-    if (avatarState === "closed") return;
+    if (avatarState === "closed" || avatarState === "thinking") return;
     const explicitReason = typeof requestedReason === "string" ? requestedReason : "";
     const endReason = explicitReason || (
       timeExpired ? "maximum_time" : technicalTurnLimitReached ? "technical_turn_limit" : "voluntary_closure"
     );
-    window.clearTimeout(avatarIdleTimerRef.current);
     window.clearTimeout(responseTimerRef.current);
     setAvatarState("closed");
     closeTimerRef.current = window.setTimeout(() => onFinish?.(endReason), 520);
@@ -245,7 +225,7 @@ export function SimulationChat({
           totalSessions={totalSessions}
           sessionSummary={sessionSummary}
         />
-        <ProgressBar turnCount={interviewTurns.length} />
+        <ProgressBar turnCount={interviewTurns.length} remainingMs={remainingMs} durationMinutes={sessionUsage?.durationMinutes || SESSION_DURATION_MINUTES} />
         <div className="learning-box">
           <h2>Tipo de sesión</h2>
           <SessionSelector
@@ -264,7 +244,7 @@ export function SimulationChat({
         <div className="learning-box trust-compact-panel">
           <h2>Privacidad</h2>
           <p>Usa solo informacion ficticia. No ingreses datos reales de pacientes.</p>
-          <button className="text-action" type="button" onClick={onOpenTrust}>
+          <button className="text-action" type="button" disabled={avatarState === "thinking" || avatarState === "closed"} onClick={onOpenTrust}>
             <ShieldCheck aria-hidden="true" />
             Centro de confianza
           </button>
@@ -302,23 +282,24 @@ export function SimulationChat({
             <button
               className="secondary-action video-view-toggle"
               type="button"
-              aria-pressed={showVideoSession}
-              onClick={() => setShowVideoSession((current) => !current)}
+              aria-pressed={showPortrait}
+              onClick={() => setShowPortrait((current) => !current)}
             >
-              <MonitorPlay aria-hidden="true" />
-              {showVideoSession ? "Ocultar vista" : "Vista simulada"}
+              <UserRound aria-hidden="true" />
+              {showPortrait ? "Ocultar retrato" : "Ver retrato"}
             </button>
-            <button className="secondary-action" type="button" onClick={onChangeCase}>
+            <button className="secondary-action" type="button" disabled={avatarState === "thinking" || avatarState === "closed"} onClick={onChangeCase}>
               <Users aria-hidden="true" />
               Caso
             </button>
-            <button className="secondary-action" type="button" onClick={usageBlocked ? startNewPractice : onRestart}>
+            <button className="secondary-action" type="button" disabled={avatarState === "thinking" || avatarState === "closed"} onClick={usageBlocked ? startNewPractice : onRestart}>
               <RotateCcw aria-hidden="true" />
               {usageBlocked ? "Nueva práctica" : "Reiniciar"}
             </button>
             <button
               className="primary-action"
               type="button"
+              disabled={avatarState === "thinking" || avatarState === "closed"}
               onClick={finishSimulation}
             >
               <SquareCheckBig aria-hidden="true" />
@@ -343,17 +324,13 @@ export function SimulationChat({
           className="chat-phase-guide"
         />
 
-        <div className={`interview-experience${showVideoSession ? " with-video" : " chat-only"}`}>
-          {showVideoSession && (
+        <div className={`interview-experience${showPortrait ? " with-video" : " chat-only"}`}>
+          {showPortrait && (
             <AvatarSessionView
               avatarState={avatarState}
               caseItem={caseItem}
               sessionNumber={sessionNumber}
               totalSessions={totalSessions}
-              turnCount={interviewTurns.length}
-              sessionStartedAt={usageStartedAt}
-              sessionDurationMinutes={sessionUsage?.durationMinutes || SESSION_DURATION_MINUTES}
-              onFinish={finishSimulation}
             />
           )}
 
@@ -394,7 +371,7 @@ export function SimulationChat({
                         <p>Esperando respuesta del paciente...</p>
                       ) : (
                         <>
-                          <p>No pudimos obtener la respuesta del paciente. Tu intervención está guardada.</p>
+                          <p>No pudimos obtener la respuesta del paciente. Tu intervención sigue en esta pantalla para que puedas reintentar.</p>
                           {failedTurn.message && <p>{failedTurn.message}</p>}
                           {failedTurn.retryAvailable && (
                             <button
@@ -429,11 +406,12 @@ export function SimulationChat({
                   <button
                     className="primary-action"
                     type="button"
+                    disabled={avatarState === "thinking" || avatarState === "closed"}
                     onClick={() => finishSimulation(timeExpired ? "maximum_time" : "technical_turn_limit")}
                   >
                     Continuar al cierre
                   </button>
-                  <button className="secondary-action" type="button" onClick={startNewPractice}>
+                  <button className="secondary-action" type="button" disabled={avatarState === "thinking" || avatarState === "closed"} onClick={startNewPractice}>
                     Iniciar una nueva práctica
                   </button>
                 </div>

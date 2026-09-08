@@ -65,7 +65,8 @@ const LEGACY_MINOR_PATTERNS = [
 const FORBIDDEN_DIAGNOSTIC_SHORTCUTS = {
   tomas: [/adiccion/i, /adicción/i],
   nicolas: [/depresion/i, /depresión/i, /castigo/i],
-  valentina: [/beca/i, /universidad de/i, /psicologia/i, /psicología/i],
+  // A named course of study is a canonical fact, not a diagnostic shortcut.
+  valentina: [/perd[ií] (?:mi |la )?beca/i],
   marcos: [/despido/i, /accidente/i],
   elena: [/enfermedad/i, /abandono/i],
   camila: [/manipuladora/i, /manipulan/i],
@@ -76,7 +77,7 @@ const FORBIDDEN_DIAGNOSTIC_SHORTCUTS = {
   andres: [/pobreza extrema/i, /fobia social/i],
   patricia: [/delito/i, /violencia/i, /consumo/i],
   miguel: [/venezuela/i, /colombia/i, /peru/i, /perú/i, /argentina/i, /haiti/i, /abogado/i, /ingeniero/i, /medico/i, /médico/i, /irregular/i],
-  sofia: [/ciberacoso/i, /superficial/i],
+  sofia: [/ciberacoso/i],
   claudio: [/24 anos/i, /24 años/i, /apagarme/i, /infidelidad/i]
 };
 

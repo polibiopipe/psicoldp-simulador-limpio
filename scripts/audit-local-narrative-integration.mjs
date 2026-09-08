@@ -147,7 +147,7 @@ check("Contextual follow-up can open developing level", () => {
 check("Developing level can use relational material", () => {
   const response = textFor("tomas", "Que pasa cuando te preguntan mucho?", { history: contextualHistory });
   assert.ok(
-    /preguntan|reglas|afuera|presion/i.test(response.responseText),
+    /preguntan|reglas|afuera|presion/i.test(normalize(response.responseText)),
     `Developing response was too generic: ${response.responseText}`
   );
 });

@@ -2,21 +2,21 @@ import { patientFacts } from "./patientFacts.js";
 import { getAvatarCanonicalBiography } from "./avatarCanonicalBiographies.js";
 
 const caseImages = {
-  tomas: "/avatar/tomas.png",
-  valentina: "/avatar/valentina.png",
-  marcos: "/avatar/marcos.png",
-  elena: "/avatar/elena.png",
-  nicolas: "/avatar/nicolas.png",
-  camila: "/avatar/camila.png",
-  rodrigo: "/avatar/rodrigo.png",
-  fernanda: "/avatar/fernanda.png",
-  hector: "/avatar/hector.png",
-  daniela: "/avatar/daniela.png",
-  andres: "/avatar/andres.png",
-  patricia: "/avatar/patricia.png",
-  miguel: "/avatar/miguel.png",
-  sofia: "/avatar/sofia.png",
-  claudio: "/avatar/claudio.png"
+  tomas: "/avatar/tomas.webp",
+  valentina: "/avatar/valentina.webp",
+  marcos: "/avatar/marcos.webp",
+  elena: "/avatar/elena.webp",
+  nicolas: "/avatar/nicolas.webp",
+  camila: "/avatar/camila.webp",
+  rodrigo: "/avatar/rodrigo.webp",
+  fernanda: "/avatar/fernanda.webp",
+  hector: "/avatar/hector.webp",
+  daniela: "/avatar/daniela.webp",
+  andres: "/avatar/andres.webp",
+  patricia: "/avatar/patricia.webp",
+  miguel: "/avatar/miguel.webp",
+  sofia: "/avatar/sofia.webp",
+  claudio: "/avatar/claudio.webp"
 };
 
 const learningObjectivesByCase = {

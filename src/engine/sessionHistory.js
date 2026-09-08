@@ -1,6 +1,7 @@
 import { buildSessionSummary } from "./sessionMemory.js";
 import { buildSessionFeedback } from "./sessionFeedback.js";
 import { buildSessionUsageMetrics } from "./simulationUsagePolicy.js";
+import { STATISTICS_VERSION } from "./researchStatistics.js";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 
 const HISTORY_STORAGE_KEY = "simuladorClinicoLdp.sessionHistory.v1";
@@ -358,6 +359,7 @@ function canUseStorage() {
 function mapRecordToSupabasePayload(record, user) {
   const feedbackPayload = {
     ...record.feedback,
+    measurementVersion: STATISTICS_VERSION,
     summary: record.summary,
     patientOpenness: record.patientOpenness,
     continuityAgreement: record.continuityAgreement,

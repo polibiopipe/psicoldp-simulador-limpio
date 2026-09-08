@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, useEffect, useMemo, useRef, useState } from "react";
 import { cases, difficultyOptions } from "./data/cases.js";
-import { createPatientResponse } from "./utils/responseEngine.js";
 import { buildEducationalReport } from "./utils/scoring.js";
 import {
   getLatestSessionSummary,
@@ -44,24 +43,26 @@ import {
   getCompletedSessionCount,
   getProcessSessionTotal
 } from "./engine/sessionPlanUtils.js";
-import { CaseSelector } from "./components/CaseSelector.jsx";
-import { CaseBrief } from "./components/CaseBrief.jsx";
-import { SimulationChat } from "./components/SimulationChat.jsx";
-import { FeedbackPanel } from "./components/FeedbackPanel.jsx";
-import { ResultsSummary } from "./components/ResultsSummary.jsx";
 import { EthicalNotice } from "./components/EthicalNotice.jsx";
-import { SessionClosure } from "./components/SessionClosure.jsx";
-import { SavedSessions } from "./components/SavedSessions.jsx";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { IntroVideo } from "./components/IntroVideo.jsx";
 import { PendingApprovalScreen } from "./components/PendingApprovalScreen.jsx";
-import { TrustCenter } from "./components/TrustCenter.jsx";
 import { AppFooter } from "./components/AppFooter.jsx";
-import { ClinicalAgenda } from "./components/ClinicalAgenda.jsx";
 import { AuthenticatedLayout } from "./components/AuthenticatedLayout.jsx";
-import { ClinicalDashboard } from "./components/ClinicalDashboard.jsx";
 import { isAccessGateRequired, isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
 import { getOrCreateUserApproval } from "./lib/userApproval.js";
+
+const CaseSelector = lazy(() => import("./components/CaseSelector.jsx").then((module) => ({ default: module.CaseSelector })));
+const CaseBrief = lazy(() => import("./components/CaseBrief.jsx").then((module) => ({ default: module.CaseBrief })));
+const SimulationChat = lazy(() => import("./components/SimulationChat.jsx").then((module) => ({ default: module.SimulationChat })));
+const FeedbackPanel = lazy(() => import("./components/FeedbackPanel.jsx").then((module) => ({ default: module.FeedbackPanel })));
+const ResultsSummary = lazy(() => import("./components/ResultsSummary.jsx").then((module) => ({ default: module.ResultsSummary })));
+const SessionClosure = lazy(() => import("./components/SessionClosure.jsx").then((module) => ({ default: module.SessionClosure })));
+const SavedSessions = lazy(() => import("./components/SavedSessions.jsx").then((module) => ({ default: module.SavedSessions })));
+const TrustCenter = lazy(() => import("./components/TrustCenter.jsx").then((module) => ({ default: module.TrustCenter })));
+const ClinicalAgenda = lazy(() => import("./components/ClinicalAgenda.jsx").then((module) => ({ default: module.ClinicalAgenda })));
+const ClinicalDashboard = lazy(() => import("./components/ClinicalDashboard.jsx").then((module) => ({ default: module.ClinicalDashboard })));
+const StatisticsDashboard = lazy(() => import("./components/StatisticsDashboard.jsx").then((module) => ({ default: module.StatisticsDashboard })));
 
 const screens = {
   home: "home",
@@ -71,6 +72,7 @@ const screens = {
   results: "results",
   savedSessions: "savedSessions",
   clinicalAgenda: "clinicalAgenda",
+  progress: "progress",
   trustCenter: "trustCenter"
 };
 
@@ -104,6 +106,8 @@ export default function App() {
   const [activeAppointmentId, setActiveAppointmentId] = useState("");
   const [activeSessionRecordSnapshot, setActiveSessionRecordSnapshot] = useState(null);
   const [activeAppointmentSnapshot, setActiveAppointmentSnapshot] = useState(null);
+  const [isInterviewBusy, setIsInterviewBusy] = useState(false);
+  const interviewBusyRef = useRef(false);
   const activeSessionRecordIdRef = useRef("");
   const activeAppointmentIdRef = useRef("");
   const sessionEndedAtRef = useRef("");
@@ -694,7 +698,19 @@ export default function App() {
     setScreen(screens.home);
   }
 
-  async function handleAsk(question, selectedInterventionType = "", conversationContext = {}) {
+  async function handleAsk(...args) {
+    if (interviewBusyRef.current) throw new Error("Espera a que termine la intervención anterior.");
+    interviewBusyRef.current = true;
+    setIsInterviewBusy(true);
+    try {
+      return await performAsk(...args);
+    } finally {
+      interviewBusyRef.current = false;
+      setIsInterviewBusy(false);
+    }
+  }
+
+  async function performAsk(question, selectedInterventionType = "", conversationContext = {}) {
     const turnId = conversationContext.interventionId || crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const sessionRecordId = getOrCreateActiveSessionRecordId();
@@ -702,6 +718,7 @@ export default function App() {
     const appointment = await ensureActiveAppointmentForCurrentSession(currentAuthSession);
     let response = null;
     try {
+      const { createPatientResponse } = await import("./utils/responseEngine.js");
       response = await createPatientResponse({
         caseItem: selectedCase,
         difficulty,
@@ -751,7 +768,7 @@ export default function App() {
       };
     const nextHistory = [...history, nextEntry];
     setHistory(nextHistory);
-    void persistSessionProgress(nextHistory, { recordId: sessionRecordId, appointment });
+    await persistSessionProgress(nextHistory, { recordId: sessionRecordId, appointment });
     void refreshAppointments(currentAuthSession);
 
     return responseText;
@@ -1046,6 +1063,7 @@ export default function App() {
   }
 
   async function handleSignOut() {
+    if (interviewBusyRef.current) return;
     if (supabase) {
       await supabase.auth.signOut();
     }
@@ -1067,6 +1085,7 @@ export default function App() {
   }
 
   function openTrustCenter() {
+    if (interviewBusyRef.current) return;
     setScreen(screens.trustCenter);
   }
 
@@ -1088,6 +1107,7 @@ export default function App() {
   }
 
   function navigateWorkspace(targetScreen) {
+    if (interviewBusyRef.current) return;
     requestExitFromResults(targetScreen);
   }
 
@@ -1105,10 +1125,6 @@ export default function App() {
   }
 
   function performWorkspaceNavigation(targetScreen) {
-    if (targetScreen === "progress") {
-      setScreen(screens.savedSessions);
-      return;
-    }
     if (targetScreen === screens.results && history.length === 0) {
       setScreen(screens.savedSessions);
       return;
@@ -1225,6 +1241,7 @@ export default function App() {
         userEmail={userEmail}
         isLocalMode={!isSupabaseConfigured}
         hasEvaluation={history.length > 0}
+        isBusy={isInterviewBusy}
         onNavigate={navigateWorkspace}
         onSignOut={handleSignOut}
       >
@@ -1249,6 +1266,10 @@ export default function App() {
 
       {screen === screens.savedSessions && (
         <SavedSessions authSession={authSession} onBackHome={goHome} />
+      )}
+
+      {screen === screens.progress && (
+        <StatisticsDashboard key={authSession?.user?.id || "signed-out"} authSession={authSession} cases={cases} />
       )}
 
       {screen === screens.clinicalAgenda && (
