@@ -98,8 +98,11 @@ export function AuthScreen({ onOpenTrust }) {
   }
 
   return (
-    <section className="screen auth-screen identity-auth-screen refined-auth-screen">
-      <div className="auth-intro-panel">
+    <section className="screen auth-screen identity-auth-screen refined-auth-screen visual-auth-screen">
+      <div className="auth-intro-panel scene-auth-intro">
+        <div className="auth-atmosphere" aria-hidden="true">
+          <img src="/visuals/espacio-escucha.webp" alt="" width="1672" height="941" fetchPriority="high" />
+        </div>
         <div className="auth-brand-lockup">
           <img src="/logo-escucha-viva-horizontal.png" alt="Escucha Viva" />
           <div>
