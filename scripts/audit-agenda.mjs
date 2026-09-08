@@ -128,6 +128,38 @@ try {
   globalThis.localStorage.setItem = () => { throw new Error("quota"); };
   assert.equal((await service.cancelSimulationAppointment(auth, appointment.id)).cloudSaved, true, "una caché llena no invalida una cancelación confirmada");
   assert.equal(row.status, "cancelled");
+
+  const availabilityOutfile = join(temp, "availability.mjs");
+  await build({
+    entryPoints: [resolve("src/engine/clinicalAgenda.js")], outfile: availabilityOutfile, bundle: true, platform: "node", format: "esm",
+    plugins: [{ name: "mock-supabase", setup(builder) {
+      builder.onResolve({ filter: /supabaseClient\.js$/ }, () => ({ path: "supabase", namespace: "test" }));
+      builder.onLoad({ filter: /.*/, namespace: "test" }, () => ({ contents: "export const isSupabaseConfigured = true; export const supabase = globalThis.__agendaTestSupabase;" }));
+    } }]
+  });
+  const availabilityService = await import(pathToFileURL(availabilityOutfile));
+  let rpcCalls = 0;
+  let rpcFailure = null;
+  globalThis.__agendaTestSupabase.from = () => { throw new Error("No se permite reemplazar horarios mediante peticiones separadas"); };
+  globalThis.__agendaTestSupabase.rpc = async (name, args) => {
+    rpcCalls += 1;
+    assert.equal(name, "replace_simulation_student_availability");
+    assert.ok(args.p_blocks.every((block) => !Object.hasOwn(block, "user_id")), "la identidad la obtiene el servidor de la autenticación");
+    if (rpcFailure instanceof Error) throw rpcFailure;
+    if (rpcFailure) return rpcFailure;
+    return { data: args.p_blocks, error: null };
+  };
+  assert.equal((await availabilityService.saveStudentWeeklyAvailability(auth, availability)).ok, true);
+  assert.equal(rpcCalls, 1, "todos los bloques se reemplazan con una sola petición");
+  assert.equal((await availabilityService.saveStudentWeeklyAvailability(auth, getEmptyWeeklyAvailability())).configured, false);
+  rpcFailure = { data: null, error: { code: "PGRST202", message: "missing function" } };
+  assert.equal((await availabilityService.saveStudentWeeklyAvailability(auth, availability)).source, "migration_required");
+  rpcFailure = { data: null, error: null };
+  assert.equal((await availabilityService.saveStudentWeeklyAvailability(auth, availability)).ok, false);
+  rpcFailure = { data: [], error: null };
+  assert.equal((await availabilityService.saveStudentWeeklyAvailability(auth, availability)).ok, false);
+  rpcFailure = new Error("offline");
+  assert.equal((await availabilityService.saveStudentWeeklyAvailability(auth, availability)).ok, false);
 } finally {
   delete globalThis.__agendaTestSupabase;
   delete globalThis.window;

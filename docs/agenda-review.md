@@ -23,8 +23,12 @@ Pasaron las auditorías existentes de expiración, reanudación autenticada y du
 
 ## Hallazgo pendiente en disponibilidad semanal
 
-`saveStudentWeeklyAvailability` en `src/engine/clinicalAgenda.js` elimina los bloques anteriores y luego inserta los nuevos mediante dos peticiones separadas. Si la segunda falla, los bloques anteriores pueden haberse perdido. Esto requiere un reemplazo transaccional en la base de datos: una función que compruebe al usuario, bloquee las modificaciones simultáneas de sus horarios y reemplace todos sus bloques en una sola transacción, conservando las políticas de acceso existentes. Después, el cliente debe invocar esa función en una sola petición.
+La versión publicada de `saveStudentWeeklyAvailability` elimina los bloques anteriores y luego inserta los nuevos mediante dos peticiones separadas. Si la segunda falla, los bloques anteriores pueden haberse perdido.
 
-Esta revisión no dispone de una conexión administrativa a Supabase para aplicar y comprobar esa migración. El cambio de interfaz evita seguir tratando como confirmados los horarios después de un error, pero no resuelve la falta de transacción. Conviene cerrar este punto antes de dar por validado el flujo completo de edición de disponibilidad.
+Ya están preparados `supabase/simulation_student_availability_atomic.sql` y el cliente que invoca `replace_simulation_student_availability` en una sola petición. La función utiliza la identidad autenticada, conserva RLS y los controles existentes de solapamiento, y serializa sus llamadas por usuario. Una excepción revierte también la eliminación de los bloques previos. Instalar esta función no modifica por sí mismo horarios existentes.
+
+Orden de publicación: comprobar el esquema real y aplicar la migración en Supabase; verificar éxito, reversión ante bloque inválido, aislamiento entre usuarios y llamadas simultáneas; después publicar el cliente. No se debe publicar este cliente antes de la migración: si falta la función, muestra un error y evita recurrir al reemplazo inseguro anterior.
+
+El cliente pasó pruebas con la frontera Supabase simulada, incluyendo una sola petición, identidad obtenida por el servidor, respuesta incompleta, migración ausente y fallo de red. La función SQL todavía requiere aplicación y prueba en PostgreSQL. El usuario conectó el complemento Supabase durante la preparación y la instalación aparece confirmada. Sus funciones de consulta y migración todavía no aparecen entre las funciones ejecutables de este hilo; la aplicación de la migración y su prueba real siguen pendientes.
 
 Otro límite del recorrido actual: la carga de citas devuelve una lista vacía ante un error del servidor. La inserción y las restricciones del servidor evitan sobrescribir citas, pero la interfaz todavía necesita distinguir entre agenda vacía y carga fallida. Debe revisarse junto con la sincronización de `App.jsx` en una sesión autenticada.
