@@ -3338,6 +3338,8 @@ textarea:focus {
 }
 
 .schedule-validation.conflict,
+.schedule-validation.invalid_date,
+.schedule-validation.daily_limit,
 .schedule-validation.outside_availability,
 .schedule-validation.no_availability,
 .schedule-validation.closed,
@@ -5001,4 +5003,3 @@ button.dashboard-metric-card:hover {
     min-width: 0;
   }
 }
-
