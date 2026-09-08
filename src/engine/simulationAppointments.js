@@ -13,7 +13,9 @@ import {
 const LOCAL_APPOINTMENTS_KEY = "escuchaViva.simulationAppointments.v1";
 
 export async function getSimulationAppointments(authSession = null) {
-  if (!isSupabaseConfigured || !supabase || !authSession?.user) return [];
+  if (!isSupabaseConfigured || !supabase || !authSession?.user) {
+    throw new Error("No podemos verificar tus citas sin una sesión y conexión activas.");
+  }
 
   const { data, error } = await supabase
     .from("simulation_appointments")
@@ -24,10 +26,11 @@ export async function getSimulationAppointments(authSession = null) {
   if (error) {
     console.warn("[appointments] load error message", error.message);
     console.warn("[appointments] load error code", error.code || null);
-    return [];
+    throw new Error("No pudimos cargar tus citas. Conservamos la última agenda verificada; reintenta antes de programar.", { cause: error });
   }
 
-  const records = (data || []).map(mapAppointmentRowToRecord);
+  if (!Array.isArray(data)) throw new Error("La respuesta de la agenda está incompleta. Vuelve a cargar tus citas.");
+  const records = data.map(mapAppointmentRowToRecord);
   cacheAppointmentsForReadOnlyDisplay(records);
   return records;
 }
@@ -54,6 +57,16 @@ export async function getSimulationAppointmentById(authSession = null, appointme
 }
 
 export async function saveSimulationAppointment(authSession = null, appointment = {}) {
+  return persistSimulationAppointment(authSession, appointment);
+}
+
+// Agenda edits can only change an unstarted reservation. A concurrent start
+// must never be reset by a stale schedule editor.
+export async function saveScheduledAppointment(authSession, appointment, existingId = "") {
+  return persistSimulationAppointment(authSession, { ...appointment, status: "scheduled" }, { existingId });
+}
+
+async function persistSimulationAppointment(authSession, appointment, scheduleEdit = null) {
   const normalized = normalizeAppointmentInput(authSession, appointment);
   if (!normalized) {
     return { localSaved: false, cloudSaved: false, error: "No hay cita valida para guardar." };
@@ -69,11 +82,13 @@ export async function saveSimulationAppointment(authSession = null, appointment 
   }
 
   const payload = mapAppointmentRecordToPayload(normalized, authSession.user);
-  const { data, error } = await supabase
-    .from("simulation_appointments")
-    .upsert(payload, { onConflict: "id" })
-    .select()
-    .maybeSingle();
+  const table = supabase.from("simulation_appointments");
+  const query = scheduleEdit
+    ? scheduleEdit.existingId
+      ? table.update(payload).eq("id", scheduleEdit.existingId).eq("user_id", authSession.user.id).eq("status", "scheduled")
+      : table.insert(payload)
+    : table.upsert(payload, { onConflict: "id" });
+  const { data, error } = await query.select().maybeSingle();
 
   if (error) {
     console.warn("[appointments] save error message", error.message);
@@ -82,6 +97,9 @@ export async function saveSimulationAppointment(authSession = null, appointment 
   }
 
   const record = mapAppointmentRowToRecord(data);
+  if (!record) {
+    return { localSaved: false, cloudSaved: false, error: "La cita cambió o no pudo confirmarse. Actualiza la agenda antes de volver a intentarlo." };
+  }
   cacheAppointmentsForReadOnlyDisplay([record, ...getReadOnlyCachedAppointments()]);
   return { localSaved: true, cloudSaved: true, data: record };
 }
@@ -104,6 +122,7 @@ export async function cancelSimulationAppointment(authSession = null, appointmen
     .update({ status: "cancelled", cancelled_at: now, updated_at: now })
     .eq("id", appointmentId)
     .eq("user_id", authSession.user.id)
+    .eq("status", "scheduled")
     .select()
     .maybeSingle();
 
@@ -113,7 +132,12 @@ export async function cancelSimulationAppointment(authSession = null, appointmen
     return { localSaved: false, cloudSaved: false, error };
   }
 
-  return { localSaved: true, cloudSaved: true, data: mapAppointmentRowToRecord(data) };
+  const record = mapAppointmentRowToRecord(data);
+  if (!record) {
+    return { localSaved: false, cloudSaved: false, error: "La cita ya no está programada o no pudo confirmarse su cancelación. Actualiza la agenda." };
+  }
+  cacheAppointmentsForReadOnlyDisplay([record, ...getReadOnlyCachedAppointments()]);
+  return { localSaved: true, cloudSaved: true, data: record };
 }
 
 export async function ensureAppointmentForSession({
@@ -257,6 +281,7 @@ function normalizeAppointmentInput(authSession, appointment) {
   const scheduledLocalDate = normalizeLocalDate(appointment.scheduledLocalDate || appointment.date || appointment.scheduledFor);
   const scheduledTime = appointment.scheduledTime || appointment.time || extractTime(appointment.scheduledFor) || "09:00";
   const scheduledFor = appointment.scheduledFor || buildScheduledFor({ date: scheduledLocalDate, time: scheduledTime });
+  if (!scheduledFor) return null;
   const now = new Date().toISOString();
   return {
     ...appointment,
@@ -341,8 +366,14 @@ export function getReadOnlyCachedAppointments() {
 function cacheAppointmentsForReadOnlyDisplay(records = []) {
   if (!canUseStorage()) return;
   const merged = new Map();
-  for (const record of records.filter(Boolean)) merged.set(record.id, record);
-  localStorage.setItem(LOCAL_APPOINTMENTS_KEY, JSON.stringify(Array.from(merged.values())));
+  for (const record of records.filter(Boolean)) {
+    if (!merged.has(record.id)) merged.set(record.id, record);
+  }
+  try {
+    localStorage.setItem(LOCAL_APPOINTMENTS_KEY, JSON.stringify(Array.from(merged.values())));
+  } catch {
+    // A full local cache must not turn a confirmed server write into a failure.
+  }
 }
 
 function canUseStorage() {

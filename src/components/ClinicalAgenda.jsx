@@ -32,18 +32,22 @@ import {
   loadStudentWeeklyAvailability,
   addDays,
   saveStudentWeeklyAvailability,
-  validateAgendaSchedule,
   WEEK_DAYS
 } from "../engine/clinicalAgenda.js";
 import {
   buildAppointmentRecord,
   cancelSimulationAppointment,
-  saveSimulationAppointment
+  saveScheduledAppointment
 } from "../engine/simulationAppointments.js";
 import {
-  ACTIVE_APPOINTMENT_STATUSES,
+  getZonedDateKey,
   SESSION_DURATION_MINUTES
 } from "../engine/simulationUsagePolicy.js";
+import {
+  buildAppointmentAvailableSlots, buildScheduleDraft, findDraftAppointment,
+  findRelevantAppointment, getAgendaToday, moveAgendaDate,
+  requireConfirmedAppointment, validateAppointmentSchedule
+} from "../engine/agendaScheduling.js";
 import {
   CLINICAL_TERM_OPTIONS,
   getClinicalTermCopy,
@@ -55,6 +59,7 @@ export function ClinicalAgenda({
   cases,
   authSession = null,
   appointments = [],
+  appointmentsStatus = { loading: true, authoritative: false },
   initialCaseId = "",
   initialScheduleRequest = null,
   onBackHome,
@@ -78,9 +83,11 @@ export function ClinicalAgenda({
     source: "loading",
     error: ""
   });
-  const [weekStart, setWeekStart] = useState(() => getWeekStartDate());
+  const [calendarDate, setCalendarDate] = useState(() => getAgendaToday());
+  const weekStart = useMemo(() => getWeekStartDate(calendarDate), [calendarDate]);
   const [calendarView, setCalendarView] = useState("mes");
-  const [suggestedSlot, setSuggestedSlot] = useState(null);
+  const appointmentMutationRef = useRef(false);
+  const [appointmentMutation, setAppointmentMutation] = useState({ pending: false, error: "", caseId: "" });
   const [languagePreference, setLanguagePreference] = useState(() => getClinicalTermPreference());
   const termCopy = getClinicalTermCopy(languagePreference);
   const [selectedCaseId, setSelectedCaseId] = useState(
@@ -96,14 +103,14 @@ export function ClinicalAgenda({
   const reminderItem = agendaItems.find((item) => item.caseItem.id === reminderCaseId) || null;
   const stats = buildAgendaStats(agendaItems);
   const scheduleAvailability = useMemo(
-    () => availabilityState.authoritative ? availability : emptyAvailability,
-    [availabilityState.authoritative, availability, emptyAvailability]
+    () => availabilityState.authoritative && appointmentsStatus.authoritative && !appointmentsStatus.loading ? availability : emptyAvailability,
+    [availabilityState.authoritative, appointmentsStatus.authoritative, appointmentsStatus.loading, availability, emptyAvailability]
   );
   const weeklyAgenda = useMemo(
     () => calendarView === "mes"
-      ? buildAppointmentMonthAgenda({ cases, appointments, baseDate: weekStart, availability: scheduleAvailability })
+      ? buildAppointmentMonthAgenda({ cases, appointments, baseDate: calendarDate, availability: scheduleAvailability })
       : buildAppointmentWeeklyAgenda({ cases, appointments, weekStart, availability: scheduleAvailability }),
-    [cases, appointments, weekStart, scheduleAvailability, calendarView, refreshKey]
+    [cases, appointments, calendarDate, weekStart, scheduleAvailability, calendarView, refreshKey]
   );
   const availableSlots = useMemo(
     () => buildAppointmentAvailableSlots({ appointments, weekStart, availability: scheduleAvailability, durationMinutes: SESSION_DURATION_MINUTES, limit: 10 }),
@@ -126,6 +133,9 @@ export function ClinicalAgenda({
         source: result.source || "unknown",
         error: result.error || ""
       });
+    }).catch(() => {
+      if (!active || requestId !== availabilityRequestRef.current) return;
+      setAvailabilityState((current) => ({ ...current, loading: false, authoritative: false, error: "No pudimos cargar tus horarios. Revisa la conexión y vuelve a abrir la agenda." }));
     });
     return () => {
       active = false;
@@ -140,6 +150,11 @@ export function ClinicalAgenda({
 
   useEffect(() => {
     if (!initialScheduleRequest?.caseId) return;
+    const item = agendaItems.find((candidate) => candidate.caseItem.id === initialScheduleRequest.caseId);
+    if (item) updateScheduleDraft(item.caseItem.id, {
+      ...buildScheduleDraft(item),
+      plannedSessionNumber: initialScheduleRequest.sessionNumber || item.nextSessionNumber || 1
+    });
     setSelectedCaseId(initialScheduleRequest.caseId);
     setScheduleCaseId(initialScheduleRequest.caseId);
   }, [initialScheduleRequest?.caseId, initialScheduleRequest?.sessionNumber]);
@@ -154,10 +169,15 @@ export function ClinicalAgenda({
     const requestId = availabilityRequestRef.current + 1;
     availabilityRequestRef.current = requestId;
     setAvailabilityState((current) => ({ ...current, saving: true, error: "" }));
-    const result = await saveStudentWeeklyAvailability(authSession, nextAvailability);
+    let result;
+    try {
+      result = await saveStudentWeeklyAvailability(authSession, nextAvailability);
+    } catch {
+      result = { ok: false, error: "No pudimos confirmar los horarios. Revisa la conexión y vuelve a guardarlos." };
+    }
     let finalResult = result;
     if (result.ok) {
-      const refreshed = await loadStudentWeeklyAvailability(authSession);
+      const refreshed = await loadStudentWeeklyAvailability(authSession).catch(() => ({ authoritative: false }));
       finalResult = refreshed.authoritative
         ? { ...refreshed, ok: true }
         : result;
@@ -169,6 +189,7 @@ export function ClinicalAgenda({
         ...previousState,
         loading: false,
         saving: false,
+        authoritative: false,
         error: finalResult.error || "No pudimos guardar tu disponibilidad.",
         source: finalResult.source || "supabase_error"
       });
@@ -246,50 +267,58 @@ export function ClinicalAgenda({
   }
 
   async function saveAppointmentFromDraft(item, entry) {
-    if (!item) return;
-    const existing = appointments.find((appointment) =>
-      appointment.caseId === item.caseItem.id &&
-      Number(appointment.sessionNumber) === Number(entry.plannedSessionNumber || item.nextSessionNumber || 1) &&
-      appointment.status !== "cancelled"
-    );
-    const baseAppointment = buildAppointmentRecord({
-      authSession,
-      caseItem: item.caseItem,
-      sessionNumber: entry.plannedSessionNumber || item.nextSessionNumber || 1,
-      date: entry.date,
-      time: entry.time,
-      durationMinutes: SESSION_DURATION_MINUTES,
-      status: "scheduled",
-      nextObjective: entry.nextObjective,
-      reminderNote: entry.reminderNote
-    });
-    const appointment = existing ? { ...baseAppointment, id: existing.id } : baseAppointment;
-    const result = await saveSimulationAppointment(authSession, appointment);
-    const saved = result.data || appointment;
-    onAppointmentsChange?.(mergeAppointmentList(appointments, saved));
-    clearScheduleDraft(item.caseItem.id);
-    setScheduleCaseId("");
-    setSuggestedSlot(null);
-    refreshAgenda();
+    if (!item || appointmentMutationRef.current) return;
+    appointmentMutationRef.current = true;
+    setAppointmentMutation({ pending: true, error: "", caseId: item.caseItem.id });
+    try {
+      const validation = validateAppointmentSchedule({ item, draft: entry, appointments, appointmentsStatus, availability: scheduleAvailability, availabilityStatus: availabilityState, cases });
+      if (!validation.ok) throw new Error(validation.message);
+      const existing = findDraftAppointment(item, entry, appointments);
+      const baseAppointment = buildAppointmentRecord({
+        authSession, caseItem: item.caseItem,
+        sessionNumber: entry.plannedSessionNumber || item.nextSessionNumber || 1,
+        date: entry.date, time: entry.time, durationMinutes: SESSION_DURATION_MINUTES,
+        status: "scheduled", nextObjective: entry.nextObjective, reminderNote: entry.reminderNote
+      });
+      const appointment = existing ? { ...baseAppointment, id: existing.id, createdAt: existing.createdAt } : baseAppointment;
+      const result = await saveScheduledAppointment(authSession, appointment, existing?.id);
+      const saved = requireConfirmedAppointment(result, "scheduled");
+      onAppointmentsChange?.((current) => mergeAppointmentList(current, saved));
+      clearScheduleDraft(item.caseItem.id);
+      setScheduleCaseId((current) => current === item.caseItem.id ? "" : current);
+      refreshAgenda();
+    } catch (error) {
+      setAppointmentMutation({ pending: false, error: error.message || "No pudimos guardar la cita. Tu formulario se conserva.", caseId: item.caseItem.id });
+    } finally {
+      appointmentMutationRef.current = false;
+      setAppointmentMutation((current) => ({ ...current, pending: false }));
+    }
   }
 
-  async function clearAppointment(item) {
-    const appointment = appointments.find((candidate) =>
-      candidate.caseId === item.caseItem.id &&
-      Number(candidate.sessionNumber) === Number(item.nextSessionNumber || item.agendaEntry?.plannedSessionNumber || 1) &&
-      candidate.status === "scheduled"
-    );
-    if (appointment?.id) {
-      const result = await cancelSimulationAppointment(authSession, appointment.id);
-      const cancelled = result.data || { ...appointment, status: "cancelled", cancelledAt: new Date().toISOString() };
-      onAppointmentsChange?.(mergeAppointmentList(appointments, cancelled));
-    } else {
-      clearClinicalAgendaEntry(item.caseItem.id);
+  async function clearAppointment(item, draft) {
+    if (!item || appointmentMutationRef.current) return;
+    appointmentMutationRef.current = true;
+    setAppointmentMutation({ pending: true, error: "", caseId: item.caseItem.id });
+    try {
+      if (!appointmentsStatus.authoritative || appointmentsStatus.loading) throw new Error("Espera a que se verifiquen tus citas antes de cancelar. Reintenta la carga de agenda si falló.");
+      const appointment = findDraftAppointment(item, draft, appointments);
+      if (appointment && appointment.status !== "scheduled") throw new Error("Una sesión iniciada o terminada no se puede cancelar desde la agenda.");
+      if (appointment?.id) {
+        const result = await cancelSimulationAppointment(authSession, appointment.id);
+        const cancelled = requireConfirmedAppointment(result, "cancelled");
+        onAppointmentsChange?.((current) => mergeAppointmentList(current, cancelled));
+      } else {
+        clearClinicalAgendaEntry(item.caseItem.id);
+      }
+      setScheduleCaseId((current) => current === item.caseItem.id ? "" : current);
+      clearScheduleDraft(item.caseItem.id);
+      refreshAgenda();
+    } catch (error) {
+      setAppointmentMutation({ pending: false, error: error.message || "No pudimos cancelar la cita. Inténtalo nuevamente.", caseId: item.caseItem.id });
+    } finally {
+      appointmentMutationRef.current = false;
+      setAppointmentMutation((current) => ({ ...current, pending: false }));
     }
-    setScheduleCaseId("");
-    clearScheduleDraft(item.caseItem.id);
-    setSuggestedSlot(null);
-    refreshAgenda();
   }
 
   return (
@@ -343,16 +372,17 @@ export function ClinicalAgenda({
         />
       </section>
 
-      <section className="agenda-calendar-panel" aria-label="Calendario clinico semanal">
+      <section className="agenda-calendar-panel" aria-label="Calendario clínico">
         <div className="agenda-calendar-toolbar">
           <div>
             <span className="eyebrow">Calendario clinico</span>
-            <h2>{calendarView === "mes" ? formatMonthLabel(weekStart) : `Semana del ${formatWeekRange(weekStart)}`}</h2>
+            <h2>{calendarView === "mes" ? formatMonthLabel(calendarDate) : calendarView === "dia" ? formatSlotDate(formatDateInput(calendarDate)) : `Semana del ${formatWeekRange(weekStart)}`}</h2>
           </div>
           <div className="agenda-calendar-actions">
             <button
               className={calendarView === "mes" ? "selected" : ""}
               type="button"
+              aria-pressed={calendarView === "mes"}
               onClick={() => setCalendarView("mes")}
             >
               Mes
@@ -360,6 +390,7 @@ export function ClinicalAgenda({
             <button
               className={calendarView === "dia" ? "selected" : ""}
               type="button"
+              aria-pressed={calendarView === "dia"}
               onClick={() => setCalendarView("dia")}
             >
               Dia
@@ -367,6 +398,7 @@ export function ClinicalAgenda({
             <button
               className={calendarView === "semana" ? "selected" : ""}
               type="button"
+              aria-pressed={calendarView === "semana"}
               onClick={() => setCalendarView("semana")}
             >
               Semana
@@ -374,43 +406,55 @@ export function ClinicalAgenda({
             <button
               className="secondary-action compact"
               type="button"
-              onClick={() => setWeekStart((current) => calendarView === "mes" ? addMonths(current, -1) : addDays(current, -7))}
+              aria-label="Período anterior"
+              onClick={() => setCalendarDate((current) => moveAgendaDate(current, calendarView, -1))}
             >
               <ChevronLeft aria-hidden="true" />
             </button>
             <button
               className="secondary-action compact"
               type="button"
-              onClick={() => setWeekStart(getWeekStartDate())}
+              onClick={() => setCalendarDate(getAgendaToday())}
             >
               Hoy
             </button>
             <button
               className="secondary-action compact"
               type="button"
-              onClick={() => setWeekStart((current) => calendarView === "mes" ? addMonths(current, 1) : addDays(current, 7))}
+              aria-label="Período siguiente"
+              onClick={() => setCalendarDate((current) => moveAgendaDate(current, calendarView, 1))}
             >
               <ChevronRight aria-hidden="true" />
             </button>
           </div>
         </div>
 
-        <AgendaCalendar
+        {(appointmentsStatus.authoritative || appointments.length > 0) ? <AgendaCalendar
           agenda={weeklyAgenda}
           view={calendarView}
+          selectedDate={formatDateInput(calendarDate)}
           termCopy={termCopy}
-          onOpenCase={(caseId) => {
-            setSelectedCaseId(caseId);
-            setScheduleCaseId(caseId);
+          onOpenAppointment={(appointment) => {
+            const item = agendaItems.find((candidate) => candidate.caseItem.id === appointment.caseId);
+            if (!item) return;
+            updateScheduleDraft(item.caseItem.id, {
+              ...buildScheduleDraft(item),
+              date: appointment.scheduledLocalDate, time: appointment.scheduledTime,
+              plannedSessionNumber: appointment.sessionNumber,
+              nextObjective: appointment.nextObjective || "", reminderNote: appointment.reminderNote || ""
+            });
+            setSelectedCaseId(item.caseItem.id);
+            setScheduleCaseId(item.caseItem.id);
           }}
-        />
+        /> : <p role="status">El calendario se mostrará cuando podamos verificar tus citas.</p>}
 
         <AvailableSlots
           slots={availableSlots}
+          verified={appointmentsStatus.authoritative && !appointmentsStatus.loading && availabilityState.authoritative}
           selectedItem={selectedItem}
           onUseSlot={(slot) => {
             if (!selectedItem) return;
-            setSuggestedSlot(slot);
+            updateScheduleDraft(selectedItem.caseItem.id, buildScheduleDraft(selectedItem, scheduleDrafts[selectedItem.caseItem.id], slot));
             setScheduleCaseId(selectedItem.caseItem.id);
           }}
         />
@@ -436,7 +480,6 @@ export function ClinicalAgenda({
               onSchedule={() => {
                 setScheduleCaseId((current) => current === item.caseItem.id ? "" : item.caseItem.id);
                 setSelectedCaseId(item.caseItem.id);
-                setSuggestedSlot(null);
               }}
               onPrepare={() => onPrepareCase?.(item.caseItem.id, item.nextSessionNumber || 1)}
               onOpenReminder={() => openReminder(item)}
@@ -577,7 +620,8 @@ export function ClinicalAgenda({
           availability={scheduleAvailability}
           availabilityStatus={availabilityState}
           appointments={appointments}
-          suggestedSlot={suggestedSlot}
+          appointmentsStatus={appointmentsStatus}
+          mutation={{ pending: appointmentMutation.pending, error: appointmentMutation.caseId === scheduleItem.caseItem.id ? appointmentMutation.error : "" }}
           savedDraft={scheduleDrafts[scheduleItem.caseItem.id]}
           termCopy={termCopy}
           onDraftChange={(draft) => updateScheduleDraft(scheduleItem.caseItem.id, draft)}
@@ -589,8 +633,8 @@ export function ClinicalAgenda({
           onSave={(entry) => {
             void saveAppointmentFromDraft(scheduleItem, entry);
           }}
-          onClear={() => {
-            void clearAppointment(scheduleItem);
+          onClear={(draft) => {
+            void clearAppointment(scheduleItem, draft);
           }}
         />
       )}
@@ -624,16 +668,6 @@ function applyAppointmentsToAgendaItems(items = [], appointments = []) {
       nextFocus: appointment.nextObjective || item.nextFocus
     };
   });
-}
-
-function findRelevantAppointment(item, appointments = []) {
-  return appointments
-    .filter((appointment) =>
-      appointment.caseId === item.caseItem.id &&
-      appointment.status !== "cancelled" &&
-      ACTIVE_APPOINTMENT_STATUSES.has(appointment.status)
-    )
-    .sort((a, b) => new Date(a.scheduledFor || a.createdAt).getTime() - new Date(b.scheduledFor || b.createdAt).getTime())[0] || null;
 }
 
 function buildAppointmentWeeklyAgenda({ cases = [], appointments = [], weekStart = getWeekStartDate(), availability = {} }) {
@@ -730,94 +764,6 @@ function buildAppointmentMonthAgenda({ cases = [], appointments = [], baseDate =
     weekStart: formatDateInput(monthStart),
     days,
     blocks: days.flatMap((day) => day.sessions)
-  };
-}
-
-function buildAppointmentAvailableSlots({
-  appointments = [],
-  weekStart = getWeekStartDate(),
-  availability = {},
-  durationMinutes = SESSION_DURATION_MINUTES,
-  limit = 10
-}) {
-  const slots = [];
-  WEEK_DAYS.forEach((day, index) => {
-    const dayAvailability = availability[day.key];
-    if (!dayAvailability?.enabled) return;
-    const date = formatDateInput(addDays(weekStart, index));
-    dayAvailability.blocks.forEach((availabilityBlock) => {
-      const start = timeToMinutes(availabilityBlock.start);
-      const end = timeToMinutes(availabilityBlock.end);
-      for (let current = start; current + durationMinutes <= end; current += durationMinutes) {
-        const conflict = appointments.some((appointment) =>
-          appointment.scheduledLocalDate === date &&
-          appointment.status !== "cancelled" &&
-          ACTIVE_APPOINTMENT_STATUSES.has(appointment.status)
-        );
-        if (conflict) break;
-        slots.push({
-          date,
-          time: minutesToTime(current),
-          endTime: minutesToTime(current + durationMinutes),
-          durationMinutes,
-          dayLabel: day.label
-        });
-      }
-    });
-  });
-  return slots.slice(0, limit);
-}
-
-function validateAppointmentSchedule({ item, draft, appointments = [], availability, availabilityStatus, cases }) {
-  if (availabilityStatus?.loading) {
-    return {
-      ok: false,
-      type: "no_availability",
-      message: "Estamos verificando tu disponibilidad.",
-      detail: "Espera unos segundos antes de programar la sesión."
-    };
-  }
-
-  if (!availabilityStatus?.authoritative) {
-    return {
-      ok: false,
-      type: "no_availability",
-      message: "Aún no has definido tu disponibilidad.",
-      detail: "Configúrala para organizar tus próximas sesiones.",
-      actionLabel: "Editar disponibilidad"
-    };
-  }
-
-  const baseValidation = validateAgendaSchedule({
-    caseId: item.caseItem.id,
-    draft,
-    cases,
-    availability
-  });
-  if (!baseValidation.ok && baseValidation.type !== "conflict") return baseValidation;
-
-  const date = String(draft.date || "").trim();
-  const sessionNumber = Number(draft.plannedSessionNumber) || item.nextSessionNumber || 1;
-  const sameDayConflict = appointments.find((appointment) =>
-    appointment.scheduledLocalDate === date &&
-    appointment.status !== "cancelled" &&
-    ACTIVE_APPOINTMENT_STATUSES.has(appointment.status) &&
-    !(appointment.caseId === item.caseItem.id && Number(appointment.sessionNumber) === Number(sessionNumber))
-  );
-  if (sameDayConflict) {
-    return {
-      ok: false,
-      type: "daily_limit",
-      message: "Ya existe una sesion programada para ese dia.",
-      detail: "Cada estudiante puede tener maximo una sesion clinica simulada por dia."
-    };
-  }
-
-  return {
-    ok: true,
-    type: "available",
-    message: "Horario disponible. Puedes agendar esta sesion.",
-    detail: `${draft.time} - duracion ${SESSION_DURATION_MINUTES} minutos.`
   };
 }
 
@@ -1086,8 +1032,11 @@ function AvailabilityEditor({ availability, status, onChange }) {
   async function handleSave() {
     if (localSaving || status?.saving) return;
     setLocalSaving(true);
-    await onChange(draft);
-    setLocalSaving(false);
+    try {
+      await onChange(draft);
+    } finally {
+      setLocalSaving(false);
+    }
   }
 
   return (
@@ -1170,10 +1119,10 @@ function AvailabilityEditor({ availability, status, onChange }) {
   );
 }
 
-function AgendaCalendar({ agenda, view, termCopy, onOpenCase }) {
-  const todayKey = getLocalDateKey(new Date());
+function AgendaCalendar({ agenda, view, selectedDate, termCopy, onOpenAppointment }) {
+  const todayKey = getZonedDateKey(new Date());
   const visibleDays = view === "dia"
-    ? [agenda.days.find((day) => day.dateKey === todayKey) || agenda.days[0]].filter(Boolean)
+    ? [agenda.days.find((day) => day.dateKey === selectedDate)].filter(Boolean)
     : agenda.days;
 
   return (
@@ -1190,7 +1139,7 @@ function AgendaCalendar({ agenda, view, termCopy, onOpenCase }) {
             </div>
             <small>
               {day.availability?.enabled
-                ? `${day.availability.start} - ${day.availability.end}`
+                ? formatAvailabilityForDay(day.availability)
                 : "Sin disponibilidad"}
             </small>
           </header>
@@ -1202,7 +1151,7 @@ function AgendaCalendar({ agenda, view, termCopy, onOpenCase }) {
                   className={`agenda-session-block state-${stateClass(session.status)}`}
                   key={`${session.caseId}-${session.date}-${session.time}`}
                   type="button"
-                  onClick={() => onOpenCase(session.caseId)}
+                  onClick={() => onOpenAppointment(session.appointment)}
                 >
                   <span>
                     <Clock aria-hidden="true" />
@@ -1211,6 +1160,7 @@ function AgendaCalendar({ agenda, view, termCopy, onOpenCase }) {
                   <strong>{session.patientName}</strong>
                   <small>{session.sessionLabel}</small>
                   <em>{session.focus}</em>
+                  <small>{appointmentStatusLabel(session.status)}</small>
                 </button>
               ))
             ) : (
@@ -1230,14 +1180,14 @@ function AgendaCalendar({ agenda, view, termCopy, onOpenCase }) {
   );
 }
 
-function AvailableSlots({ slots, selectedItem, onUseSlot }) {
+function AvailableSlots({ slots, verified, selectedItem, onUseSlot }) {
   return (
     <aside className="agenda-available-slots">
       <div>
         <span className="eyebrow">Espacios disponibles</span>
-        <h3>Esta semana</h3>
+        <h3>Semana seleccionada</h3>
       </div>
-      {slots.length ? (
+      {!verified ? <p>Los espacios libres se mostrarán cuando estén verificadas tus citas y tu disponibilidad.</p> : slots.length ? (
         <div className="available-slot-list">
           {slots.map((slot) => (
             <button
@@ -1253,7 +1203,7 @@ function AvailableSlots({ slots, selectedItem, onUseSlot }) {
           ))}
         </div>
       ) : (
-        <p>No hay espacios libres esta semana con tu disponibilidad configurada.</p>
+        <p>No hay horarios futuros libres en esta semana con tu disponibilidad configurada.</p>
       )}
       {!selectedItem && <p>Selecciona un caso para usar un horario libre.</p>}
     </aside>
@@ -1284,7 +1234,8 @@ function ScheduleEditor({
   availability,
   availabilityStatus,
   appointments = [],
-  suggestedSlot,
+  appointmentsStatus,
+  mutation = {},
   savedDraft,
   termCopy,
   onDraftChange,
@@ -1293,16 +1244,8 @@ function ScheduleEditor({
   onCancel,
   onClear
 }) {
-  const [draft, setDraft] = useState(() => savedDraft || {
-    date: suggestedSlot?.date || item.agendaEntry?.date || "",
-    time: suggestedSlot?.time || item.agendaEntry?.time || "",
-    durationMinutes: SESSION_DURATION_MINUTES,
-    modality: item.agendaEntry?.modality || "simulada",
-    plannedSessionNumber: item.agendaEntry?.plannedSessionNumber || item.nextSessionNumber || 1,
-    status: item.agendaEntry?.status || "programada",
-    nextObjective: item.agendaEntry?.nextObjective || item.nextFocus || "",
-    reminderNote: item.agendaEntry?.reminderNote || item.task?.description || ""
-  });
+  const [draft, setDraft] = useState(() => buildScheduleDraft(item, savedDraft));
+  const draftAppointment = findDraftAppointment(item, draft, appointments);
 
   useEffect(() => {
     if (savedDraft) setDraft(savedDraft);
@@ -1310,6 +1253,7 @@ function ScheduleEditor({
 
   const validation = validateAppointmentSchedule({
     item,
+    appointmentsStatus,
     draft,
     appointments,
     availability,
@@ -1321,11 +1265,9 @@ function ScheduleEditor({
     : validation;
 
   function updateDraft(patch) {
-    setDraft((current) => {
-      const next = { ...current, ...patch };
-      onDraftChange?.(next);
-      return next;
-    });
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    onDraftChange?.(next);
   }
 
   return (
@@ -1334,20 +1276,21 @@ function ScheduleEditor({
         <header>
           <span className="eyebrow">Programar sesión</span>
           <h2 id="schedule-editor-title">{item.caseItem.name}</h2>
-          <p>{item.nextSessionLabel} {termCopy.prep}</p>
+          <p>Sesión {draft.plannedSessionNumber} de {item.plannedSessions} {termCopy.prep}</p>
         </header>
 
-        <div className="schedule-form-grid">
+        <fieldset className="schedule-form-grid" disabled={mutation.pending} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <label>
             <span>Fecha</span>
             <input
               type="date"
+              min={getZonedDateKey(new Date())}
               value={draft.date}
               onChange={(event) => updateDraft({ date: event.target.value })}
             />
           </label>
           <label>
-            <span>Hora</span>
+            <span>Hora de Chile (Santiago)</span>
             <input
               type="time"
               value={draft.time}
@@ -1359,16 +1302,8 @@ function ScheduleEditor({
             <input type="text" value={`${SESSION_DURATION_MINUTES} min`} readOnly />
           </label>
           <label>
-            <span>Modalidad simulada</span>
-            <select
-              value={draft.modality}
-              onChange={(event) => updateDraft({ modality: event.target.value })}
-            >
-              <option value="simulada">Sesión simulada</option>
-              <option value="seguimiento">Seguimiento formativo</option>
-              <option value="reevaluacion">Reevaluacion</option>
-              <option value="cierre">Cierre formativo</option>
-            </select>
+            <span>Modalidad</span>
+            <input type="text" value="Sesión simulada" readOnly />
           </label>
           <label>
             <span>Sesión correspondiente</span>
@@ -1385,20 +1320,7 @@ function ScheduleEditor({
           </label>
           <label>
             <span>Estado en agenda</span>
-            <select
-              value={draft.status}
-              onChange={(event) => updateDraft({ status: event.target.value })}
-            >
-              <option value="programada">Programada</option>
-              <option value="en_curso">En curso</option>
-              <option value="realizada">Realizada</option>
-              <option value="nota_clinica_pendiente">Nota clinica pendiente</option>
-              <option value="pendiente_cierre">Pendiente de cierre</option>
-              <option value="reprogramada">Reprogramada</option>
-              <option value="cancelada">Cancelada</option>
-              <option value="riesgo_abierto">Riesgo abierto</option>
-              <option value="seguimiento_pendiente">Seguimiento pendiente</option>
-            </select>
+            <input type="text" value={draftAppointment ? appointmentStatusLabel(draftAppointment.status) : "Por programar"} readOnly />
           </label>
           <label className="wide">
             <span>Objetivo de la próxima sesión</span>
@@ -1418,25 +1340,26 @@ function ScheduleEditor({
               placeholder="Ej.: preguntar como llego despues de la sesion anterior."
             />
           </label>
-        </div>
+        </fieldset>
 
         <ScheduleValidationMessage validation={validationWithAction} />
+        {mutation.error && <p className="schedule-validation invalid_date" role="alert">{mutation.error}</p>}
 
         <div className="schedule-actions">
           <button
             className="primary-action"
             type="button"
             onClick={() => onSave(draft)}
-            disabled={!validation.ok}
+            disabled={!validation.ok || mutation.pending}
           >
             <CheckCircle2 aria-hidden="true" />
-            Guardar programacion
+            {mutation.pending ? "Confirmando…" : "Guardar programación"}
           </button>
-          <button className="secondary-action" type="button" onClick={onClear}>
-            Limpiar
+          <button className="secondary-action" type="button" disabled={mutation.pending || Boolean(draftAppointment && draftAppointment.status !== "scheduled")} onClick={() => onClear(draft)}>
+            {draftAppointment ? "Cancelar cita" : "Limpiar borrador"}
           </button>
-          <button className="secondary-action" type="button" onClick={onCancel}>
-            Cancelar
+          <button className="secondary-action" type="button" disabled={mutation.pending} onClick={onCancel}>
+            Volver sin guardar
           </button>
         </div>
       </div>
@@ -1487,12 +1410,6 @@ function formatMonthLabel(value) {
   }
 }
 
-function addMonths(value, amount) {
-  const date = new Date(value);
-  date.setMonth(date.getMonth() + amount);
-  return getWeekStartDate(date);
-}
-
 function formatSlotDate(value) {
   if (!value) return "Fecha pendiente";
   try {
@@ -1504,14 +1421,6 @@ function formatSlotDate(value) {
   } catch {
     return value;
   }
-}
-
-function getLocalDateKey(date) {
-  const value = new Date(date);
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function formatRegistryDate(value) {

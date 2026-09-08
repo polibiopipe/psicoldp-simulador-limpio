@@ -249,7 +249,28 @@ export function normalizeLocalDate(value, timezone = SIMULATION_TIMEZONE) {
 
 export function buildScheduledFor({ date, time, timezone = SIMULATION_TIMEZONE }) {
   const localDate = normalizeLocalDate(date, timezone);
-  const safeTime = /^\d{2}:\d{2}$/.test(String(time || "")) ? time : "09:00";
-  if (!localDate) return "";
-  return `${localDate}T${safeTime}:00`;
+  const safeTime = time || "09:00";
+  if (!localDate || !/^([01]\d|2[0-3]):[0-5]\d$/.test(safeTime)) return "";
+  const wallTime = `${localDate}T${safeTime}:00.000Z`;
+  const target = Date.parse(wallTime);
+  if (!Number.isFinite(target) || new Date(target).toISOString() !== wallTime) return "";
+
+  // Convert the selected Santiago wall time to an instant, including DST.
+  // A round trip rejects times that do not exist during the spring clock change.
+  try {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+    });
+    let instant = target;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const parts = Object.fromEntries(formatter.formatToParts(instant).map((part) => [part.type, part.value]));
+      const represented = Date.parse(`${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.000Z`);
+      if (represented === target) return new Date(instant).toISOString();
+      instant += target - represented;
+    }
+  } catch {
+    return "";
+  }
+  return "";
 }

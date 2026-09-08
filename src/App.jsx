@@ -100,6 +100,8 @@ export default function App() {
   const [agendaScheduleRequest, setAgendaScheduleRequest] = useState(null);
   const [sessionRecords, setSessionRecords] = useState([]);
   const [appointmentRecords, setAppointmentRecords] = useState([]);
+  const [appointmentsStatus, setAppointmentsStatus] = useState({ loading: true, authoritative: false, error: "" });
+  const appointmentsRequestRef = useRef(0);
   const [activeSessionRecordId, setActiveSessionRecordId] = useState("");
   const [activeAppointmentId, setActiveAppointmentId] = useState("");
   const [activeSessionRecordSnapshot, setActiveSessionRecordSnapshot] = useState(null);
@@ -250,20 +252,29 @@ export default function App() {
   }, [authSession?.user?.id]);
 
   useEffect(() => {
+    const requestId = ++appointmentsRequestRef.current;
+    setSessionRecords([]);
+    setAppointmentRecords([]);
     if (approvalState.status !== "approved" || !authSession?.user) {
-      setSessionRecords([]);
-      setAppointmentRecords([]);
+      setAppointmentsStatus({ loading: false, authoritative: false, error: "" });
       return;
     }
 
     let cancelled = false;
-    Promise.all([
+    setAppointmentsStatus({ loading: true, authoritative: false, error: "" });
+    Promise.allSettled([
       getSessionHistoryForUser(authSession),
       getSimulationAppointments(authSession)
     ]).then(([records, appointments]) => {
       if (cancelled) return;
-      setSessionRecords(records);
-      setAppointmentRecords(appointments);
+      if (records.status === "fulfilled") setSessionRecords(records.value);
+      if (requestId !== appointmentsRequestRef.current) return;
+      if (appointments.status === "fulfilled") {
+        setAppointmentRecords(appointments.value);
+        setAppointmentsStatus({ loading: false, authoritative: true, error: "" });
+      } else {
+        setAppointmentsStatus({ loading: false, authoritative: false, error: "No pudimos cargar tus citas. Reintenta para verificar tu agenda." });
+      }
     });
 
     return () => {
@@ -758,9 +769,26 @@ export default function App() {
   }
 
   async function refreshAppointments(currentAuthSession = authSession) {
-    const appointments = await getSimulationAppointments(currentAuthSession);
-    setAppointmentRecords(appointments);
-    return appointments;
+    const requestId = ++appointmentsRequestRef.current;
+    setAppointmentsStatus((current) => ({ ...current, loading: true, error: "" }));
+    try {
+      const appointments = await getSimulationAppointments(currentAuthSession);
+      if (requestId !== appointmentsRequestRef.current) return null;
+      setAppointmentRecords(appointments);
+      setAppointmentsStatus({ loading: false, authoritative: true, error: "" });
+      return appointments;
+    } catch {
+      if (requestId === appointmentsRequestRef.current) {
+        setAppointmentsStatus({ loading: false, authoritative: false, error: "No pudimos actualizar tus citas. Conservamos la última agenda verificada. Reintenta antes de programar." });
+      }
+      return null;
+    }
+  }
+
+  function applyConfirmedAgendaChange(update) {
+    ++appointmentsRequestRef.current;
+    setAppointmentRecords(update);
+    setAppointmentsStatus({ loading: false, authoritative: true, error: "" });
   }
 
   function getCurrentAppointmentForSession({ includeExpired = true } = {}) {
@@ -860,7 +888,7 @@ export default function App() {
     }
 
     const refreshed = await refreshAppointments(currentAuthSession);
-    const recovered = findActiveAppointmentForCase(refreshed, selectedCase.id, sessionNumber);
+    const recovered = findActiveAppointmentForCase(refreshed || [], selectedCase.id, sessionNumber);
     if (recovered) {
       const activeAppointment = await activateAppointmentForPractice(recovered, currentAuthSession);
       if (activeAppointment) return activeAppointment;
@@ -1229,6 +1257,17 @@ export default function App() {
         onSignOut={handleSignOut}
       >
 
+      {(appointmentsStatus.loading || appointmentsStatus.error) && (
+        <div className="connection-status-banner" role={appointmentsStatus.error ? "alert" : "status"}>
+          {appointmentsStatus.loading ? "Estamos verificando tus citas…" : appointmentsStatus.error}
+          {appointmentsStatus.error && (
+            <button className="secondary-action" type="button" onClick={() => void refreshAppointments()}>
+              Reintentar carga de agenda
+            </button>
+          )}
+        </div>
+      )}
+
       {screen === screens.home && (
         <ClinicalDashboard
           cases={cases}
@@ -1256,12 +1295,13 @@ export default function App() {
           cases={cases}
           authSession={authSession}
           appointments={appointmentRecords}
+          appointmentsStatus={appointmentsStatus}
           initialCaseId={agendaFocusCaseId}
           initialScheduleRequest={agendaScheduleRequest}
           onBackHome={goHome}
           onPrepareCase={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.brief)}
           onStartSession={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.simulation)}
-          onAppointmentsChange={setAppointmentRecords}
+          onAppointmentsChange={applyConfirmedAgendaChange}
         />
       )}
 

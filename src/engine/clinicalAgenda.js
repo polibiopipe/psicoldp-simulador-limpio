@@ -160,7 +160,11 @@ export function getWeeklyAvailability() {
 export function saveWeeklyAvailability(availability = {}) {
   const normalized = normalizeWeeklyAvailability(availability);
   if (canUseStorage()) {
-    localStorage.setItem(AVAILABILITY_STORAGE_KEY, JSON.stringify(normalized));
+    try {
+      localStorage.setItem(AVAILABILITY_STORAGE_KEY, JSON.stringify(normalized));
+    } catch {
+      // The server remains authoritative when the local cache is unavailable.
+    }
   }
   return normalized;
 }
@@ -219,35 +223,15 @@ export async function saveStudentWeeklyAvailability(authSession = null, availabi
     };
   }
 
-  const rows = mapWeeklyAvailabilityToRows(authSession.user.id, normalized);
-
-  const { error: deleteError } = await supabase
-    .from(AVAILABILITY_TABLE)
-    .delete()
-    .eq("user_id", authSession.user.id);
-
-  if (deleteError) {
-    console.warn("[availability] delete error message", deleteError.message);
-    console.warn("[availability] delete error code", deleteError.code || null);
-    const classified = classifyAvailabilityError(deleteError);
-    return { ok: false, availability: normalized, error: classified.message, source: classified.source };
+  const blocks = mapWeeklyAvailabilityToRows(authSession.user.id, normalized)
+    .map(({ day_of_week, start_time, end_time }) => ({ day_of_week, start_time, end_time }));
+  let response;
+  try {
+    response = await supabase.rpc("replace_simulation_student_availability", { p_blocks: blocks });
+  } catch {
+    return { ok: false, availability: normalized, error: "No pudimos confirmar el guardado de tus horarios. Revisa la conexión e inténtalo nuevamente.", source: "network_or_supabase_error" };
   }
-
-  if (!rows.length) {
-    const empty = getEmptyWeeklyAvailability();
-    saveWeeklyAvailability(empty);
-    return {
-      ok: true,
-      availability: empty,
-      configured: false,
-      error: ""
-    };
-  }
-
-  const { data, error } = await supabase
-    .from(AVAILABILITY_TABLE)
-    .insert(rows)
-    .select("id,day_of_week,start_time,end_time,timezone,updated_at");
+  const { data, error } = response;
 
   if (error) {
     console.warn("[availability] save error message", error.message);
@@ -256,10 +240,14 @@ export async function saveStudentWeeklyAvailability(authSession = null, availabi
     return { ok: false, availability: normalized, error: classified.message, source: classified.source };
   }
 
-  const saved = mapAvailabilityRowsToWeekly(data || rows);
+  if (!Array.isArray(data) || data.length !== blocks.length) {
+    return { ok: false, availability: normalized, error: "No pudimos confirmar todos tus horarios. Actualiza la agenda.", source: "unconfirmed" };
+  }
+  const saved = mapAvailabilityRowsToWeekly(data);
   saveWeeklyAvailability(saved);
   return {
     ok: true,
+    authoritative: true,
     availability: saved,
     configured: hasConfiguredAvailability(saved),
     error: ""
@@ -912,6 +900,9 @@ function normalizeTimeValue(value = "") {
 function classifyAvailabilityError(error = {}) {
   const code = String(error.code || "");
   const message = String(error.message || "");
+  if (code === "PGRST202" || code === "42883") {
+    return { source: "migration_required", message: "La actualización del guardado de horarios aún está pendiente. Inténtalo cuando termine la actualización." };
+  }
   if (code === "42P01" || /does not exist|schema cache|simulation_student_availability/i.test(message)) {
     return {
       source: "schema_missing",
