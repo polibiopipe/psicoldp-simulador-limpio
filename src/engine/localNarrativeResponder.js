@@ -1,3 +1,5 @@
+import { getAvatarNarrative } from "../data/avatarNarratives.js";
+import { getAvatarCanonicalBiography } from "../data/avatarCanonicalBiographies.js";
 import { patientFacts as allPatientFacts } from "../data/patientFacts.js";
 import { getNarrativeDisclosureContext, normalizeNarrativeText } from "./narrativeDisclosure.js";
 
@@ -107,7 +109,7 @@ export function classifyNarrativeIntent(message = "") {
   if (/\b(rutina|dia normal|dia a dia|como es un dia|como son tus dias|duermes|descansas|que haces durante el dia)\b/.test(text)) return "routine";
   if (/\b(colegio|universidad|estudias|estudios|cuarto medio|carrera|evaluacion|nota|notas|postulacion|clases)\b/.test(text)) return "education";
   if (/\b(trabajo|trabajas|pega|laboral|licencia|jubil|jubilacion|oportunidad|plazo|profesion|a que te dedicas)\b/.test(text)) return "work";
-  if (/\b(como afecta|te afecta|consecuencia|consecuencias|que pasa cuando|que haces cuando|como impacta|que cambia)\b/.test(text)) return "impact";
+  if (/\b(como afecta|como esta afectando|te afecta|consecuencia|consecuencias|que pasa cuando|que haces cuando|como impacta|que cambia)\b/.test(text)) return "impact";
   if (/\b(que sientes|como te sientes|como te has sentido|emocion|culpa|rabia|pena|verguenza|tristeza|cansado|cansada|agotado|agotada)\b/.test(text)) return "feelings";
   if (/\b(que temes|que mas temes|que es lo que mas temes|miedo|que te preocupa|que seria lo peor|que perderias|que podrias perder|temor|te asusta|miedo mas profundo)\b/.test(text)) return "fear";
   if (/\b(que significa|que sentido|por dentro|que hay detras|que necesitas|que te cuesta reconocer|por que respondes que no sabes|respondes que no sabes|conflicto interno|fondo)\b/.test(text)) return "meaning";
@@ -153,6 +155,7 @@ function composeNarrativeResponse({
   const disclosureLevel = narrativeContext.disclosureLevel;
   const turnSeed = history.length + String(message || "").length + String(patientId).length + (Number(sessionNumber) || 1);
   const available = narrativeContext.availableFacts || [];
+  const direct = getAvatarCanonicalBiography(patientId)?.directAnswers || {};
 
   if (intent === "age") {
     const age = Number(facts.age) || narrativeContext.currentAge;
@@ -165,29 +168,21 @@ function composeNarrativeResponse({
   }
 
   if (intent === "education") {
-    return pickCanonical([facts.academic, facts.school, facts.works], turnSeed);
+    return direct.studies?.[0] || null;
   }
 
   if (intent === "work") {
-    return pickCanonical([facts.works, facts.academic, facts.school], turnSeed);
+    return direct.work?.[0] || null;
   }
 
   if (intent === "routine") {
-    return pickCanonical([facts.habits, selectAvailableFact(available, history, ["rutina", "dia", "computador"])], turnSeed);
+    return direct.routine?.[0] || null;
   }
 
-  if (intent === "reason") {
-    return joinNatural(
-      pickCanonical([facts.motive, selectInitialDisclosure(available, history)], turnSeed),
-      pickShortFact(getFactByPrefix(available, "Motivo/desencadenante reciente"))
-    );
-  }
-
-  if (intent === "recent_trigger") {
-    return joinNatural(
-      pickShortFact(getFactByPrefix(available, "Motivo/desencadenante reciente")),
-      selectInitialDisclosure(available, history)
-    );
+  if (intent === "reason" || intent === "recent_trigger") {
+    return intent === "recent_trigger" && disclosureLevel !== "initial"
+      ? getAvatarNarrative(patientId)?.disclosure.developing[0] || direct.reason?.[0]
+      : direct.reason?.[0] || null;
   }
 
   if (DEEP_INTENTS.has(intent) && disclosureLevel !== "deep") {
@@ -200,6 +195,8 @@ function composeNarrativeResponse({
       turnSeed
     });
   }
+
+  if (disclosureLevel === "initial" && intent !== "history") return direct.reason?.[0] || null;
 
   if (intent === "feelings") {
     return selectNarrativeByDepth({
@@ -232,11 +229,9 @@ function composeNarrativeResponse({
   }
 
   if (intent === "history") {
-    return timelineResponse({
-      timeline: narrativeContext.availableTimeline,
-      fallback: facts.motive || profile.explicitReason,
-      turnSeed
-    });
+    // A chronological note is not patient dialogue. Let the conversational
+    // engine handle historical questions instead of reciting the case file.
+    return null;
   }
 
   if (intent === "fear" || intent === "meaning" || intent === "ambivalence") {
@@ -267,16 +262,16 @@ function familyResponse({ patientId, message, facts, narrativeContext, turnSeed 
     ], turnSeed);
   }
 
-  const canonical = pickCanonical([facts.family, facts.social], turnSeed);
+  const canonical = getAvatarCanonicalBiography(patientId)?.directAnswers.family?.[0];
   if (canonical) return canonical;
 
   return selectAvailableFact(narrativeContext.availableFacts, [], ["familia", "casa", "vivo"]);
 }
 
 function reservedResponse({ patientId, intent, disclosureLevel, available, history, turnSeed }) {
-  const initialLine = selectInitialDisclosure(available, history);
+  const initialLine = getAvatarCanonicalBiography(patientId)?.directAnswers.reason?.[0] || "Me cuesta ordenarlo todavía.";
   const developingLine = disclosureLevel === "developing"
-    ? selectAvailableFact(available, history, ["siento", "cuando", "me cuesta", "afuera", "preguntan"])
+    ? getFactByPrefix(available, "Forma habitual de protegerse o vincularse")
     : "";
   const anchors = [developingLine, initialLine].filter(Boolean);
   const anchor = pickVariant(anchors, turnSeed) || "Me cuesta ordenarlo todavia.";
@@ -292,9 +287,9 @@ function reservedResponse({ patientId, intent, disclosureLevel, available, histo
 
 function selectNarrativeByDepth({ available, history, disclosureLevel, fallback, turnSeed }) {
   const preferredPrefixes = disclosureLevel === "deep"
-    ? ["Tension interna disponible", "Lo que podria empeorar"]
+    ? ["Tension interna disponible", "Lo que podria empeorar si esto continua"]
     : disclosureLevel === "developing"
-    ? ["Forma habitual de protegerse"]
+    ? ["Forma habitual de protegerse o vincularse"]
     : [];
 
   const preferred = preferredPrefixes
@@ -312,19 +307,6 @@ function selectNarrativeByDepth({ available, history, disclosureLevel, fallback,
     .filter((line) => line && !wasAlreadyMentioned(line, history));
 
   return pickVariant(fresh.length ? fresh : sourceLines.map(naturalizeFact).filter(Boolean), turnSeed);
-}
-
-function timelineResponse({ timeline, fallback, turnSeed }) {
-  if (!Array.isArray(timeline) || !timeline.length) return fallback || null;
-  const item = timeline[Math.min(timeline.length - 1, Math.abs(turnSeed) % timeline.length)];
-  const event = cleanString(item?.event);
-  const meaning = cleanString(item?.meaning);
-  if (!event) return fallback || null;
-  return meaning ? `${event} ${meaning}` : event;
-}
-
-function selectInitialDisclosure(available, history) {
-  return selectAvailableFact(available, history, ["mis ", "estoy ", "me ", "vine ", "dicen "]);
 }
 
 function selectAvailableFact(available = [], history = [], cues = []) {
@@ -351,34 +333,11 @@ function naturalizeFact(fact = "") {
     .trim();
 }
 
-function pickShortFact(text = "") {
-  const clean = cleanString(text);
-  if (!clean) return "";
-  const sentences = clean.split(/(?<=[.!?])\s+/).filter(Boolean);
-  return sentences.slice(0, 2).join(" ").trim() || clean;
-}
-
-function pickCanonical(values = [], seed = 0) {
-  const candidates = values.map(cleanString).filter(Boolean);
-  return pickVariant(candidates, seed);
-}
-
 function pickVariant(values = [], seed = 0) {
   const candidates = values.filter(Boolean);
   if (!candidates.length) return "";
   const index = Math.abs(Number(seed) || 0) % candidates.length;
   return candidates[index];
-}
-
-function joinNatural(first, second) {
-  const left = cleanString(first);
-  const right = cleanString(second);
-  if (!left) return right;
-  if (!right) return left;
-  const normalizedLeft = normalizeNarrativeText(left);
-  const normalizedRight = normalizeNarrativeText(right);
-  if (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)) return left;
-  return `${left} ${right}`;
 }
 
 function wasAlreadyMentioned(fact, history = []) {

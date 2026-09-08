@@ -9525,3 +9525,9 @@ body,
     min-height: 140px;
   }
 }
+
+/* The optional case portrait is a still image, without video controls. */
+.portrait-session .avatar-stage-portrait { animation: none !important; }
+.portrait-session .video-patient-stage { min-height: 260px; }
+.portrait-session .video-session-status { flex-wrap: wrap; gap: 0.5rem; }
+.progress-wrap > small { display: block; margin-top: 0.5rem; line-height: 1.4; }

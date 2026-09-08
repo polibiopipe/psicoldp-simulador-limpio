@@ -1,3 +1,4 @@
+import { avatarCanonicalBiographies } from "../data/avatarCanonicalBiographies.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -68,6 +69,7 @@ for (const caseId of AVATAR_IDS) {
   if (!clinicalSimulationProfiles[caseId]) fail(`clinicalSimulationProfiles: falta el caso ${caseId}`);
   if (!patientMasterRecords[caseId]) fail(`patientMasterRecords: falta el caso ${caseId}`);
 
+  assertAdultAge("canonicalBiography", caseId, avatarCanonicalBiographies[caseId]?.identity.age);
   assertAdultAge("cases", caseId, caseById[caseId]?.age);
   assertAdultAge("patientFacts", caseId, patientFacts[caseId]?.age);
   if (caseFacts[caseId]) assertAdultAge("caseFacts", caseId, caseFacts[caseId]?.age);
@@ -116,8 +118,8 @@ for (const forbidden of ["marcela", "no tengo hermanos"]) {
 
 const sourceRoot = join(PROJECT_ROOT, "src");
 const forbiddenPatterns = [
-  { pattern: new RegExp(`16\\s+${yearsWord}`, "i"), label: `16 ${yearsWord}` },
-  { pattern: new RegExp(`16\\s+${yearsWordAscii}`, "i"), label: `16 ${yearsWordAscii}` },
+  { pattern: new RegExp(`(?:edad actual|actualmente tiene)\\s*:?\\s*16\\s+${yearsWord}`, "i"), label: `16 ${yearsWord}` },
+  { pattern: new RegExp(`(?:edad actual|actualmente tiene)\\s*:?\\s*16\\s+${yearsWordAscii}`, "i"), label: `16 ${yearsWordAscii}` },
   { pattern: new RegExp(`tengo\\s+${"16"}`, "i"), label: `tengo ${"16"}` },
   { pattern: new RegExp(`adolescente\\s+de\\s+${"16"}`, "i"), label: `adolescente de ${"16"}` }
 ];

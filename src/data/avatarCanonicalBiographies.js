@@ -1,3 +1,4 @@
+import { patientConversationLines } from "./patientConversationLines.js";
 const PATIENT_IDS = [
   "tomas",
   "valentina",
@@ -951,6 +952,10 @@ const FACT_PATHS = {
 function makeCanonicalBiography(id, biography) {
   const directAnswers = {
     ...buildDirectAnswers(biography),
+    ...Object.fromEntries(Object.entries(patientConversationLines[id] || {})
+      .filter(([key]) => !["relationalPattern", "internalConflict", "stakes", "openingReason"].includes(key))
+      .map(([key, text]) => [key, [text]])),
+    reason: [patientConversationLines[id].openingReason],
     ...(biography.directAnswers || {})
   };
 
@@ -972,7 +977,7 @@ function buildDirectAnswers(bio) {
   const health = bio.health || {};
   const consultation = bio.consultation || {};
   const isStudying = Boolean(education.program && !/^no cursa/i.test(education.status || ""));
-  const hasWork = Boolean(employment.role && !/^sin empleo/i.test(employment.status || ""));
+  const hasWork = Boolean(employment.role && !/^(sin empleo|jubilad)/i.test(employment.status || ""));
 
   return {
     fullName: [`Me llamo ${identity.fullName}.`],
@@ -980,17 +985,21 @@ function buildDirectAnswers(bio) {
     age: [`Tengo ${identity.age} anos.`],
     birthDate: [`Naci el ${formatBirthDate(identity.birthDate)}.`],
     location: [`Vivo en ${identity.commune || identity.city}${identity.commune && identity.city && identity.commune !== identity.city ? `, ${identity.city}` : ""}.`],
-    household: [`Vivo con ${joinPeople(identity.livingWith)}.`],
+    household: [identity.livingWith?.[0]?.startsWith("vive ")
+      ? `${capitalize(identity.livingWith[0].replace(/^vive /, "vivo "))}.`
+      : `Vivo con ${joinPeople(identity.livingWith)}.`],
     studies: [isStudying ? `Estudio ${education.program}.` : `Ahora no estudio formalmente. ${hasWork ? `Trabajo como ${lowerFirst(employment.role)}.` : "Mi ocupacion principal es otra en este momento."}`],
     institution: [isStudying ? `Estudio en ${education.institution}${education.campus ? `, en el campus de ${education.campus}` : ""}.` : "No estoy estudiando actualmente."],
     program: [isStudying ? `Estudio ${education.program}.` : "No estoy cursando una carrera actualmente."],
     academicYear: [isStudying ? `${capitalize(education.year || "Estoy estudiando")}${education.semester ? `, ${education.semester}` : ""}.` : "No estoy cursando estudios actualmente."],
     courses: [education.courses?.length ? `Este periodo tengo ${joinList(education.courses.slice(0, 5))}${education.courses.length > 5 ? ", entre otros" : ""}.` : "No tengo ramos actuales definidos porque no estoy estudiando ahora."],
-    work: [hasWork ? `Trabajo como ${lowerFirst(employment.role)}${employment.employer ? ` en ${employment.employer}` : ""}.` : employment.role ? `No tengo empleo formal; mi ocupacion principal es ${lowerFirst(employment.role)}.` : "No trabajo formalmente ahora."],
+    work: [/^jubilad/i.test(employment.status || "")
+      ? `Estoy jubilado. Antes trabajaba como ${lowerFirst(employment.role).replace(/^ex /, "")}${employment.employer ? ` en ${employment.employer}` : ""}.`
+      : hasWork ? `Trabajo como ${lowerFirst(employment.role)}${employment.employer ? ` en ${employment.employer}` : ""}.` : employment.role ? `No tengo empleo formal; mi ocupacion principal es ${lowerFirst(employment.role)}.` : "No trabajo formalmente ahora."],
     family: [`Mi familia cercana incluye ${summarizeFamily(family)}.`],
-    relationship: [relationships.relationshipStatus || "No estoy en pareja ahora."],
-    children: [family.children?.length ? `Si, tengo ${joinPeople(family.children.map((child) => child.name ? `${child.name}, ${child.role}` : child.role))}.` : "No tengo hijos."],
-    siblings: [family.siblings?.length ? `Tengo ${joinPeople(family.siblings.map((sibling) => sibling.name ? `${sibling.name}, ${sibling.role}` : sibling.role))}.` : "No tengo hermanos."],
+    relationship: [patientRelationship(relationships.relationshipStatus)],
+    children: [family.children?.length ? `Si, tengo ${family.children.length === 1 ? (/hija/i.test(family.children[0].role) ? "una hija" : "un hijo") : `${family.children.length} hijos`}: ${joinPeople(family.children.map((child) => child.name ? `${child.name}, ${child.role}` : child.role))}.` : "No tengo hijos."],
+    siblings: [family.siblings?.length ? `Tengo ${family.siblings.length === 1 ? (/hermana/i.test(family.siblings[0].role) ? "una hermana" : "un hermano") : `${family.siblings.length} hermanos`}: ${joinPeople(family.siblings.map((sibling) => sibling.name ? `${sibling.name}, ${sibling.role}` : sibling.role))}.` : "No tengo hermanos."],
     friends: [relationships.supportNetwork?.length ? `Cuento con ${joinPeople(relationships.supportNetwork)}.` : "Tengo algunas personas cerca, aunque no siempre me resulta facil pedir apoyo."],
     routine: [daily.weekdayRoutine || "Mi rutina de semana es bastante marcada."],
     weekend: [daily.weekendRoutine || "Los fines de semana intento descansar y ordenar pendientes."],
@@ -1003,11 +1012,33 @@ function buildDirectAnswers(bio) {
     socialMedia: [interests.socialMedia?.length ? `Uso ${joinList(interests.socialMedia)}.` : interests.technologyUse || "Uso tecnologia de forma cotidiana."],
     health: [health.physicalConditions?.length ? `En salud fisica, tengo ${joinList(health.physicalConditions)}.` : "No tengo enfermedades cronicas conocidas."],
     medication: [health.medications?.length ? `Uso ${joinList(health.medications)}.` : "No tomo medicamentos de forma regular."],
-    therapyHistory: [health.priorPsychologicalSupport || "No he tenido apoyo psicologico previo relevante."],
-    substanceUse: [`Alcohol: ${health.substanceUse?.alcohol || "no definido"}. Tabaco: ${health.substanceUse?.tobacco || "no definido"}. Otras sustancias: ${health.substanceUse?.other || "no definido"}.`],
+    therapyHistory: [patientTherapyHistory(health.priorPsychologicalSupport)],
+    substanceUse: [patientSubstanceUse(health.substanceUse)],
     expectation: [consultation.expectations || "Espero poder ordenar lo que me esta pasando."],
     reason: [consultation.immediateReason || consultation.recentEvent || "Vine porque hay algo que me esta costando ordenar."]
   };
+}
+
+function patientRelationship(status = "") {
+  if (status.startsWith("en pareja con ")) return `Estoy ${status}.`;
+  if (status.includes("termino una relacion")) return "Ahora no estoy en pareja. Terminé una relación de un año y medio hace seis meses, por falta de tiempo y desgaste.";
+  return "No estoy en pareja actualmente.";
+}
+
+function patientTherapyHistory(history = "") {
+  if (history.startsWith("a los 16")) return "A los 16 años fui a tres sesiones de orientación escolar por ansiedad ante las evaluaciones. No tuve un diagnóstico clínico.";
+  if (history.startsWith("una entrevista escolar")) return "Tuve una entrevista escolar breve en segundo medio porque participaba poco.";
+  if (!history || history.startsWith("no registra")) return "No he tenido apoyo psicológico previo relevante.";
+  return history;
+}
+
+function patientSubstanceUse(substances = {}) {
+  const alcohol = substances.alcohol === "no consume" ? "No tomo alcohol."
+    : substances.alcohol === "social, una o dos veces al mes" ? "Tomo alcohol en reuniones, una o dos veces al mes."
+    : substances.alcohol === "social u ocasional" ? "Tomo alcohol socialmente, de vez en cuando." : "No tengo definido ese antecedente sobre alcohol.";
+  const tobacco = substances.tobacco === "no fuma" ? "No fumo." : "No tengo definido ese antecedente sobre tabaco.";
+  const other = substances.other === "no consume otras sustancias" ? "No consumo otras sustancias." : "No tengo definido ese antecedente sobre otras sustancias.";
+  return `${alcohol} ${tobacco} ${other}`;
 }
 
 function makeWorkingAdult(input) {
@@ -1050,7 +1081,7 @@ function makeAdultProfile(input) {
   const partner = input.partner || null;
   const children = input.children || [];
   const educationStatus = input.educationStatus || "no cursa estudios actuales";
-  const workStatus = input.workStatus || input.employer ? "trabaja actualmente" : "sin empleo formal";
+  const workStatus = input.workStatus || (input.employer ? "trabaja actualmente" : "sin empleo formal");
 
   return {
     identity: {
@@ -1163,7 +1194,7 @@ function summarizeFamily(family = {}) {
     family.partner ? `${family.partner.name}, pareja` : "",
     ...(family.children || []).map((person) => `${person.name}, ${person.role}`)
   ].filter(Boolean);
-  return joinPeople(people);
+  return joinList(people);
 }
 
 function formatBirthDate(value) {

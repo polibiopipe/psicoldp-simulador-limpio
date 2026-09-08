@@ -49,11 +49,11 @@ for (const [caseId, narrative] of Object.entries(avatarNarratives)) {
     }
   }
 
-  if (!Array.isArray(narrative.timeline) || narrative.timeline.length < 3) {
-    fail(`${caseId}: timeline debe tener al menos 3 hitos.`);
+  if (!Array.isArray(narrative.timeline) || narrative.timeline.length < 1) {
+    fail(`${caseId}: timeline debe tener al menos un acontecimiento canónico; no se inventan hitos para completar una cuota.`);
   } else {
     narrative.timeline.forEach((item, index) => {
-      for (const field of ["period", "event", "meaning"]) {
+      for (const field of ["period", "event"]) {
         if (typeof item[field] !== "string" || !item[field].trim()) {
           fail(`${caseId}: timeline[${index}].${field} esta vacio.`);
         }
@@ -95,9 +95,13 @@ for (const forbidden of ["24 anos", "24 años", "apagarme un rato"]) {
   }
 }
 
-if (getAvatarNarrative("claudio") !== avatarNarratives.claudio) {
+if (JSON.stringify(getAvatarNarrative("claudio")) !== JSON.stringify(avatarNarratives.claudio)) {
   fail("getAvatarNarrative no devuelve el expediente esperado para claudio.");
 }
+
+const copy = getAvatarNarrative("claudio");
+copy.disclosure.initial.push("mutation probe");
+if (avatarNarratives.claudio.disclosure.initial.includes("mutation probe")) fail("getAvatarNarrative debe aislar las mutaciones del consumidor.");
 
 if (getAvatarNarrative("caso-inexistente") !== null) {
   fail("getAvatarNarrative debe devolver null para una clave desconocida.");

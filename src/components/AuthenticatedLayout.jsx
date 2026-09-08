@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import {
   BarChart3,
   CalendarClock,
@@ -26,6 +26,7 @@ export function AuthenticatedLayout({
   userEmail,
   isLocalMode = false,
   hasEvaluation = false,
+  isBusy = false,
   onNavigate,
   onSignOut
 }) {
@@ -42,7 +43,7 @@ export function AuthenticatedLayout({
         <nav className="workspace-nav">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isDisabled = item.id === "results" && !hasEvaluation;
+            const isDisabled = isBusy || (item.id === "results" && !hasEvaluation);
             const isActive = currentScreen === item.id;
             return (
               <button
@@ -51,6 +52,7 @@ export function AuthenticatedLayout({
                 type="button"
                 onClick={() => onNavigate(item.id)}
                 disabled={isDisabled}
+                aria-current={isActive ? "page" : undefined}
               >
                 <Icon aria-hidden="true" />
                 {item.label}
@@ -74,7 +76,7 @@ export function AuthenticatedLayout({
           <div className="workspace-user">
             <span>{userLabel}</span>
             {!isLocalMode && (
-              <button className="workspace-signout" type="button" onClick={onSignOut}>
+              <button className="workspace-signout" type="button" disabled={isBusy} onClick={onSignOut}>
                 <LogOut aria-hidden="true" />
                 Cerrar sesion
               </button>
@@ -82,7 +84,11 @@ export function AuthenticatedLayout({
           </div>
         </header>
 
-        <div className="workspace-content">{children}</div>
+        <div className="workspace-content">
+          <Suspense fallback={<div className="screen" role="status">Cargando esta sección…</div>}>
+            {children}
+          </Suspense>
+        </div>
       </section>
     </div>
   );

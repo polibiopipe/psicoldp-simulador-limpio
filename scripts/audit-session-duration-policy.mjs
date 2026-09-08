@@ -106,7 +106,6 @@ const timeMetrics = buildSessionUsageMetrics({
 assert.equal(timeMetrics.elapsedSeconds, 45 * 60, "el tiempo máximo se registra en 45 minutos aunque el cierre se confirme después");
 
 const simulationChatSource = readFileSync(resolve(process.cwd(), "src/components/SimulationChat.jsx"), "utf8");
-const avatarViewSource = readFileSync(resolve(process.cwd(), "src/components/AvatarSessionView.jsx"), "utf8");
 const endpointSource = readFileSync(resolve(process.cwd(), "api/gemini-patient-response.js"), "utf8");
 const appSource = readFileSync(resolve(process.cwd(), "src/App.jsx"), "utf8");
 const sessionHistorySource = readFileSync(resolve(process.cwd(), "src/engine/sessionHistory.js"), "utf8");
@@ -116,7 +115,7 @@ assert.match(simulationChatSource, /Puedes continuar mientras quede tiempo/, "24
 assert.match(simulationChatSource, /Quedan 10 minutos\./, "se conserva la advertencia del minuto 35");
 assert.match(simulationChatSource, /Quedan 5 minutos\./, "se conserva la advertencia del minuto 40");
 assert.match(simulationChatSource, /Queda 1 minuto\./, "se conserva la advertencia del minuto 44");
-assert.match(avatarViewSource, /sessionStartedAt/, "el reloj visual usa el inicio persistido al retomar");
+assert.match(simulationChatSource, /sessionUsage\?\.startedAt/, "el reloj del chat usa el inicio persistido al retomar");
 assert.match(endpointSource, /countCompletedStudentTurns\(sessionRecord\.conversation \|\| \[\]\) >= MAX_STUDENT_TURNS/, "el endpoint respeta el tope técnico de 60");
 assert.match(appSource, /endReason/, "App conserva el motivo de término hasta guardar la sesión");
 assert.match(appSource, /endedAt/, "App conserva la hora real de término hasta guardar la sesión");

@@ -140,7 +140,9 @@ check("sesion 3 puede habilitar deep con continuidad minima", () => {
 });
 
 check("boundaries siempre se incluyen", () => {
-  const context = getNarrativeDisclosureContext({ patientId: "tomas", currentUserMessage: "Hola" });
+  const initial = getNarrativeDisclosureContext({ patientId: "tomas", currentUserMessage: "Hola" });
+  assert.equal(initial.availableTimeline.length, 0, "los hitos contextuales se reservan al comenzar");
+  const context = getNarrativeDisclosureContext({ patientId: "tomas", sessionNumber: 2, currentUserMessage: "Hola" });
   assert.ok(context.internalGuidance.boundaries.length > 0);
   assertContainsAny(
     JSON.stringify(context.internalGuidance.boundaries),
@@ -163,7 +165,9 @@ check("contexto no contiene contenido de niveles bloqueados", () => {
 });
 
 check("objeto retornado no muta avatarNarratives", () => {
-  const context = getNarrativeDisclosureContext({ patientId: "tomas", currentUserMessage: "Hola" });
+  const initial = getNarrativeDisclosureContext({ patientId: "tomas", currentUserMessage: "Hola" });
+  assert.equal(initial.availableTimeline.length, 0, "los hitos contextuales se reservan al comenzar");
+  const context = getNarrativeDisclosureContext({ patientId: "tomas", sessionNumber: 2, currentUserMessage: "Hola" });
   const originalInitial = avatarNarratives.tomas.disclosure.initial[0];
   const originalBoundary = avatarNarratives.tomas.narrativeBoundaries[0];
   context.availableFacts[0] = "MUTADO";

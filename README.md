@@ -1,147 +1,44 @@
-# Escucha Viva · Simuladores formativos
+# Escucha Viva · Entrevista psicológica formativa
 
-Escucha Viva es una plataforma de simuladores formativos, iniciativa de Nucleo Vivo. Su modulo Entrevista Psicologica Formativa permite practicar un proceso de cuatro sesiones con pacientes virtuales ficticios y recibir retroalimentacion orientada al aprendizaje.
+Plataforma educativa de Núcleo Vivo con 15 pacientes ficticios adultos. Permite preparar, agendar y practicar entrevistas, completar un cierre y revisar retroalimentación con evidencia de las intervenciones. El proceso admite entre 1 y 12 sesiones planificadas; cada entrevista dispone de 45 minutos y un máximo técnico de 60 intervenciones. El tiempo continúa al cerrar o recargar la página.
 
-Este simulador tiene fines exclusivamente educativos. No reemplaza atencion psicologica real, no realiza diagnosticos definitivos, no entrega tratamiento clinico y no debe usarse con datos reales de pacientes.
+La entrevista es por texto, con dictado opcional del navegador y un retrato estático. Los indicadores de tiempo y uso no representan competencia clínica. La retroalimentación y los puntajes son orientativos: no constituyen un instrumento validado ni reemplazan la revisión docente. No introducir datos de pacientes reales.
 
-## Version 2
+## Arquitectura actual
 
-La V2 amplia el prototipo inicial con:
+- React 19 y Vite para la interfaz; las pantallas y el motor de respuestas se cargan según se necesitan.
+- Supabase Auth y aprobación manual para acceder a la versión publicada; sesiones, agenda y perfiles protegidos por sus políticas de acceso.
+- `api/gemini-patient-response.js`: función de Vercel que valida la cuenta, la sesión, la duración y la intervención antes de solicitar una respuesta a Gemini. Conserva reintentos idempotentes y respaldo local.
+- `src/utils/responseEngine.js`: cliente de la función y manejo de errores recuperables.
+- `src/data/avatarCanonicalBiographies.js`: identidad y hechos de los 15 casos. `patientConversationLines.js` expresa los mismos hechos en primera persona.
+- `src/engine/narrativeDisclosure.js`: selector compartido de revelación inicial, contextual y profunda. Los antecedentes íntimos no se incluyen anticipadamente en el contexto del modelo.
+- `src/utils/patientResponseValidation.js`: validación compartida que admite respuestas breves completas y detecta señales de truncamiento.
+- `src/engine/sessionHistory.js`: registros de práctica y versión de medición; `src/engine/researchStatistics.js`: indicadores y exportación.
 
-- Cinco casos ficticios: Tomas, Valentina, Marcos, Elena y Nicolas.
-- Selector de caso y selector de dificultad.
-- Motor de respuestas por reglas con memoria basica de la conversacion.
-- Perfiles narrativos profundos para cada paciente ficticio.
-- Calculo local de confianza/apertura del paciente de 0 a 100.
-- Deteccion de encuadre, preguntas abiertas/cerradas, validacion, juicios, consejos apresurados, exploracion contextual y cierre.
-- Pacientes ficticios con estilos comunicacionales diferenciados.
-- Barra de progreso, contador de turnos y reinicio de simulacion.
-- Retroalimentacion educativa con niveles de logro:
-  - Logrado.
-  - Parcialmente logrado.
-  - Requiere mejorar.
-  - No observado.
-- Resultados compartibles por correo usando `mailto:`.
-- Copia de resultados al portapapeles.
-- Descarga de resultados en `.txt`.
-- Interfaz responsiva para computador y celular.
+## Progreso e investigación
 
-## Estructura
+Estadísticas utiliza los registros de la cuenta para mostrar actividad, cierres y medidas formativas, con descarga CSV. El módulo personal funciona independientemente de la configuración de investigación.
 
-```text
-src/
-  App.jsx
-  main.jsx
-  styles.css
-  data/
-    cases.js
-    caseFacts.js
-    patientProfiles.js
-    rubrics.js
-    responseEngine.js
-    responseBank.js
-    responseProfiles.js
-  engine/
-    analyzeIntent.js
-    conversationState.js
-    responsePlanner.js
-    responseGenerator.js
-    mockAiEngine.js
-  components/
-    Home.jsx
-    CaseSelector.jsx
-    CaseBrief.jsx
-    SimulationChat.jsx
-    PatientCard.jsx
-    FeedbackPanel.jsx
-    ResultsSummary.jsx
-    EmailShare.jsx
-    ProgressBar.jsx
-    EthicalNotice.jsx
-  utils/
-    scoring.js
-    textUtils.js
-    analyzeStudentInput.js
-    responseEngine.js
-    conversationAnalysis.js
-    exportResults.js
-```
+La instalación opcional de investigación se describe en [docs/research-statistics.md](docs/research-statistics.md). La migración mantiene el estudio desactivado y no asigna investigadores. No activar ni recopilar información para una tesis sin definir el protocolo, los permisos y el consentimiento correspondiente.
 
-## Motor de respuestas local
+## Comprobaciones
 
-El motor no usa IA externa, Firebase ni Supabase. La version actual funciona como una pseudo API local:
-
-```text
-mensaje del estudiante
-  -> analyzeIntent.js
-  -> patientProfiles.js + caseFacts.js
-  -> conversationState.js
-  -> responsePlanner.js
-  -> responseGenerator.js
-  -> mockAiEngine.js
-```
-
-`src/engine/mockAiEngine.js` expone:
-
-```js
-generatePatientResponse({
-  caseId,
-  studentMessage,
-  conversationHistory,
-  conversationState,
-  difficulty
-});
-```
-
-Devuelve `responseText`, `detectedIntent`, `directAnswer`, `emotionalTone`, `opennessLevel` y `updatedState`. Esta forma permite reemplazar mas adelante la generacion local por una API real sin redisenar los componentes.
-
-El motor funciona con reglas locales editables:
-
-1. `src/data/patientProfiles.js` define el prompt interno de cada paciente: identidad, motivo explicito, preocupacion oculta, forma de hablar, temas que lo abren o cierran y limites eticos.
-2. `src/data/caseFacts.js` contiene datos concretos para responder nombre, edad, estudios, trabajo, vivienda, familia, pares, videojuegos y motivo de consulta.
-3. `src/engine/analyzeIntent.js` clasifica el mensaje con prioridad: saludo, nombre, edad, motivo de consulta, preguntas concretas y luego exploraciones mas amplias.
-4. `src/engine/conversationState.js` registra turnos, temas explorados, validacion, juicios, consejos apresurados, respuestas usadas y nivel de apertura.
-5. `src/engine/responsePlanner.js` decide la estructura `respuesta directa + ampliacion contextual + matiz emocional`.
-6. `src/engine/responseGenerator.js` compone la respuesta final segun apertura baja, media o alta.
-7. `src/utils/responseEngine.js` queda como adaptador compatible con React.
-8. `src/utils/scoring.js` usa los patrones de la conversacion para generar retroalimentacion formativa.
-
-### Ejemplos de prueba del motor
-
-Pregunta:
-
-```text
-Tomas, que lugar tienen los videojuegos para ti cuando te sientes solo?
-```
-
-Respuesta esperada en tono:
-
-```text
-No se si es soledad exactamente... pero cuando juego no tengo que estar pensando si caigo bien o mal. Ahi se que hacer. Afuera me cuesta mas, como que todo se siente mas incomodo.
-```
-
-Pregunta:
-
-```text
-Valentina, que pasa cuando intentas descansar?
-```
-
-Respuesta esperada en tono:
-
-```text
-Me cuesta. Puedo estar acostada, pero mi cabeza sigue haciendo listas. Y si descanso mucho rato, aparece esa sensacion de que estoy perdiendo tiempo o que deberia estar avanzando en algo.
-```
-
-Pregunta:
-
-```text
-Marcos, como llegas a tu casa despues del trabajo?
-```
-
-Respuesta esperada en tono:
-
-```text
-Llego apagado. A veces mi pareja me habla y yo respondo corto, no porque no me importe, sino porque siento que ya no me queda paciencia. Despues me da culpa, pero en el momento solo quiero silencio.
+```bash
+npm run audit:coherence
+npm run audit:encoding
+npm run audit:feedback
+npm run audit:session-expiration
+npm run audit:session-resume-auth
+npm run audit:session-duration-policy
+npm run audit:adult-avatars
+npm run audit:clinical-all
+npm run audit:phase3a-safety
+node scripts/audit-avatar-canonical-biographies.mjs
+node scripts/audit-narrative-disclosure.mjs
+node scripts/audit-local-narrative-integration.mjs
+node scripts/audit-avatar-conversation-scenarios.mjs
+node scripts/audit-research-statistics.mjs
+npm run build
 ```
 
 ## Requisitos
@@ -152,7 +49,7 @@ Llego apagado. A veces mi pareja me habla y yo respondo corto, no porque no me i
 ## Instalacion
 
 ```bash
-npm install
+npm ci
 ```
 
 ## Desarrollo local
@@ -174,8 +71,7 @@ La aplicacion exige dos validaciones cuando Supabase esta configurado:
 1. Confirmacion del correo mediante Supabase Auth.
 2. Aprobacion manual del perfil en `public.user_profiles`.
 
-Antes de desplegar esta version, ejecuta el archivo
-`supabase/simulation_sessions.sql` completo en Supabase SQL Editor. El script:
+Para una instalación nueva, revisa `supabase/simulation_sessions.sql` en Supabase SQL Editor. En una instalación existente, compara las migraciones aplicadas antes de ejecutar SQL: este archivo restablece las aprobaciones existentes. El script:
 
 - crea perfiles pendientes automaticamente al registrar usuarios;
 - protege la lectura del perfil con RLS;
@@ -245,7 +141,15 @@ dist/
 npm run preview
 ```
 
-## Despliegue en Netlify
+## Despliegue actual en Vercel
+
+El proyecto utiliza la integración GitHub–Vercel. El build genera `dist/` y las funciones se encuentran en `api/`.
+
+Configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` para el cliente. Las claves `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` y cualquier secreto de correo pertenecen solo al servidor, nunca al prefijo `VITE_`. `GEMINI_MODEL` permite seleccionar el modelo; el valor por defecto del servidor es `gemini-2.5-flash`.
+
+Publicar únicamente `dist/` en un hosting estático no instala las funciones ni configura Supabase. La comprobación de una versión debe incluir autenticación, respuestas y persistencia con una cuenta autorizada.
+
+## Integración alternativa existente en Netlify
 
 Opcion recomendada desde GitHub:
 
@@ -266,11 +170,12 @@ despliegue conectado a Git o mediante Netlify CLI para incluir la Function.
 
 ## Dependencias
 
-No se agregaron dependencias nuevas en la V2. El proyecto mantiene:
+El proyecto utiliza:
 
 - React y React DOM para la interfaz.
 - Vite para desarrollo/build.
 - lucide-react para iconos de interfaz.
+- Supabase JS para autenticación y persistencia.
 
 ## Limites eticos
 

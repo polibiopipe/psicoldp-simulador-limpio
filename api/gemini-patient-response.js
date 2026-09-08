@@ -1,3 +1,4 @@
+import { isIncompletePatientResponse as isIncompleteGeminiResponse } from "../src/utils/patientResponseValidation.js";
 import { cases } from "../src/data/cases.js";
 import { patientFacts } from "../src/data/patientFacts.js";
 import { patientMasterRecords } from "../src/data/patients/index.js";
@@ -18,35 +19,6 @@ const DEFAULT_MODEL = "gemini-2.5-flash";
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const MAX_HISTORY_TURNS = MAX_CONTEXT_TURNS;
 const MAX_REQUEST_BODY_CHARS = 24000;
-const INVALID_FINAL_WORDS = new Set([
-  "a",
-  "al",
-  "de",
-  "del",
-  "en",
-  "con",
-  "por",
-  "para",
-  "un",
-  "una",
-  "el",
-  "la",
-  "los",
-  "las",
-  "lo",
-  "que",
-  "como",
-  "cuando",
-  "porque",
-  "pero",
-  "aunque",
-  "desde",
-  "hacia",
-  "sobre",
-  "entre",
-  "unos",
-  "unas"
-]);
 
 export default async function handler(req, res) {
   applyHeaders(res, corsHeaders());
@@ -133,8 +105,11 @@ export default async function handler(req, res) {
     return;
   }
 
+  const storedHistory = usageValidation.sessionRecord?.conversation;
+  const fullHistory = Array.isArray(storedHistory) && storedHistory.length >= (payload.conversationHistory?.length || 0)
+    ? storedHistory : payload.conversationHistory;
   const localFallback = (fallbackReason) => localFallbackResponse({
-    payload,
+    payload: { ...payload, conversationHistory: fullHistory },
     caseId,
     studentMessage,
     fallbackReason
@@ -182,7 +157,7 @@ export default async function handler(req, res) {
     ),
     sessionNumber: toSafeNumber(payload.sessionNumber) || null
   });
-  const recentHistory = normalizeHistory(payload.conversationHistory);
+  const recentHistory = normalizeHistory(fullHistory);
   const sessionContext = {
     sessionNumber: toSafeNumber(payload.sessionNumber) || null,
     stage: cleanText(payload.interviewStage || payload.sessionStage, 160),
@@ -192,7 +167,7 @@ export default async function handler(req, res) {
   const narrativeContext = getNarrativeDisclosureContext({
     patientId: caseId,
     sessionNumber: sessionContext.sessionNumber,
-    conversationHistory: payload.conversationHistory,
+    conversationHistory: fullHistory,
     currentUserMessage: studentMessage
   });
   console.info("[gemini] narrative context", {
@@ -626,13 +601,36 @@ function buildSystemInstruction() {
   ].join("\n");
 }
 
-function buildUserPrompt({ caseContext, narrativeContext, recentHistory, sessionContext, studentMessage }) {
+export function buildUserPrompt({ caseContext, narrativeContext, recentHistory, sessionContext, studentMessage }) {
+  // Only the disclosure selector may supply intimate narrative material.
+  // Legacy master records contain hidden conflicts even in the first session.
+  const biography = caseContext.canonicalBiography || {};
+  const { concerns, immediateReason, recentEvent, ...consultation } = biography.consultation || {};
+  const { currentConflicts, ...relationships } = biography.relationships || {};
+  const { emotionalClimate, familyRole, ...family } = biography.family || {};
+  const deep = narrativeContext?.disclosureLevel === "deep";
+  const developing = deep || narrativeContext?.disclosureLevel === "developing";
+  const profile = caseContext.minimumClinicalProfile || {};
+  const safeBiography = {
+    ...biography,
+    family: deep ? biography.family : family,
+    consultation: deep ? biography.consultation : developing
+      ? { ...consultation, immediateReason, recentEvent } : consultation,
+    relationships: developing ? biography.relationships : relationships
+  };
   return [
     "EXPEDIENTE Y CONTEXTO DEL PACIENTE SIMULADO:",
-    safeJson(caseContext),
+    safeJson({
+      caseId: caseContext.caseId,
+      name: profile.name,
+      age: profile.age,
+      communicationStyle: profile.communicationStyle,
+      therapeuticBoundaries: profile.therapeuticBoundaries,
+      riskNotes: profile.riskNotes
+    }),
     "",
     "DATOS BIOGRAFICOS CANONICOS:",
-    safeJson(caseContext.canonicalBiography || null),
+    safeJson(safeBiography),
     "",
     buildNarrativePromptFragment(narrativeContext),
     "",
@@ -884,43 +882,6 @@ function joinTextParts(parts) {
 
 function extractGeminiFinishReason(body) {
   return cleanText(body?.candidates?.[0]?.finishReason || "", 80);
-}
-
-function isIncompleteGeminiResponse(text, finishReason) {
-  const normalizedReason = String(finishReason || "").toUpperCase();
-  if (normalizedReason === "MAX_TOKENS") return true;
-
-  const trimmed = normalizeTerminalText(text);
-  if (!trimmed || trimmed.length < 16) return true;
-
-  const words = trimmed.split(/\s+/).filter(Boolean);
-  if (words.length < 5) return true;
-
-  const hasCompletePunctuation = /(?:[.!?]|\.{3}|…)$/.test(trimmed);
-  const finalWord = getFinalWord(trimmed);
-  const endsWithInvalidWord = INVALID_FINAL_WORDS.has(finalWord);
-
-  if (!hasCompletePunctuation && endsWithInvalidWord) return true;
-  if (!hasCompletePunctuation && words.length < 12) return true;
-  if (!hasCompletePunctuation && trimmed.length < 80) return true;
-
-  return false;
-}
-
-function normalizeTerminalText(text) {
-  return String(text || "")
-    .trim()
-    .replace(/[)"'”’»\]]+$/g, "")
-    .trim();
-}
-
-function getFinalWord(text) {
-  const match = normalizeTerminalText(text)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .match(/[a-zñáéíóúü]+$/i);
-  return match ? match[0] : "";
 }
 
 function sanitizePatientResponse(text) {

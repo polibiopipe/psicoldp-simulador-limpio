@@ -237,6 +237,9 @@ function buildDisclosureContext({ patientId, narrative, disclosureLevel }) {
 
 function selectTimeline(timeline = [], disclosureLevel) {
   if (!Array.isArray(timeline)) return [];
+  if (timeline.every((entry) => LEVEL_ORDER.includes(entry.disclosureLevel))) {
+    return timeline.filter((entry) => LEVEL_ORDER.indexOf(entry.disclosureLevel) <= LEVEL_ORDER.indexOf(disclosureLevel));
+  }
   if (disclosureLevel === "deep") return timeline;
   if (disclosureLevel === "developing") return timeline.slice(0, Math.min(3, timeline.length));
   return timeline.slice(0, Math.min(1, timeline.length));
@@ -245,7 +248,7 @@ function selectTimeline(timeline = [], disclosureLevel) {
 function extractStudentMessages(conversationHistory) {
   if (!Array.isArray(conversationHistory)) return [];
   return conversationHistory
-    .filter((entry) => entry && !entry.isSessionPrelude)
+    .filter((entry) => entry && !entry.isSessionPrelude && (!entry.role || ["student", "user"].includes(entry.role)))
     .map((entry) => {
       if (typeof entry === "string") return extractMessageText(entry);
       return extractMessageText(
