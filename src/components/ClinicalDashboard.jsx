@@ -56,9 +56,10 @@ export function ClinicalDashboard({
 
   return (
     <section className="screen clinical-dashboard">
-      <header className="dashboard-hero">
+      <header className="dashboard-hero scene-dashboard-hero">
+        <img className="dashboard-atmosphere" src="/visuals/espacio-escucha.webp" alt="" width="1672" height="941" decoding="async" />
         <div>
-          <span className="eyebrow">Panel clinico formativo</span>
+          <span className="eyebrow">Panel clínico formativo</span>
           <h1>{firstName ? `Hola, ${firstName}` : "Inicio"}</h1>
           <p>
             Revisa continuidad, pacientes y pendientes antes de iniciar una nueva
