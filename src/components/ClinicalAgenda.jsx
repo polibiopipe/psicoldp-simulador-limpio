@@ -59,6 +59,7 @@ export function ClinicalAgenda({
   cases,
   authSession = null,
   appointments = [],
+  appointmentsStatus = { loading: true, authoritative: false },
   initialCaseId = "",
   initialScheduleRequest = null,
   onBackHome,
@@ -102,8 +103,8 @@ export function ClinicalAgenda({
   const reminderItem = agendaItems.find((item) => item.caseItem.id === reminderCaseId) || null;
   const stats = buildAgendaStats(agendaItems);
   const scheduleAvailability = useMemo(
-    () => availabilityState.authoritative ? availability : emptyAvailability,
-    [availabilityState.authoritative, availability, emptyAvailability]
+    () => availabilityState.authoritative && appointmentsStatus.authoritative && !appointmentsStatus.loading ? availability : emptyAvailability,
+    [availabilityState.authoritative, appointmentsStatus.authoritative, appointmentsStatus.loading, availability, emptyAvailability]
   );
   const weeklyAgenda = useMemo(
     () => calendarView === "mes"
@@ -270,7 +271,7 @@ export function ClinicalAgenda({
     appointmentMutationRef.current = true;
     setAppointmentMutation({ pending: true, error: "", caseId: item.caseItem.id });
     try {
-      const validation = validateAppointmentSchedule({ item, draft: entry, appointments, availability: scheduleAvailability, availabilityStatus: availabilityState, cases });
+      const validation = validateAppointmentSchedule({ item, draft: entry, appointments, appointmentsStatus, availability: scheduleAvailability, availabilityStatus: availabilityState, cases });
       if (!validation.ok) throw new Error(validation.message);
       const existing = findDraftAppointment(item, entry, appointments);
       const baseAppointment = buildAppointmentRecord({
@@ -282,7 +283,7 @@ export function ClinicalAgenda({
       const appointment = existing ? { ...baseAppointment, id: existing.id, createdAt: existing.createdAt } : baseAppointment;
       const result = await saveScheduledAppointment(authSession, appointment, existing?.id);
       const saved = requireConfirmedAppointment(result, "scheduled");
-      onAppointmentsChange?.(mergeAppointmentList(appointments, saved));
+      onAppointmentsChange?.((current) => mergeAppointmentList(current, saved));
       clearScheduleDraft(item.caseItem.id);
       setScheduleCaseId((current) => current === item.caseItem.id ? "" : current);
       refreshAgenda();
@@ -299,12 +300,13 @@ export function ClinicalAgenda({
     appointmentMutationRef.current = true;
     setAppointmentMutation({ pending: true, error: "", caseId: item.caseItem.id });
     try {
+      if (!appointmentsStatus.authoritative || appointmentsStatus.loading) throw new Error("Espera a que se verifiquen tus citas antes de cancelar. Reintenta la carga de agenda si falló.");
       const appointment = findDraftAppointment(item, draft, appointments);
       if (appointment && appointment.status !== "scheduled") throw new Error("Una sesión iniciada o terminada no se puede cancelar desde la agenda.");
       if (appointment?.id) {
         const result = await cancelSimulationAppointment(authSession, appointment.id);
         const cancelled = requireConfirmedAppointment(result, "cancelled");
-        onAppointmentsChange?.(mergeAppointmentList(appointments, cancelled));
+        onAppointmentsChange?.((current) => mergeAppointmentList(current, cancelled));
       } else {
         clearClinicalAgendaEntry(item.caseItem.id);
       }
@@ -427,7 +429,7 @@ export function ClinicalAgenda({
           </div>
         </div>
 
-        <AgendaCalendar
+        {(appointmentsStatus.authoritative || appointments.length > 0) ? <AgendaCalendar
           agenda={weeklyAgenda}
           view={calendarView}
           selectedDate={formatDateInput(calendarDate)}
@@ -444,10 +446,11 @@ export function ClinicalAgenda({
             setSelectedCaseId(item.caseItem.id);
             setScheduleCaseId(item.caseItem.id);
           }}
-        />
+        /> : <p role="status">El calendario se mostrará cuando podamos verificar tus citas.</p>}
 
         <AvailableSlots
           slots={availableSlots}
+          verified={appointmentsStatus.authoritative && !appointmentsStatus.loading && availabilityState.authoritative}
           selectedItem={selectedItem}
           onUseSlot={(slot) => {
             if (!selectedItem) return;
@@ -617,6 +620,7 @@ export function ClinicalAgenda({
           availability={scheduleAvailability}
           availabilityStatus={availabilityState}
           appointments={appointments}
+          appointmentsStatus={appointmentsStatus}
           mutation={{ pending: appointmentMutation.pending, error: appointmentMutation.caseId === scheduleItem.caseItem.id ? appointmentMutation.error : "" }}
           savedDraft={scheduleDrafts[scheduleItem.caseItem.id]}
           termCopy={termCopy}
@@ -1176,14 +1180,14 @@ function AgendaCalendar({ agenda, view, selectedDate, termCopy, onOpenAppointmen
   );
 }
 
-function AvailableSlots({ slots, selectedItem, onUseSlot }) {
+function AvailableSlots({ slots, verified, selectedItem, onUseSlot }) {
   return (
     <aside className="agenda-available-slots">
       <div>
         <span className="eyebrow">Espacios disponibles</span>
         <h3>Semana seleccionada</h3>
       </div>
-      {slots.length ? (
+      {!verified ? <p>Los espacios libres se mostrarán cuando estén verificadas tus citas y tu disponibilidad.</p> : slots.length ? (
         <div className="available-slot-list">
           {slots.map((slot) => (
             <button
@@ -1230,6 +1234,7 @@ function ScheduleEditor({
   availability,
   availabilityStatus,
   appointments = [],
+  appointmentsStatus,
   mutation = {},
   savedDraft,
   termCopy,
@@ -1248,6 +1253,7 @@ function ScheduleEditor({
 
   const validation = validateAppointmentSchedule({
     item,
+    appointmentsStatus,
     draft,
     appointments,
     availability,

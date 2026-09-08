@@ -81,7 +81,10 @@ export function buildAppointmentAvailableSlots({
   return slots.slice(0, limit);
 }
 
-export function validateAppointmentSchedule({ item, draft, appointments = [], availability, availabilityStatus, cases, now = new Date() }) {
+export function validateAppointmentSchedule({ item, draft, appointments = [], appointmentsStatus, availability, availabilityStatus, cases, now = new Date() }) {
+  if (!appointmentsStatus?.authoritative || appointmentsStatus.loading) {
+    return { ok: false, type: "unverified_agenda", message: "La agenda aún no está verificada.", detail: "Espera a que se carguen tus citas o utiliza Reintentar carga de agenda antes de programar." };
+  }
   if (availabilityStatus?.loading || availabilityStatus?.saving) {
     return { ok: false, type: "no_availability", message: "Estamos verificando tu disponibilidad.", detail: "Espera unos segundos antes de programar la sesión." };
   }

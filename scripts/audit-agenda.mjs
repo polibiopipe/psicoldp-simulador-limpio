@@ -44,7 +44,9 @@ assert.equal(draft.reminderNote, "Conservar esta nota", "elegir otro espacio man
 const availability = getEmptyWeeklyAvailability();
 for (const key of Object.keys(availability)) availability[key] = { enabled: true, blocks: [{ start: "09:00", end: "12:00" }] };
 const now = new Date("2026-09-08T13:00:00Z"); // martes, 10:00 en Santiago
-const input = { item, draft, cases, availability, availabilityStatus: { authoritative: true }, now };
+const input = { item, draft, cases, availability, appointmentsStatus: { authoritative: true }, availabilityStatus: { authoritative: true }, now };
+assert.equal(validateAppointmentSchedule({ ...input, appointmentsStatus: { authoritative: false } }).type, "unverified_agenda");
+assert.equal(validateAppointmentSchedule({ ...input, appointmentsStatus: { authoritative: true, loading: true } }).ok, false);
 assert.equal(validateAppointmentSchedule(input).ok, true);
 assert.equal(validateAppointmentSchedule({ ...input, appointments: [next] }).ok, true, "reprogramar la misma cita no se considera duplicación");
 assert.equal(validateAppointmentSchedule({ ...input, appointments: [{ ...next, id: "other", caseId: "otro" }] }).type, "daily_limit");
@@ -71,6 +73,7 @@ globalThis.window = {};
 globalThis.localStorage = { getItem: (key) => cache.get(key), setItem: (key, value) => cache.set(key, value) };
 let row = null;
 let failure = null;
+let incompleteLoad = false;
 globalThis.__agendaTestSupabase = {
   from() {
     let operation;
@@ -82,6 +85,11 @@ globalThis.__agendaTestSupabase = {
       upsert(value) { operation = "upsert"; payload = value; return this; },
       eq(key, value) { filters.push([key, value]); return this; },
       select() { return this; },
+      async order() {
+        if (failure instanceof Error) throw failure;
+        if (failure) return { data: null, error: failure };
+        return { data: incompleteLoad ? null : row ? [row] : [], error: null };
+      },
       async maybeSingle() {
         if (failure instanceof Error) throw failure;
         if (failure) return { data: null, error: failure };
@@ -104,6 +112,16 @@ try {
   });
   const service = await import(pathToFileURL(outfile));
   const auth = { user: { id: "user-1", email: "qa@example.invalid" } };
+  assert.deepEqual(await service.getSimulationAppointments(auth), [], "una agenda vacía confirmada sí es una lista vacía");
+  await assert.rejects(service.getSimulationAppointments(null), /sesión y conexión/);
+  failure = { code: "NETWORK_ERROR", message: "offline" };
+  await assert.rejects(service.getSimulationAppointments(auth), /No pudimos cargar/);
+  failure = new Error("connection lost");
+  await assert.rejects(service.getSimulationAppointments(auth), /connection lost/);
+  failure = null;
+  incompleteLoad = true;
+  await assert.rejects(service.getSimulationAppointments(auth), /incompleta/);
+  incompleteLoad = false;
   const appointment = service.buildAppointmentRecord({ authSession: auth, caseItem, sessionNumber: 2, date: draft.date, time: draft.time });
   failure = { code: "NETWORK_ERROR", message: "offline" };
   assert.equal((await service.saveScheduledAppointment(auth, appointment)).cloudSaved, false);
@@ -111,6 +129,11 @@ try {
   failure = null;
   assert.equal((await service.saveScheduledAppointment(auth, appointment)).cloudSaved, true);
   assert.equal(row.scheduled_for, "2026-09-09T13:00:00.000Z");
+  const confirmedCache = service.getReadOnlyCachedAppointments();
+  failure = { code: "NETWORK_ERROR", message: "offline" };
+  await assert.rejects(service.getSimulationAppointments(auth));
+  assert.deepEqual(service.getReadOnlyCachedAppointments(), confirmedCache, "una carga fallida no vacía la agenda verificada");
+  failure = null;
   assert.equal((await service.saveScheduledAppointment(auth, { ...appointment, scheduledTime: "11:00" }, appointment.id)).cloudSaved, true);
   assert.equal(service.getReadOnlyCachedAppointments()[0].scheduledTime, "11:00", "la caché conserva la versión nueva");
   row = { ...row, status: "in_progress", started_at: "2026-09-09T13:00:00Z" };

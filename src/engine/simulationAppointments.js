@@ -13,7 +13,9 @@ import {
 const LOCAL_APPOINTMENTS_KEY = "escuchaViva.simulationAppointments.v1";
 
 export async function getSimulationAppointments(authSession = null) {
-  if (!isSupabaseConfigured || !supabase || !authSession?.user) return [];
+  if (!isSupabaseConfigured || !supabase || !authSession?.user) {
+    throw new Error("No podemos verificar tus citas sin una sesión y conexión activas.");
+  }
 
   const { data, error } = await supabase
     .from("simulation_appointments")
@@ -24,10 +26,11 @@ export async function getSimulationAppointments(authSession = null) {
   if (error) {
     console.warn("[appointments] load error message", error.message);
     console.warn("[appointments] load error code", error.code || null);
-    return [];
+    throw new Error("No pudimos cargar tus citas. Conservamos la última agenda verificada; reintenta antes de programar.", { cause: error });
   }
 
-  const records = (data || []).map(mapAppointmentRowToRecord);
+  if (!Array.isArray(data)) throw new Error("La respuesta de la agenda está incompleta. Vuelve a cargar tus citas.");
+  const records = data.map(mapAppointmentRowToRecord);
   cacheAppointmentsForReadOnlyDisplay(records);
   return records;
 }
