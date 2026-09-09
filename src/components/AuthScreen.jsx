@@ -214,7 +214,7 @@ export function AuthScreen({ onOpenTrust }) {
 
         <button className="text-action auth-trust-action" type="button" onClick={onOpenTrust}>
           <ShieldCheck aria-hidden="true" />
-          Privacidad y cumplimiento
+          Privacidad y consentimiento
         </button>
       </div>
     </section>

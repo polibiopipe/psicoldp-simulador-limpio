@@ -3883,6 +3883,35 @@ textarea:hover {
   padding-top: clamp(28px, 5vw, 54px);
 }
 
+.consent-panel { min-width: 0; overflow-wrap: anywhere; }
+.consent-panel p, .consent-panel li { line-height: 1.65; }
+.consent-panel h3 { margin-top: 24px; }
+.consent-document section { padding-block: 12px; border-bottom: 1px solid #d9e3e2; }
+.consent-document h4 { margin: 0 0 8px; }
+.consent-document p { white-space: pre-line; margin: 0; }
+.consent-document { margin: 24px 0; }
+.consent-status, .research-invitation { display: flex; align-items: flex-start; gap: 16px; padding: 20px; margin-block: 20px; border: 1px solid #c4deda; border-radius: 18px; background: #edf7f4; }
+.consent-status > svg { flex: 0 0 24px; color: #007c7a; }
+.consent-status p, .research-invitation p { margin: 8px 0 12px; }
+.consent-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+.consent-actions button, .consent-actions a { max-width: 100%; white-space: normal; }
+.consent-form { margin-top: 28px; }
+.consent-form fieldset { min-width: 0; padding: 18px; border: 1px solid #c4deda; border-radius: 16px; }
+.consent-form legend { padding-inline: 8px; font-weight: 750; }
+.consent-choice { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; line-height: 1.6; cursor: pointer; }
+.consent-choice input[type="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; min-height: 0; margin-top: 4px; accent-color: #007c7a; }
+.consent-withdrawal, .consent-history { margin-top: 24px; }
+.consent-error { padding: 14px; border-radius: 12px; background: #fff0ed; color: #802d29; }
+.consent-success { padding: 14px; border-radius: 12px; background: #e5f6ed; color: #185642; }
+.consent-small { font-size: .9rem; color: #536670; }
+.research-invitation { align-items: center; justify-content: space-between; }
+.research-invitation .secondary-action { flex-shrink: 0; }
+@media (max-width: 700px) {
+  .research-invitation { flex-direction: column; align-items: stretch; }
+  .consent-status { padding: 14px; gap: 10px; }
+  .consent-actions > * { width: 100%; }
+}
+
 .trust-back-action {
   width: fit-content;
   margin-bottom: 22px;

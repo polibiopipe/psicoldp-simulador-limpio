@@ -15,7 +15,7 @@ const navItems = [
   { id: "clinicalAgenda", label: "Agenda", icon: CalendarClock },
   { id: "savedSessions", label: "Sesiones", icon: FileText },
   { id: "results", label: "Cierre y evaluación", icon: ClipboardCheck },
-  { id: "trustCenter", label: "Confianza", icon: ShieldCheck }
+  { id: "trustCenter", label: "Consentimiento", icon: ShieldCheck }
 ];
 
 export function AuthenticatedLayout({
