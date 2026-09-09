@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MonitorPlay, RotateCcw, Send, ShieldCheck, SquareCheckBig, TriangleAlert, Users } from "lucide-react";
+import { MonitorPlay, Send, ShieldCheck, SquareCheckBig, TriangleAlert, Users } from "lucide-react";
 import { PatientCard } from "./PatientCard.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
@@ -31,26 +31,23 @@ export function SimulationChat({
   onRestart,
   onStartNewPractice,
   onChangeCase,
-  onOpenTrust
+  onOpenTrust,
+  onBusyChange
 }) {
   const [question, setQuestion] = useState("");
   const [selectedInterventionType, setSelectedInterventionType] = useState("");
   const [showStageSuggestions, setShowStageSuggestions] = useState(false);
-  const [showVideoSession, setShowVideoSession] = useState(() =>
-    typeof window === "undefined" || typeof window.matchMedia !== "function"
-      ? true
-      : window.matchMedia("(min-width: 761px)").matches
-  );
+  const [showVideoSession, setShowVideoSession] = useState(false);
   const [avatarState, setAvatarState] = useState("idle");
   const [validationFeedback, setValidationFeedback] = useState("");
   const [canRetryLastMessage, setCanRetryLastMessage] = useState(false);
   const [failedTurn, setFailedTurn] = useState(null);
   const [clockTick, setClockTick] = useState(0);
+  const sendingRef = useRef(false);
   const conversationRef = useRef(null);
   const previousHistoryLengthRef = useRef(history.length);
   const avatarIdleTimerRef = useRef(null);
   const responseTimerRef = useRef(null);
-  const closeTimerRef = useRef(null);
   const visibleHistory = history.filter(isDisplayableEntry);
   const interviewTurns = visibleHistory.filter((entry) => !entry.isSessionPrelude);
   const usageStartedAt = sessionUsage?.startedAt || "";
@@ -88,7 +85,7 @@ export function SimulationChat({
       top: conversation.scrollHeight,
       behavior: "smooth"
     });
-  }, [history.length]);
+  }, [history.length, failedTurn?.status]);
 
   useEffect(() => {
     if (history.length <= previousHistoryLengthRef.current) {
@@ -107,7 +104,6 @@ export function SimulationChat({
   useEffect(() => () => {
     window.clearTimeout(avatarIdleTimerRef.current);
     window.clearTimeout(responseTimerRef.current);
-    window.clearTimeout(closeTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -141,7 +137,9 @@ export function SimulationChat({
       );
       return;
     }
-    if (avatarState === "thinking" || avatarState === "closed") return;
+    if (sendingRef.current || avatarState === "closed") return;
+    sendingRef.current = true;
+    onBusyChange?.(true);
 
     const studentMessage = rawQuestion.trim();
     const failedTurnId = failedTurn?.question === studentMessage ? failedTurn.id : crypto.randomUUID();
@@ -182,6 +180,10 @@ export function SimulationChat({
           retryAvailable
         });
         setValidationFeedback("");
+      } finally {
+        sendingRef.current = false;
+        onBusyChange?.(false);
+        setAvatarState((current) => current === "thinking" ? "idle" : current);
       }
     }, 520);
   }
@@ -200,6 +202,7 @@ export function SimulationChat({
   }
 
   function startNewPractice() {
+    if (sendingRef.current) return;
     setQuestion("");
     setSelectedInterventionType("");
     setValidationFeedback("");
@@ -224,7 +227,7 @@ export function SimulationChat({
   }
 
   function finishSimulation(requestedReason = "") {
-    if (avatarState === "closed") return;
+    if (sendingRef.current || avatarState === "closed") return;
     const explicitReason = typeof requestedReason === "string" ? requestedReason : "";
     const endReason = explicitReason || (
       timeExpired ? "maximum_time" : technicalTurnLimitReached ? "technical_turn_limit" : "voluntary_closure"
@@ -232,7 +235,7 @@ export function SimulationChat({
     window.clearTimeout(avatarIdleTimerRef.current);
     window.clearTimeout(responseTimerRef.current);
     setAvatarState("closed");
-    closeTimerRef.current = window.setTimeout(() => onFinish?.(endReason), 520);
+    onFinish?.(endReason);
   }
 
   return (
@@ -308,21 +311,18 @@ export function SimulationChat({
               <MonitorPlay aria-hidden="true" />
               {showVideoSession ? "Ocultar vista" : "Vista simulada"}
             </button>
-            <button className="secondary-action" type="button" onClick={onChangeCase}>
+            <button className="secondary-action" type="button" onClick={onChangeCase} disabled={avatarState === "thinking" || avatarState === "closed"}>
               <Users aria-hidden="true" />
-              Caso
-            </button>
-            <button className="secondary-action" type="button" onClick={usageBlocked ? startNewPractice : onRestart}>
-              <RotateCcw aria-hidden="true" />
-              {usageBlocked ? "Nueva práctica" : "Reiniciar"}
+              Guardar y salir
             </button>
             <button
               className="primary-action"
               type="button"
               onClick={finishSimulation}
+              disabled={avatarState === "thinking" || avatarState === "closed"}
             >
               <SquareCheckBig aria-hidden="true" />
-              Terminar
+              Ir al cierre
             </button>
           </div>
         </header>
@@ -394,7 +394,7 @@ export function SimulationChat({
                         <p>Esperando respuesta del paciente...</p>
                       ) : (
                         <>
-                          <p>No pudimos obtener la respuesta del paciente. Tu intervención está guardada.</p>
+                          <p>No pudimos obtener la respuesta del paciente. Tu texto se conserva en esta pantalla para reintentar.</p>
                           {failedTurn.message && <p>{failedTurn.message}</p>}
                           {failedTurn.retryAvailable && (
                             <button
@@ -430,10 +430,11 @@ export function SimulationChat({
                     className="primary-action"
                     type="button"
                     onClick={() => finishSimulation(timeExpired ? "maximum_time" : "technical_turn_limit")}
+                    disabled={avatarState === "thinking" || avatarState === "closed"}
                   >
                     Continuar al cierre
                   </button>
-                  <button className="secondary-action" type="button" onClick={startNewPractice}>
+                  <button className="secondary-action" type="button" onClick={startNewPractice} disabled={avatarState === "thinking" || avatarState === "closed"}>
                     Iniciar una nueva práctica
                   </button>
                 </div>
@@ -444,10 +445,8 @@ export function SimulationChat({
 
         <form className="question-form" onSubmit={submitQuestion}>
           <label htmlFor="student-question">Intervención del estudiante</label>
-          <p className="writing-support">
-            Escribe con calma y claridad. Una pregunta cuidadosa puede abrir una
-            conversación más profunda.
-          </p>
+          <details className="interview-writing-help">
+          <summary>Ayuda para intervenir (opcional)</summary>
           <PedagogicalGuide
             guideId="intervencion_breve"
             autoOpen={false}
@@ -459,6 +458,7 @@ export function SimulationChat({
             <select
               id="intervention-type"
               value={selectedInterventionType}
+              disabled={avatarState === "thinking" || avatarState === "closed" || usageBlocked}
               onChange={(event) => {
                 setSelectedInterventionType(event.target.value);
                 setShowStageSuggestions(false);
@@ -490,6 +490,7 @@ export function SimulationChat({
               </div>
             )}
           </div>
+          </details>
           <div className="input-row">
             <textarea
               id="student-question"

@@ -167,6 +167,10 @@ try {
   const closureButton = () => ui.root.findAllByType('button').find((button) => button.props.onClick?.name === 'saveContinuityAgreement' || button.props.onClick?.name === 'backHomeAfterSave');
   assert.ok(closureButton(), 'el cierre tiene una acción de guardado');
   await act(async () => { await closureButton().props.onClick(); });
+  assert.equal(closureCalls, 0, 'una decisión sin fundamento no se registra como completa');
+  assert.match(JSON.stringify(ui.toJSON()), /Fundamenta tu decisión/);
+  await act(async () => { ui.root.findAllByType('textarea').find((t) => t.props.placeholder?.includes('motivo aun')).props.onChange({ target: { value: 'Falta comprender el motivo y explorar los apoyos cotidianos.' } }); });
+  await act(async () => { await closureButton().props.onClick(); });
   assert.equal(closureCalls, 1);
   assert.equal(navigated, false, 'el cierre rechazado no navega');
   assert.match(JSON.stringify(ui.toJSON()), /El cierre no se ha confirmado/);

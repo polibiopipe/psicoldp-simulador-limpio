@@ -32,21 +32,19 @@ export function ClinicalDashboard({
     [sessionRecords, cases, agendaItems]
   );
   const agendaActiveItems = agendaItems.filter((item) => item.completedSessions > 0 || item.agendaEntry);
-  const activeItems = [
-    ...draftSessionItems,
-    ...appointmentItems.filter((item) => !draftSessionItems.some((draft) => draft.caseItem.id === item.caseItem.id)),
-    ...agendaActiveItems.filter((item) => !draftSessionItems.some((draft) => draft.caseItem.id === item.caseItem.id))
-  ];
+  // A patient is counted once; pending work is keyed by case and session.
+  const activePatientCount = new Set([
+    ...draftSessionItems, ...appointmentItems, ...agendaActiveItems
+  ].map((item) => item.caseItem.id)).size;
   const pendingNotes = agendaItems.filter((item) => item.noteStatus.status === "pending");
   const pendingTasks = agendaItems.filter((item) => item.task?.description);
   const riskItems = agendaItems.filter((item) => item.risk.status === "open");
-  const resumableSessions = [
+  const resumableSessions = uniqueSessionItems([
     ...draftSessionItems,
-    ...appointmentItems.filter((item) => !draftSessionItems.some((draft) => draft.caseItem.id === item.caseItem.id)),
-    ...agendaItems.filter((item) => !draftSessionItems.some((draft) => draft.caseItem.id === item.caseItem.id) && isResumableSession(item))
-  ];
+    ...appointmentItems.filter((item) => ["in_progress", "closure_pending"].includes(item.appointment.status))
+  ]);
   const nextItem =
-    draftSessionItems[0] ||
+    resumableSessions[0] ||
     appointmentItems[0] ||
     agendaItems.find((item) => item.nextSessionNumber && (item.completedSessions > 0 || item.agendaEntry)) ||
     agendaItems.find((item) => item.caseItem.id === "claudio") ||
@@ -82,9 +80,9 @@ export function ClinicalDashboard({
         <DashboardMetric
           icon={UsersRound}
           label="Pacientes activos"
-          value={activeItems.length}
+          value={activePatientCount}
           actionLabel="Ver agenda"
-          onClick={activeItems.length ? () => onOpenAgenda?.() : null}
+          onClick={activePatientCount ? () => onOpenAgenda?.() : null}
         />
         <DashboardMetric
           icon={CalendarClock}
@@ -153,11 +151,7 @@ export function ClinicalDashboard({
                   onClick={() => openItemSession({ item: nextItem, onPrepareCase, onStartSession })}
                 >
                   <Play aria-hidden="true" />
-                  {nextItem.draftRecord?.status === "closure_pending"
-                    ? "Registrar cierre"
-                    : nextItem.draftRecord || nextItem.completedSessions > 0
-                      ? "Retomar sesion"
-                      : "Preparar caso"}
+                  {sessionActionLabel(nextItem)}
                 </button>
                 <button className="secondary-action" type="button" onClick={() => onOpenAgenda?.(nextItem.caseItem.id)}>
                   Ver registro
@@ -178,22 +172,21 @@ export function ClinicalDashboard({
             <Target aria-hidden="true" />
           </div>
           <div className="pending-list">
+            {!resumableSessions.length && !pendingNotes.length && !pendingTasks.length && !riskItems.length && (
+              <p className="pending-empty">No tienes trabajo pendiente. Elige un paciente para comenzar.</p>
+            )}
             <PendingGroup
               title="Sesiones por retomar"
               items={resumableSessions}
               emptyText="Sin sesiones por retomar"
               renderItem={(item) => (
                 <PendingActionItem
-                  key={`${item.caseItem.id}-session`}
+                  key={`${item.caseItem.id}-${item.nextSessionNumber}-session`}
                   item={item}
                   tone="session"
                   typeLabel="Sesion por retomar"
                   detail={item.nextFocus}
-                  actionLabel={item.draftRecord?.status === "closure_pending"
-                    ? "Registrar cierre"
-                    : item.draftRecord || item.completedSessions > 0
-                      ? "Retomar sesion"
-                      : "Preparar caso"}
+                  actionLabel={sessionActionLabel(item)}
                   onAction={() => openItemSession({ item, onPrepareCase, onStartSession })}
                   onOpenRecord={() => onOpenAgenda?.(item.caseItem.id)}
                 />
@@ -227,7 +220,7 @@ export function ClinicalDashboard({
                   tone="warning"
                   typeLabel="Tarea por revisar"
                   detail={item.task?.description}
-                  actionLabel="Retomar sesion"
+                  actionLabel={sessionActionLabel(item)}
                   onAction={() => openItemSession({ item, onPrepareCase, onStartSession })}
                   onOpenRecord={() => onOpenAgenda?.(item.caseItem.id)}
                 />
@@ -321,7 +314,8 @@ function DashboardMetric({ icon: Icon, label, value, actionLabel, onClick }) {
   );
 }
 
-function PendingGroup({ title, items, emptyText, renderItem }) {
+function PendingGroup({ title, items, renderItem }) {
+  if (!items.length) return null;
   return (
     <section className="pending-group" aria-label={title}>
       <div className="pending-group-heading">
@@ -333,7 +327,7 @@ function PendingGroup({ title, items, emptyText, renderItem }) {
           {items.map(renderItem)}
         </div>
       ) : (
-        <p className="pending-empty">{emptyText}</p>
+        null
       )}
     </section>
   );
@@ -364,17 +358,25 @@ function getFriendlyUserName(email = "") {
   return name ? name.replace(/[._-]+/g, " ").split(" ")[0] : "";
 }
 
-function isResumableSession(item) {
-  return Boolean(item.nextSessionNumber && (item.completedSessions > 0 || item.agendaEntry));
+function uniqueSessionItems(items) {
+  const unique = new Map();
+  for (const item of items) {
+    const key = `${item.caseItem.id}:${item.nextSessionNumber || 1}`;
+    if (!unique.has(key)) unique.set(key, item);
+  }
+  return [...unique.values()];
+}
+
+function sessionActionLabel(item) {
+  const status = item.draftRecord?.status || item.appointment?.status;
+  if (status === "closure_pending") return "Registrar cierre";
+  if (status === "in_progress") return "Retomar sesión";
+  return "Preparar sesión";
 }
 
 function openItemSession({ item, onPrepareCase, onStartSession }) {
-  if (item.draftRecord) {
-    onStartSession?.(item.caseItem.id, item.nextSessionNumber || item.draftRecord.sessionNumber || 1);
-    return;
-  }
-  const targetSession = item.nextSessionNumber || item.latestSummary?.sessionNumber || 1;
-  if (item.completedSessions > 0 && item.nextSessionNumber) {
+  const targetSession = item.nextSessionNumber || item.draftRecord?.sessionNumber || 1;
+  if (item.draftRecord || ["in_progress", "closure_pending"].includes(item.appointment?.status)) {
     onStartSession?.(item.caseItem.id, targetSession);
     return;
   }
@@ -382,8 +384,7 @@ function openItemSession({ item, onPrepareCase, onStartSession }) {
 }
 
 function getRelevantSessionLabel(item) {
-  const session = item.latestSummary?.sessionNumber || item.nextSessionNumber || item.completedSessions || 1;
-  return `Sesion ${session}`;
+  return `Sesión ${item.nextSessionNumber || item.draftRecord?.sessionNumber || item.latestSummary?.sessionNumber || 1}`;
 }
 
 function orderFeaturedCases(cases) {

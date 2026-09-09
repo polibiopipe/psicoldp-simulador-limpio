@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -70,9 +70,14 @@ export function SessionClosure({
   onBackHome,
   onRequestExit,
   onSaveSessionRecord,
-  onDraftChange
+  onDraftChange,
+  onDraftSnapshot,
+  onViewFeedback,
+  initialClinicalDecision = null,
+  initialClinicalArtifacts = null
 }) {
   const savingRef = useRef(false);
+  const justificationRef = useRef(null);
   const [isSaving, setIsSaving] = useState(false);
   const savedSignatureRef = useRef("");
   const [copied, setCopied] = useState(false);
@@ -249,6 +254,13 @@ export function SessionClosure({
       onDraftChange?.();
     }
   }, [closureSignature, hasSavedSessionRecord, onDraftChange]);
+  useEffect(() => {
+    onDraftSnapshot?.({
+      clinicalDecision: normalizedClinicalDecision,
+      clinicalPlanEvaluation,
+      clinicalArtifacts: normalizedClinicalArtifacts
+    });
+  }, [closureSignature, onDraftSnapshot]);
   const preSessionPlanKey = [
     preSessionPlan?.proposedSessionCount,
     preSessionPlan?.sessionCountJustification,
@@ -257,8 +269,8 @@ export function SessionClosure({
 
   useEffect(() => {
     hydratingDraftRef.current = true;
-    const initialDecision = buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan });
-    const initialArtifacts = buildInitialClinicalArtifacts();
+    const initialDecision = initialClinicalDecision || buildInitialClinicalDecision({ sessionNumber, sessionPlan, preSessionPlan });
+    const initialArtifacts = initialClinicalArtifacts || buildInitialClinicalArtifacts();
     const decisionDraft = loadClinicalDraft(decisionDraftKey);
     const artifactsDraft = loadClinicalDraft(artifactsDraftKey);
     const hasDecisionDraft = hasMeaningfulClinicalDecisionDraft(decisionDraft, initialDecision);
@@ -296,14 +308,12 @@ export function SessionClosure({
       setDraftStatus({ type: "pending", message: "Cambios pendientes de guardar." });
     }
 
-    const timeoutId = window.setTimeout(() => {
-      if (hasDecisionDraft) saveClinicalDraft(decisionDraftKey, clinicalDecision);
-      if (hasArtifactsDraft) saveClinicalDraft(artifactsDraftKey, clinicalArtifacts);
-      setDraftStatus({ type: "saved", message: "Borrador guardado." });
-      restoredDraftRef.current = false;
-    }, 500);
-
-    return () => window.clearTimeout(timeoutId);
+    const decisionResult = hasDecisionDraft ? saveClinicalDraft(decisionDraftKey, clinicalDecision) : { ok: true };
+    const artifactsResult = hasArtifactsDraft ? saveClinicalDraft(artifactsDraftKey, clinicalArtifacts) : { ok: true };
+    setDraftStatus(decisionResult.ok && artifactsResult.ok
+      ? { type: "saved", message: "Borrador guardado en este dispositivo. Falta confirmar el cierre." }
+      : { type: "error", message: "No pudimos guardar el borrador en este dispositivo. Conserva esta pantalla y guarda el cierre." });
+    restoredDraftRef.current = false;
   }, [
     decisionDraftKey,
     artifactsDraftKey,
@@ -444,6 +454,11 @@ export function SessionClosure({
 
   async function saveCurrentSummary({ includeHistory = false } = {}) {
     if (!includeHistory) return true;
+    if (!clinicalDecision.justification?.trim()) {
+      setDraftStatus({ type: "error", message: "Fundamenta tu decisión antes de guardar. Si aún no puedes decidir, puedes salir y dejar el cierre pendiente." });
+      justificationRef.current?.focus();
+      return false;
+    }
     if (savingRef.current) return false;
     savingRef.current = true;
     setIsSaving(true);
@@ -581,15 +596,8 @@ export function SessionClosure({
       <header className="session-closure-header">
         <span className="eyebrow">Proceso por sesiones</span>
         <h1 id="session-closure-title">{closureTitle}</h1>
-        <p>
-          Resumen formativo de la sesión simulada. Esta síntesis es ficticia y ayuda a
-          ordenar qué se exploró y qué podría retomarse en el proceso.
-        </p>
-        <p>
-          Las cuatro sesiones son una ruta formativa base, no un cierre obligatorio.
-          Puedes continuar evaluando, solicitar información complementaria o iniciar
-          diseño de intervención si la comprensión clínica ya es suficiente.
-        </p>
+        <p>Elige el siguiente paso, fundamenta tu decisión y guarda el cierre.
+          Puedes consultar el resumen o ampliar la formulación cuando lo necesites.</p>
         {draftStatus && (
           <div className={`draft-autosave-status ${draftStatus.type}`} role="status">
             {draftStatus.message}
@@ -601,6 +609,295 @@ export function SessionClosure({
         <details className="closure-stage" open>
           <summary>
             <span>1</span>
+            <strong>Decidir y guardar el cierre</strong>
+            <small>Continuidad, cierre, derivación o acción final.</small>
+          </summary>
+          <div className="closure-stage-body">
+      <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
+        <div className="clinical-plan-header">
+          <div>
+            <span className="eyebrow">Decision clinica formativa</span>
+            <h2>Decision sobre continuidad del proceso</h2>
+            <p>
+              Decide si corresponde cerrar, continuar, derivar o activar una respuesta de
+              riesgo. La cantidad de sesiones es una hipótesis clínica que puedes sostener,
+              ajustar o cuestionar durante el proceso.
+            </p>
+          </div>
+          <div className="clinical-plan-range">
+            <span>Plan propuesto</span>
+            <strong>
+              {plannedSessionTotal}
+            </strong>
+            <span>sesión(es)</span>
+          </div>
+        </div>
+
+        <PedagogicalGuide guideId="decision_clinica" autoOpen={false} />
+        <PedagogicalGuide
+          guideId="plan_intervencion"
+          autoOpen={false}
+          compact
+          className="clinical-inline-guide"
+        />
+
+        <div className="clinical-decision-grid" role="radiogroup" aria-label="Decision sobre continuidad">
+          {CLINICAL_DECISION_OPTIONS.map((option) => (
+            <label
+              className={`clinical-decision-option ${
+                normalizedClinicalDecision.action === option.value ? "selected" : ""
+              }`}
+              key={option.value}
+            >
+              <input
+                type="radio"
+                name="clinical-decision-action"
+                value={option.value}
+                checked={normalizedClinicalDecision.action === option.value}
+                onChange={() => updateDecision({ action: option.value })}
+              />
+              <span>
+                <strong>{option.label}</strong>
+                <small>{option.description}</small>
+              </span>
+            </label>
+          ))}
+        </div>
+
+        <div className="clinical-plan-form">
+          <label>
+            <span>Cantidad de sesiones que propones para este caso</span>
+            <small>
+              Puedes mantener tu plan inicial o ajustarlo si la evolucion del paciente lo
+              justifica.
+            </small>
+            <select
+              value={normalizedClinicalDecision.proposedSessions}
+              onChange={(event) => updateDecision({ proposedSessions: Number(event.target.value) })}
+            >
+              {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
+                <option key={value} value={value}>
+                  {value} sesión{value > 1 ? "es" : ""}
+                </option>
+              ))}
+            </select>
+            {planBelowCompletedSessions && (
+              <div className="prep-plan-memory-warning" role="alert">
+                Ya existen {completedSessionCount} sesiones registradas. No se eliminará
+                memoria clinica previa; el plan visual se ajustara sin borrar lo trabajado.
+              </div>
+            )}
+          </label>
+
+          <label>
+            <span>¿Por qué propones esta cantidad de sesiones?</span>
+            <textarea
+              ref={justificationRef}
+              value={clinicalDecision.justification}
+              onChange={(event) => updateDecision({ justification: event.target.value })}
+              placeholder="Ej.: porque el motivo aun necesita delimitarse y falta explorar apoyo o riesgo."
+              rows={3}
+            />
+          </label>
+
+          <details className="closure-inline-detail">
+            <summary>Ampliar el fundamento clínico (opcional)</summary>
+          <label>
+            <span>¿Qué información clínica ya tienes?</span>
+            <textarea
+              value={clinicalDecision.knownInformation || ""}
+              onChange={(event) => updateDecision({ knownInformation: event.target.value })}
+              placeholder="Resume los datos relevantes obtenidos en entrevista, sin convertirlos aun en diagnostico cerrado."
+              rows={2}
+            />
+          </label>
+
+          <label>
+            <span>¿Qué información consideras que falta?</span>
+            <textarea
+              value={clinicalDecision.missingInformation || ""}
+              onChange={(event) => updateDecision({ missingInformation: event.target.value })}
+              placeholder="Nombra antecedentes, riesgo, red de apoyo, contexto o hipotesis que aun requieren exploracion."
+              rows={2}
+            />
+          </label>
+
+          <label>
+            <span>Que riesgos, dilemas eticos o aspectos contextuales debes considerar?</span>
+            <textarea
+              value={clinicalDecision.ethicalConsiderations || ""}
+              onChange={(event) => updateDecision({ ethicalConsiderations: event.target.value })}
+              placeholder="Ej.: confidencialidad, riesgo, pertinencia de derivacion, contexto familiar o limites del simulador."
+              rows={2}
+            />
+          </label>
+
+          </details>
+
+          <label>
+            <span>Objetivos del proceso propuesto o siguiente paso</span>
+            <textarea
+              value={clinicalDecision.nextSessionObjectives}
+              onChange={(event) => updateDecision({ nextSessionObjectives: event.target.value })}
+              placeholder="Ej.: profundizar historia del problema, red de apoyo y recursos cotidianos."
+              rows={3}
+            />
+          </label>
+
+          <label>
+            <span>Que riesgos o aspectos pendientes quedan abiertos?</span>
+            <textarea
+              value={clinicalDecision.pendingRisks}
+              onChange={(event) => updateDecision({ pendingRisks: event.target.value })}
+              placeholder="Ej.: no se exploro riesgo de forma suficiente; queda pendiente red de apoyo."
+              rows={3}
+            />
+          </label>
+        </div>
+
+        <details className="closure-inline-detail">
+          <summary>Consultar orientación sobre mi decisión</summary>
+        <div className={`clinical-plan-evaluation ${clinicalPlanEvaluation.level}`}>
+          <div>
+            <span>{clinicalPlanEvaluation.decisionLabel}</span>
+            <strong>{clinicalPlanEvaluation.levelLabel}</strong>
+          </div>
+          <p>{clinicalPlanEvaluation.summary}</p>
+          <div className="session-summary-grid">
+            <div>
+              <h3>Fortalezas</h3>
+              <ul>
+                {clinicalPlanEvaluation.strengths.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Aspectos a revisar</h3>
+              <ul>
+                {(clinicalPlanEvaluation.concerns.length
+                  ? clinicalPlanEvaluation.concerns
+                  : clinicalPlanEvaluation.recommendations
+                ).slice(0, 4).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+        </details>
+      </section>
+
+      <div className="continuity-callout">
+        <div>
+          <h2>{canContinueInSimulator && hasSavedContinuityAgreement ? "Continuidad registrada" : closureAction.title}</h2>
+          <p>
+            {canContinueInSimulator && hasSavedContinuityAgreement
+              ? `La continuidad dentro del simulador quedó registrada. Puedes revisar la retroalimentación o agendar la sesión ${nextSessionNumber}.`
+              : closureAction.description}
+          </p>
+        </div>
+        <PedagogicalGuide
+          guideId="cierre_seguimiento"
+          autoOpen={false}
+          compact
+          className="clinical-inline-guide"
+        />
+        <div className="closure-actions">
+          {canContinueInSimulator && !hasSavedContinuityAgreement ? (
+            <button className="primary-action" type="button" onClick={saveContinuityAgreement}>
+              {closureAction.primaryLabel}
+              <CheckCircle2 aria-hidden="true" />
+            </button>
+          ) : null}
+          {canContinueInSimulator && hasSavedContinuityAgreement ? (
+            <>
+              <button className="primary-action" type="button" onClick={onViewFeedback || backHomeAfterSave}>
+                <CheckCircle2 aria-hidden="true" />
+                {onViewFeedback ? "Revisar retroalimentación" : "Volver al inicio"}
+              </button>
+              <button className="secondary-action" type="button" onClick={scheduleNextSession}>
+                <ArrowRight aria-hidden="true" />
+                Agendar sesión {nextSessionNumber}
+              </button>
+            </>
+          ) : null}
+          {!canContinueInSimulator ? (
+            <button className="primary-action" type="button" onClick={async () => {
+              if (!await saveCurrentSummary({ includeHistory: true })) return;
+              if (onViewFeedback) onViewFeedback();
+              else onBackHome();
+            }}>
+              <CheckCircle2 aria-hidden="true" />
+              {hasSavedSessionRecord ? "Revisar retroalimentación" : "Guardar decisión"}
+            </button>
+          ) : null}
+          <button className="secondary-action" type="button" onClick={copyCurrentSummary}>
+            <Clipboard aria-hidden="true" />
+            {copied ? "Resumen copiado" : "Copiar resumen"}
+          </button>
+          {!hasSavedContinuityAgreement && (
+            <button className="secondary-action" type="button" onClick={requestBackHomeWithoutDecision}>
+              <Home aria-hidden="true" />
+              Volver al inicio
+            </button>
+          )}
+          <button className="secondary-action" type="button" onClick={copyProcessSummary}>
+            <Clipboard aria-hidden="true" />
+            {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
+          </button>
+        </div>
+      </div>
+
+      {reachedSessionLimit && (
+        <section className="session-summary-card closure-panel closure-panel-wide">
+          <span className="eyebrow">Síntesis de proceso</span>
+          <h2>Resumen del proceso con {processSummary.patientName}</h2>
+          <p>{processSummary.summaryText}</p>
+          <div className="session-summary-grid">
+            <div>
+              <h3>Temas trabajados</h3>
+              <ul>
+                {processSummary.workedTopics.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Evolución de apertura</h3>
+              <p className="microcopy">Señal cualitativa de apertura simulada, no medición clínica.</p>
+              <ul>
+                {processSummary.opennessEvolution.map((item) => (
+                  <li key={item.sessionNumber}>
+                    Sesión {item.sessionNumber}: {item.label || "sin señal cualitativa registrada"}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Habilidades logradas</h3>
+              <ul>
+                {processSummary.studentStrengths.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Aspectos por seguir practicando</h3>
+              <ul>
+                {processSummary.studentImprovements.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
+          </div>
+        </details>
+        <details className="closure-stage">
+          <summary>
+            <span>2</span>
             <strong>Resumen breve de sesión</strong>
             <small>Paciente, turnos, apertura y señales generales del cierre.</small>
           </summary>
@@ -632,85 +929,6 @@ export function SessionClosure({
               <h2>Sesión {summary.sessionNumber} con {summary.patientName}</h2>
               <p>{summary.resumenConversacion}</p>
             </section>
-          </div>
-        </details>
-
-        <details className="closure-stage">
-          <summary>
-            <span>2</span>
-            <strong>Retroalimentación formativa</strong>
-            <small>Indicadores, fortalezas y aspectos prioritarios.</small>
-          </summary>
-          <div className="closure-stage-body">
-      {isLimitedEvaluation ? (
-        <div className="session-note low-turn-note">
-          Retroalimentación limitada: hubo muy pocas intervenciones para sostener
-          juicios robustos. Usa esta devolución como orientación para
-          iniciar mejor el próximo intento.
-        </div>
-      ) : (
-      <div className="closure-metrics" aria-label="Métricas de cierre">
-        <article>
-          <Clock aria-hidden="true" />
-          <strong>{interviewTurns.length}</strong>
-          <span>turnos</span>
-        </article>
-        <article>
-          <CheckCircle2 aria-hidden="true" />
-          <strong>{sessionFeedback.levelLabel}</strong>
-          <span>evidencia</span>
-        </article>
-        <article>
-          <TrendingUp aria-hidden="true" />
-          <strong>{sessionFeedback.pendingAreas.length}</strong>
-          <span>pendientes</span>
-        </article>
-        <article>
-          <MessageSquareText aria-hidden="true" />
-          <strong>{report.trust.label}</strong>
-          <span>apertura simulada</span>
-        </article>
-      </div>
-      )}
-
-      <div className="closure-panels closure-feedback-brief">
-        <section className="closure-card closure-panel">
-          <h2>Fortalezas principales</h2>
-          <ul>
-            {sessionFeedback.strengths.slice(0, 3).map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="closure-card closure-panel">
-          <h2>Aspectos por mejorar</h2>
-          <ul>
-            {sessionFeedback.priorityImprovements.slice(0, 3).map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="closure-card closure-panel">
-          <h2>Temas pendientes</h2>
-          <ul>
-            {(sessionFeedback.pendingAreas.length ? sessionFeedback.pendingAreas : summary.temasPendientes).map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="closure-card closure-panel">
-          <h2>Ejemplos de cierre formativo</h2>
-          <ul>
-            {closureExamples.slice(0, 3).map((example) => (
-              <li key={example}>"{example}"</li>
-            ))}
-          </ul>
-        </section>
-      </div>
-
           </div>
         </details>
 
@@ -774,7 +992,7 @@ export function SessionClosure({
         <details className="closure-stage">
           <summary>
             <span>4</span>
-            <strong>Formulación clínica e instrumentos</strong>
+            <strong>Ampliar formulación e instrumentos (opcional)</strong>
             <small>Hipótesis, datos, instrumentos e informe externo.</small>
           </summary>
           <div className="closure-stage-body">
@@ -1209,283 +1427,6 @@ export function SessionClosure({
           </div>
         </details>
 
-        <details className="closure-stage">
-          <summary>
-            <span>5</span>
-            <strong>Decisión clínica</strong>
-            <small>Continuidad, cierre, derivación o acción final.</small>
-          </summary>
-          <div className="closure-stage-body">
-      <section className="closure-card closure-panel closure-panel-wide clinical-plan-panel">
-        <div className="clinical-plan-header">
-          <div>
-            <span className="eyebrow">Decision clinica formativa</span>
-            <h2>Decision sobre continuidad del proceso</h2>
-            <p>
-              Decide si corresponde cerrar, continuar, derivar o activar una respuesta de
-              riesgo. La cantidad de sesiones es una hipótesis clínica que puedes sostener,
-              ajustar o cuestionar durante el proceso.
-            </p>
-          </div>
-          <div className="clinical-plan-range">
-            <span>Plan propuesto</span>
-            <strong>
-              {plannedSessionTotal}
-            </strong>
-            <span>sesión(es)</span>
-          </div>
-        </div>
-
-        <PedagogicalGuide guideId="decision_clinica" />
-        <PedagogicalGuide
-          guideId="plan_intervencion"
-          autoOpen={false}
-          compact
-          className="clinical-inline-guide"
-        />
-
-        <div className="clinical-decision-grid" role="radiogroup" aria-label="Decision sobre continuidad">
-          {CLINICAL_DECISION_OPTIONS.map((option) => (
-            <label
-              className={`clinical-decision-option ${
-                normalizedClinicalDecision.action === option.value ? "selected" : ""
-              }`}
-              key={option.value}
-            >
-              <input
-                type="radio"
-                name="clinical-decision-action"
-                value={option.value}
-                checked={normalizedClinicalDecision.action === option.value}
-                onChange={() => updateDecision({ action: option.value })}
-              />
-              <span>
-                <strong>{option.label}</strong>
-                <small>{option.description}</small>
-              </span>
-            </label>
-          ))}
-        </div>
-
-        <div className="clinical-plan-form">
-          <label>
-            <span>Cantidad de sesiones que propones para este caso</span>
-            <small>
-              Puedes mantener tu plan inicial o ajustarlo si la evolucion del paciente lo
-              justifica.
-            </small>
-            <select
-              value={normalizedClinicalDecision.proposedSessions}
-              onChange={(event) => updateDecision({ proposedSessions: Number(event.target.value) })}
-            >
-              {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
-                <option key={value} value={value}>
-                  {value} sesión{value > 1 ? "es" : ""}
-                </option>
-              ))}
-            </select>
-            {planBelowCompletedSessions && (
-              <div className="prep-plan-memory-warning" role="alert">
-                Ya existen {completedSessionCount} sesiones registradas. No se eliminará
-                memoria clinica previa; el plan visual se ajustara sin borrar lo trabajado.
-              </div>
-            )}
-          </label>
-
-          <label>
-            <span>¿Por qué propones esta cantidad de sesiones?</span>
-            <textarea
-              value={clinicalDecision.justification}
-              onChange={(event) => updateDecision({ justification: event.target.value })}
-              placeholder="Ej.: porque el motivo aun necesita delimitarse y falta explorar apoyo o riesgo."
-              rows={3}
-            />
-          </label>
-
-          <label>
-            <span>¿Qué información clínica ya tienes?</span>
-            <textarea
-              value={clinicalDecision.knownInformation || ""}
-              onChange={(event) => updateDecision({ knownInformation: event.target.value })}
-              placeholder="Resume los datos relevantes obtenidos en entrevista, sin convertirlos aun en diagnostico cerrado."
-              rows={2}
-            />
-          </label>
-
-          <label>
-            <span>¿Qué información consideras que falta?</span>
-            <textarea
-              value={clinicalDecision.missingInformation || ""}
-              onChange={(event) => updateDecision({ missingInformation: event.target.value })}
-              placeholder="Nombra antecedentes, riesgo, red de apoyo, contexto o hipotesis que aun requieren exploracion."
-              rows={2}
-            />
-          </label>
-
-          <label>
-            <span>Que riesgos, dilemas eticos o aspectos contextuales debes considerar?</span>
-            <textarea
-              value={clinicalDecision.ethicalConsiderations || ""}
-              onChange={(event) => updateDecision({ ethicalConsiderations: event.target.value })}
-              placeholder="Ej.: confidencialidad, riesgo, pertinencia de derivacion, contexto familiar o limites del simulador."
-              rows={2}
-            />
-          </label>
-
-          <label>
-            <span>Objetivos del proceso propuesto o siguiente paso</span>
-            <textarea
-              value={clinicalDecision.nextSessionObjectives}
-              onChange={(event) => updateDecision({ nextSessionObjectives: event.target.value })}
-              placeholder="Ej.: profundizar historia del problema, red de apoyo y recursos cotidianos."
-              rows={3}
-            />
-          </label>
-
-          <label>
-            <span>Que riesgos o aspectos pendientes quedan abiertos?</span>
-            <textarea
-              value={clinicalDecision.pendingRisks}
-              onChange={(event) => updateDecision({ pendingRisks: event.target.value })}
-              placeholder="Ej.: no se exploro riesgo de forma suficiente; queda pendiente red de apoyo."
-              rows={3}
-            />
-          </label>
-        </div>
-
-        <div className={`clinical-plan-evaluation ${clinicalPlanEvaluation.level}`}>
-          <div>
-            <span>{clinicalPlanEvaluation.decisionLabel}</span>
-            <strong>{clinicalPlanEvaluation.levelLabel}</strong>
-          </div>
-          <p>{clinicalPlanEvaluation.summary}</p>
-          <div className="session-summary-grid">
-            <div>
-              <h3>Fortalezas</h3>
-              <ul>
-                {clinicalPlanEvaluation.strengths.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3>Aspectos a revisar</h3>
-              <ul>
-                {(clinicalPlanEvaluation.concerns.length
-                  ? clinicalPlanEvaluation.concerns
-                  : clinicalPlanEvaluation.recommendations
-                ).slice(0, 4).map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div className="continuity-callout">
-        <div>
-          <h2>{canContinueInSimulator && hasSavedContinuityAgreement ? "Continuidad registrada" : closureAction.title}</h2>
-          <p>
-            {canContinueInSimulator && hasSavedContinuityAgreement
-              ? `La continuidad dentro del simulador quedó registrada. La sesión ${nextSessionNumber} podrá iniciarse después como acción opcional.`
-              : closureAction.description}
-          </p>
-        </div>
-        <PedagogicalGuide
-          guideId="cierre_seguimiento"
-          autoOpen={false}
-          compact
-          className="clinical-inline-guide"
-        />
-        <div className="closure-actions">
-          {canContinueInSimulator && !hasSavedContinuityAgreement ? (
-            <button className="primary-action" type="button" onClick={saveContinuityAgreement}>
-              {closureAction.primaryLabel}
-              <CheckCircle2 aria-hidden="true" />
-            </button>
-          ) : null}
-          {canContinueInSimulator && hasSavedContinuityAgreement ? (
-            <>
-              <button className="primary-action" type="button" onClick={backHomeAfterSave}>
-                <Home aria-hidden="true" />
-                Volver al inicio
-              </button>
-              <button className="secondary-action" type="button" onClick={scheduleNextSession}>
-                <ArrowRight aria-hidden="true" />
-                Iniciar sesión {nextSessionNumber} ahora
-              </button>
-            </>
-          ) : null}
-          {!canContinueInSimulator ? (
-            <button className="primary-action" type="button" onClick={backHomeAfterSave}>
-              <Home aria-hidden="true" />
-              {closureAction.primaryLabel}
-            </button>
-          ) : null}
-          <button className="secondary-action" type="button" onClick={copyCurrentSummary}>
-            <Clipboard aria-hidden="true" />
-            {copied ? "Resumen copiado" : "Copiar resumen"}
-          </button>
-          {!hasSavedContinuityAgreement && (
-            <button className="secondary-action" type="button" onClick={requestBackHomeWithoutDecision}>
-              <Home aria-hidden="true" />
-              Volver al inicio
-            </button>
-          )}
-          <button className="secondary-action" type="button" onClick={copyProcessSummary}>
-            <Clipboard aria-hidden="true" />
-            {processCopied ? "Proceso copiado" : "Copiar resumen del proceso"}
-          </button>
-        </div>
-      </div>
-
-      {reachedSessionLimit && (
-        <section className="session-summary-card closure-panel closure-panel-wide">
-          <span className="eyebrow">Síntesis de proceso</span>
-          <h2>Resumen del proceso con {processSummary.patientName}</h2>
-          <p>{processSummary.summaryText}</p>
-          <div className="session-summary-grid">
-            <div>
-              <h3>Temas trabajados</h3>
-              <ul>
-                {processSummary.workedTopics.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3>Evolución de apertura</h3>
-              <p className="microcopy">Señal cualitativa de apertura simulada, no medición clínica.</p>
-              <ul>
-                {processSummary.opennessEvolution.map((item) => (
-                  <li key={item.sessionNumber}>
-                    Sesión {item.sessionNumber}: {item.label || "sin señal cualitativa registrada"}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3>Habilidades logradas</h3>
-              <ul>
-                {processSummary.studentStrengths.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3>Aspectos por seguir practicando</h3>
-              <ul>
-                {processSummary.studentImprovements.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-      )}
-          </div>
-        </details>
       </div>
 
       </fieldset>

@@ -192,15 +192,11 @@ export function CaseBrief({
       setDraftStatus({ type: "pending", message: "Cambios pendientes de guardar." });
     }
 
-    const timeoutId = window.setTimeout(() => {
-      const result = saveClinicalDraft(preparationDraftKey, preSessionPlan);
-      if (result.ok) {
-        setDraftStatus({ type: "saved", message: "Borrador guardado." });
-      }
-      restoredDraftRef.current = false;
-    }, 500);
-
-    return () => window.clearTimeout(timeoutId);
+    const result = saveClinicalDraft(preparationDraftKey, preSessionPlan);
+    setDraftStatus(result.ok
+      ? { type: "saved", message: "Borrador guardado en este dispositivo." }
+      : { type: "error", message: "No pudimos guardar el borrador. Conserva esta pantalla para completar la preparación." });
+    restoredDraftRef.current = false;
   }, [preparationDraftKey, preSessionPlan]);
 
   useEffect(() => {
@@ -302,19 +298,21 @@ export function CaseBrief({
     beginWithPreparationState(preparationWeak);
   }
 
-  function beginWithPreparationState(overrideUsed = false) {
+  async function beginWithPreparationState(overrideUsed = false) {
     if (!onBegin) return;
-    scrollPersistenceDisabledRef.current = true;
-    clearClinicalDraft(preparationDraftKey);
-    clearClinicalScrollPosition(preparationScrollKey);
-    setDraftStatus(null);
-    onBegin({
+    const began = await onBegin({
       preparationQuality: preparationWeak ? "debil" : "suficiente",
       preparationOverrideUsed: Boolean(overrideUsed),
       preparationWeakReasons: readiness.weakReasons,
       preparationMissingFields: readiness.missingReasons,
       preparationStartedAt: new Date().toISOString()
     });
+    if (began) {
+      scrollPersistenceDisabledRef.current = true;
+      clearClinicalDraft(preparationDraftKey);
+      clearClinicalScrollPosition(preparationScrollKey);
+      setDraftStatus(null);
+    }
   }
 
   function getPrepStepStatus(stepId) {
@@ -443,7 +441,7 @@ export function CaseBrief({
 
     setPrepStepFeedback({
       type: "warning",
-      message: "Usa Guardar avance / Siguiente paso para avanzar sin saltarte la validación."
+      message: "Usa Siguiente paso para avanzar sin saltarte la validación."
     });
   }
 
@@ -816,6 +814,9 @@ export function CaseBrief({
         </button>
       </header>
 
+      {sessionNumber <= completedSessionCount && (
+        <p className="session-note" role="status">Esta sesión ya tiene un cierre guardado. Si vuelves a practicarla, se creará otro registro de entrevista.</p>
+      )}
       <div className="brief-layout preparation-brief-layout">
         <div className="brief-sidebar-stack">
           <aside className="antechamber-case-file" aria-label="Ficha clínica resumida">
@@ -879,10 +880,12 @@ export function CaseBrief({
               </div>
             )}
 
+            <details className="brief-reference-details">
+              <summary>Consultar antecedentes, objetivos y cuidados</summary>
             <div className="antechamber-brief-block">
               <span>Antecedentes relevantes</span>
               <ul>
-                {caseItem.background.slice(0, 3).map((item) => (
+                {caseItem.background.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
@@ -900,11 +903,12 @@ export function CaseBrief({
             <div className="antechamber-brief-block caution">
               <span>Antes de iniciar</span>
               <ul>
-                {caseItem.sensitiveTopics.slice(0, 3).map((item) => (
+                {caseItem.sensitiveTopics.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
             </div>
+            </details>
           </aside>
 
           {preSessionPlan && (
@@ -954,109 +958,6 @@ export function CaseBrief({
         </div>
 
         <div className="brief-content">
-          <header className="section-header">
-            <span className="eyebrow">Escucha Viva - Entrevista Psicológica Formativa</span>
-            <h1>{caseItem.name}</h1>
-            <span className="case-practice-label">Persona ficticia para práctica formativa.</span>
-            <p>{caseItem.motive}</p>
-          </header>
-
-          <section className="info-panel">
-            <div className="panel-heading">
-              <ClipboardList aria-hidden="true" />
-              <h2>Tipo de sesión</h2>
-            </div>
-            <SessionSelector
-              currentSession={sessionNumber}
-              availableSessions={availableSessions}
-              totalSessions={proposedSessionCount}
-              onSelect={onSelectSession}
-            />
-            {sessionSummary ? (
-              <p className="session-note">
-                Hay un resumen ficticio de la sesión anterior guardado para este caso.
-                Puedes continuar el proceso formativo sin perder lo ya trabajado.
-              </p>
-            ) : (
-              <p className="session-note">
-                La primera entrevista permite encuadrar, explorar el motivo inicial y
-                dejar temas abiertos para continuidad simulada.
-              </p>
-            )}
-          </section>
-
-          {sessionSummary && (
-            <section className="info-panel">
-              <div className="panel-heading">
-                <ClipboardCheck aria-hidden="true" />
-                <h2>Continuidad clinica disponible</h2>
-              </div>
-              <ul>
-                {previousClinicalDecision && (
-                  <li>
-                    Decision previa: {previousClinicalDecision.action || "registrada"}
-                    {previousClinicalDecision.justification ? ` - ${previousClinicalDecision.justification}` : ""}
-                  </li>
-                )}
-                {previousExternalReport && (
-                  <li>
-                    Informe externo recibido: {previousExternalReport.requestedInstrument?.name ||
-                      previousExternalReport.caseData?.instrument || "evaluacion complementaria simulada"}.
-                  </li>
-                )}
-                {previousReportIntegration && (
-                  <li>
-                    Integracion del informe: {previousReportIntegration.hypothesisImpact ||
-                      previousReportIntegration.nextDecision ||
-                      "pendiente de profundizar"}.
-                  </li>
-                )}
-                {previousPendingTopics.slice(0, 3).map((item) => (
-                  <li key={item}>Pendiente: {item}</li>
-                ))}
-                {!previousClinicalDecision && !previousExternalReport && previousPendingTopics.length === 0 && (
-                  <li>Hay memoria de sesion previa, sin decisiones o informes externos registrados.</li>
-                )}
-              </ul>
-            </section>
-          )}
-
-          <section className="info-panel">
-            <div className="panel-heading">
-              <ClipboardList aria-hidden="true" />
-              <h2>Antecedentes relevantes</h2>
-            </div>
-            <ul>
-              {caseItem.background.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="info-panel">
-            <div className="panel-heading">
-              <Target aria-hidden="true" />
-              <h2>Objetivos formativos de esta simulación</h2>
-            </div>
-            <ul>
-              {(caseItem.learningObjectives || caseItem.objectives || []).slice(0, 6).map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="info-panel caution">
-            <div className="panel-heading">
-              <TriangleAlert aria-hidden="true" />
-              <h2>Recomendaciones antes de iniciar</h2>
-            </div>
-            <ul>
-              {caseItem.sensitiveTopics.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-
           {preSessionPlan && (
             <section className="info-panel clinical-preparation-panel">
               <div className="clinical-prep-hero">
@@ -1064,7 +965,7 @@ export function CaseBrief({
                   <ClipboardList aria-hidden="true" />
                   <div>
                     <span className="eyebrow">Antesala clínica</span>
-                    <h2>Antes de comenzar: prepara tu primera entrevista</h2>
+                    <h2>{sessionNumber === 1 ? "Prepara tu primera entrevista" : "Prepara la continuidad de esta sesión"}</h2>
                   </div>
                 </div>
                 <p>
@@ -1165,7 +1066,7 @@ export function CaseBrief({
                   </button>
                 ) : (
                   <button className="primary-action" type="button" onClick={handlePrepNextClick}>
-                    Guardar avance / Siguiente paso
+                    Siguiente paso
                   </button>
                 )}
               </div>
