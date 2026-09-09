@@ -9562,6 +9562,40 @@ body,
 .clinical-plan-form > details { grid-column: 1 / -1; }
 .clinical-plan-form > details label { display: grid; gap: 8px; margin-block: 14px; }
 .progress-wrap > p { font-size: .85rem; color: #52676c; margin-bottom: 0; }
+
+/* Keep sticky navigation attached to the page, not a non-scrolling overflow ancestor. */
+body:has(.authenticated-shell),
+#root:has(.authenticated-shell),
+.app-shell.authenticated-shell {
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+@media (min-width: 901px) {
+  .workspace-sidebar {
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .workspace-sidebar > * { flex-shrink: 0; }
+  .workspace-topbar { top: 0; }
+}
+
+@media (max-width: 900px) {
+  .workspace-sidebar,
+  .workspace-topbar {
+    position: static;
+    height: auto;
+    max-height: none;
+  }
+}
+
 @media (max-width: 760px) {
   .results-view-switch { gap: 8px; }
   .results-view-switch button { padding: 12px; }
