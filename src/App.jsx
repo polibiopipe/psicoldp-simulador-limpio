@@ -57,6 +57,8 @@ import { AuthScreen } from "./components/AuthScreen.jsx";
 import { IntroVideo } from "./components/IntroVideo.jsx";
 import { PendingApprovalScreen } from "./components/PendingApprovalScreen.jsx";
 import { ResearchInvitation } from "./components/ResearchConsent.jsx";
+import { AccessConsentGate } from "./components/AccessConsentGate.jsx";
+import { useAccessConsent } from "./engine/accessConsent.js";
 import { TrustCenter } from "./components/TrustCenter.jsx";
 import { AppFooter } from "./components/AppFooter.jsx";
 import { ClinicalAgenda } from "./components/ClinicalAgenda.jsx";
@@ -101,6 +103,8 @@ export default function App() {
     profile: null,
     error: null
   });
+  const accessConsent = useAccessConsent(authSession?.user?.id || "", isSupabaseConfigured && approvalState.status === "approved");
+  const hasAcceptedAccess = !isSupabaseConfigured || accessConsent.ready;
   const [connectionNotice, setConnectionNotice] = useState("");
   const [saveStatus, setSaveStatus] = useState(null);
   const [closureSaveState, setClosureSaveState] = useState("idle");
@@ -303,7 +307,7 @@ export default function App() {
     const requestId = ++appointmentsRequestRef.current;
     setSessionRecords([]);
     setAppointmentRecords([]);
-    if (approvalState.status !== "approved" || !authSession?.user) {
+    if (approvalState.status !== "approved" || !authSession?.user || !hasAcceptedAccess) {
       setAppointmentsStatus({ loading: false, authoritative: false, error: "" });
       return;
     }
@@ -334,10 +338,12 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [approvalState.status, authSession?.user?.id]);
+  }, [approvalState.status, authSession?.user?.id, hasAcceptedAccess]);
 
   async function getFreshAuthSessionForSimulation() {
     if (!isSupabaseConfigured || !supabase) return authSession;
+
+    if (!hasAcceptedAccess) throw new Error("Debes aceptar las condiciones de ingreso antes de usar el simulador.");
 
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) {
@@ -1156,7 +1162,7 @@ export default function App() {
       const { error } = await supabase.auth.signOut();
       if (error) {
         setConnectionNotice("No pudimos cerrar tu sesión de acceso. Revisa la conexión y vuelve a intentarlo.");
-        return;
+        return false;
       }
     }
     setHistory([]);
@@ -1169,6 +1175,7 @@ export default function App() {
     setConnectionNotice("");
     setAuthLoading(false);
     setScreen(screens.home);
+    return true;
   }
 
   async function refreshApproval() {
@@ -1332,6 +1339,14 @@ export default function App() {
         <AppFooter onOpenTrust={openTrustCenter} />
       </main>
     );
+  }
+
+  if (isSupabaseConfigured && authSession && !hasAcceptedAccess) {
+    if (screen === screens.trustCenter) {
+      return <main className="app-shell"><TrustCenter key={authSession.user.id} userId={authSession.user.id} onBack={closeTrustCenter} onBusyChange={handleConsentBusy} /></main>;
+    }
+    return <AccessConsentGate key={`${authSession.user.id}:${accessConsent.document?.version || accessConsent.status}`}
+      access={accessConsent} email={authSession.user.email} onSignOut={handleSignOut} onOpenTrust={openTrustCenter} />;
   }
 
   const userEmail = isSupabaseConfigured && authSession ? authSession.user.email : "";

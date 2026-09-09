@@ -32,6 +32,8 @@ begin
     'feedback','{}'::jsonb,'status','closure_pending','score',40);
   perform set_config('request.jwt.claims',jsonb_build_object('sub',owner_id,'role','authenticated')::text,true);
   set local role authenticated;
+  insert into public.simulation_access_consents(user_id,document_version,adult_confirmed,educational_use_accepted,data_processing_accepted)
+  select owner_id,version,true,true,true from public.simulation_access_documents where is_current;
   select count(*) into saved_count from public.save_simulation_session_closure(payload);
   if saved_count<>1 or not exists(select 1 from public.simulation_sessions where id=session_id and status='closure_pending')
     or not exists(select 1 from public.simulation_appointments where id=appt_id and status='closure_pending') then

@@ -9629,3 +9629,25 @@ body:has(.authenticated-shell),
   .results-view-switch { gap: 8px; }
   .results-view-switch button { padding: 12px; }
 }
+
+/* Mandatory entry acceptance: document scrolls with the page, including small screens. */
+.access-consent-shell { min-height: 100dvh; padding: clamp(16px, 4vw, 48px); }
+.access-consent-card { width: 100%; max-width: 900px; margin: 0 auto; padding: clamp(20px, 4vw, 44px); background: #fff; border: 1px solid #d4e2e3; border-radius: 24px; color: #172b35; box-sizing: border-box; }
+.access-consent-card h1 { font-size: clamp(1.65rem, 4vw, 2.5rem); line-height: 1.15; margin: 12px 0 18px; }
+.access-consent-card p { line-height: 1.65; }
+.access-consent-card header > svg { display: block; color: #147b83; width: 36px; height: 36px; margin-bottom: 14px; }
+.access-consent-account, .access-consent-document { overflow-wrap: anywhere; }
+.access-consent-document section { margin: 22px 0; }
+.access-consent-document h3 { font-size: 1.08rem; margin-bottom: 6px; }
+.access-consent-document p { margin-top: 0; white-space: pre-line; }
+.access-consent-form { margin-top: 28px; padding-top: 22px; border-top: 1px solid #d4e2e3; }
+.access-consent-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.access-consent-form legend { font-weight: 700; margin-bottom: 14px; }
+.access-consent-form .consent-checkbox { display: flex; align-items: flex-start; gap: 12px; margin: 14px 0; line-height: 1.5; }
+.access-consent-form input[type="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; margin-top: 3px; accent-color: #147b83; }
+.access-consent-form .primary-action { white-space: normal; min-height: 48px; }
+.access-consent-exit { margin-top: 20px; }
+.access-consent-card button { max-width: 100%; white-space: normal; }
+.access-consent-summary { margin-bottom: 32px; padding-bottom: 28px; border-bottom: 1px solid #d4e2e3; }
+.access-consent-summary details { margin: 16px 0; }
+.access-consent-summary summary { cursor: pointer; font-weight: 700; }

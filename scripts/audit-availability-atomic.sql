@@ -25,6 +25,8 @@ begin
 
   perform set_config('request.jwt.claims', jsonb_build_object('sub',user_a,'role','authenticated')::text, true);
   set local role authenticated;
+  insert into public.simulation_access_consents(user_id,document_version,adult_confirmed,educational_use_accepted,data_processing_accepted)
+  select user_a,version,true,true,true from public.simulation_access_documents where is_current;
   perform public.replace_simulation_student_availability('[{"day_of_week":1,"start_time":"09:00","end_time":"12:00"}]');
   if (select count(*) from public.simulation_student_availability) <> 1 then
     raise exception 'FAIL: ownership isolation or valid replacement';

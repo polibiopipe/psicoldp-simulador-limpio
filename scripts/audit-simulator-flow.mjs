@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
@@ -17,7 +17,10 @@ let appointmentFailure = false;
 let responseResolve;
 let responseCalls = 0;
 const auth = { user: { id: 'flow-student', email: 'student@example.test' } };
-const tables = { user_profiles: [{ ...auth.user, approved: true }], simulation_sessions: [], simulation_appointments: [] };
+const accessDocument = { ...JSON.parse(await readFile(new URL('../docs/access-consent-1.0.json', import.meta.url), 'utf8')), is_current: true };
+let practiceReads = 0;
+let accessWrites = 0;
+const tables = { simulation_access_documents: [accessDocument], simulation_access_consents: [], user_profiles: [{ ...auth.user, approved: true }], simulation_sessions: [], simulation_appointments: [] };
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.window = {
   scrollY: 0, addEventListener() {}, removeEventListener() {}, scrollTo() {},
@@ -53,9 +56,11 @@ globalThis.__flowSupabase = {
       eq(key, value) { filters.push((r) => r[key] === value); return this; },
       in(key, values) { filters.push((r) => values.includes(r[key])); return this; },
       limit(n) { max = n; return this; },
-      maybeSingle() { single = true; return this; },
+      maybeSingle() { single = true; return this; }, single() { single = true; return this; },
+      insert(row) { payload = { ...row, id: 'access-receipt', created_at: new Date().toISOString(), document_snapshot: accessDocument }; accessWrites++; return this; },
       upsert(row) { payload = row; return this; },
       then(yes, no) {
+        if (["simulation_sessions", "simulation_appointments"].includes(table) && !payload) practiceReads++;
         if (payload && (writeFailure || (appointmentFailure && table === 'simulation_appointments'))) {
           return Promise.resolve({ data: null, error: { message: 'offline' } }).then(yes, no);
         }
@@ -91,7 +96,25 @@ try {
   });
   const s = await import(pathToFileURL(outfile));
   await act(async () => { ui = TestRenderer.create(React.createElement(s.App)); await flush(); });
+  assert.equal(ui.root.findAllByType(s.AuthenticatedLayout).length, 0, 'the workspace stays unmounted until affirmative acceptance');
+  assert.equal(practiceReads, 0, 'practice history must not load behind the gate');
+  assert.equal(accessWrites, 0, 'login alone does not imply acceptance');
+  assert.ok(ui.root.findAllByType('input').every((n) => n.props.checked === false));
+  const submitConsent = () => ui.root.findByType('form').props.onSubmit({ preventDefault() {} });
+  await act(async () => { await submitConsent(); });
+  assert.equal(accessWrites, 0, 'empty acceptance cannot be submitted');
+  for (const index of [0, 1, 2]) await act(async () => { ui.root.findAllByType('input')[index].props.onChange({ target: { checked: true } }); });
+  writeFailure = true;
+  await act(async () => { await submitConsent(); });
+  assert.equal(ui.root.findAllByType(s.AuthenticatedLayout).length, 0, 'a failed database write does not admit the user');
+  assert.match(JSON.stringify(ui.toJSON()), /No se confirmó tu aceptación/);
+  writeFailure = false;
+  await act(async () => { await Promise.all([submitConsent(), submitConsent()]); await flush(); });
+  assert.equal(accessWrites, 2, 'one failed attempt plus one successful write; double clicks do not duplicate');
+  assert.equal(tables.simulation_research_consent_events, undefined, 'mandatory entry does not consent to research');
   assert.equal(ui.root.findByType(s.AuthenticatedLayout).props.currentScreen, 'home');
+  await act(async () => { ui.unmount(); ui = TestRenderer.create(React.createElement(s.App)); await flush(); });
+  assert.equal(ui.root.findByType(s.AuthenticatedLayout).props.currentScreen, 'home', 'confirmed acceptance persists across reloads');
   assert.equal(button('Progreso'), undefined, 'no existe una ruta duplicada con otro nombre');
   const home = () => ui.root.findByType(s.ClinicalDashboard);
   await act(async () => { await home().props.onStartSession('claudio', 1); });
@@ -177,7 +200,14 @@ try {
   s.saveSessionSummary({ caseId: 'claudio', sessionNumber: 1, simulatedDate: new Date().toISOString(), clinicalDecision: { action: 'close_or_refer', proposedSessions: 4 } }, auth.user.id);
   assert.equal(s.buildClinicalAgendaItem(caseItem).nextSessionNumber, null, 'cerrar antes de la cuarta sesión no propone otra entrevista');
   await act(async () => { ui.unmount(); });
-  console.log('PASS: flujo de preparación, envío, guardado fallido, salida, reanudación, cierre pendiente, cambio de dispositivo y cierre definitivo.');
+  accessDocument.version = '2.0';
+  await act(async () => { ui = TestRenderer.create(React.createElement(s.App)); await flush(); });
+  assert.equal(ui.root.findAllByType(s.AuthenticatedLayout).length, 0, 'a new version requires a new explicit acceptance');
+  assert.ok(ui.root.findAllByType('input').every((n) => n.props.checked === false));
+  accessDocument.version = '1.0';
+  await act(async () => { ui.unmount(); auth.user = { id: 'second-student', email: 'second@example.invalid' }; tables.user_profiles.push({ ...auth.user, approved: true }); ui = TestRenderer.create(React.createElement(s.App)); await flush(); });
+  assert.equal(ui.root.findAllByType(s.AuthenticatedLayout).length, 0, 'one account cannot reuse another account acceptance');
+  console.log('PASS: mandatory gate, unchecked declarations, failed writes, double clicks, account/version isolation and flujo de preparación, envío, guardado fallido, salida, reanudación, cierre pendiente, cambio de dispositivo y cierre definitivo.');
 } finally {
   if (ui) await act(async () => { ui.unmount(); });
   await rm(temp, { recursive: true, force: true });

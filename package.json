@@ -28,7 +28,8 @@
     "audit:conversation-scenarios": "node scripts/audit-avatar-conversation-scenarios.mjs",
     "audit:all": "node scripts/audit-all.mjs",
     "audit:simulator-flow": "node scripts/audit-simulator-flow.mjs",
-    "audit:research-consent": "node scripts/audit-research-consent.mjs"
+    "audit:research-consent": "node scripts/audit-research-consent.mjs",
+    "audit:access-consent": "node scripts/audit-access-consent.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",

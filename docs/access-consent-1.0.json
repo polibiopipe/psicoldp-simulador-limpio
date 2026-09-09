@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "title": "Condiciones de uso educativo y privacidad de Escucha Viva",
+  "information": {
+    "sections": [
+      {
+        "title": "Responsable y finalidad",
+        "text": "Escucha Viva es un simulador educativo de Núcleo Vivo, desarrollado por Polibio Solís. El contacto para privacidad, consultas y solicitudes es contacto@nucleovivo.net. Utilizamos los datos necesarios para administrar tu cuenta, permitir el acceso, guardar y retomar tus prácticas, gestionar tu agenda y ofrecer retroalimentación formativa."
+      },
+      {
+        "title": "Uso educativo y mayoría de edad",
+        "text": "El acceso está dirigido a personas de 18 años o más. Los personajes y sus antecedentes son ficticios. El simulador no entrega atención de salud ni reemplaza la supervisión docente. La inteligencia artificial puede equivocarse; debes revisar críticamente sus respuestas. Puedes pausar la actividad si te produce malestar."
+      },
+      {
+        "title": "Qué datos se tratan",
+        "text": "Se vinculan a tu cuenta el nombre y correo, las citas, disponibilidad, objetivos de preparación, mensajes de la entrevista, cierres, retroalimentación y registros necesarios de funcionamiento. Guardamos también esta aceptación, su versión y fecha. No ingreses datos de pacientes reales, información de tu propia salud ni otros antecedentes sensibles. Esta aceptación no autoriza grabaciones de audio, video ni biometría."
+      },
+      {
+        "title": "Proveedores y tratamiento fuera de Chile",
+        "text": "Supabase gestiona la cuenta y los registros en la región Este de Estados Unidos; Vercel aloja la aplicación y procesa sus solicitudes. Google Gemini recibe los mensajes de la entrevista, su contexto y el caso ficticio para generar respuestas. Según la modalidad del servicio de Google, estos mensajes pueden usarse para mejorar sus productos y ser revisados por personas; consulta sus condiciones en https://ai.google.dev/gemini-api/terms. No se ofrece una garantía general de exclusión de entrenamiento del proveedor. Algunas respuestas pueden generarse localmente. El personal que administra la infraestructura puede acceder técnicamente a los registros para soporte y gestión."
+      },
+      {
+        "title": "Conservación, copia y retiro de la autorización",
+        "text": "Los registros de práctica se conservan para dar continuidad a tu historial hasta que los elimines desde «Sesiones» o solicites su gestión. El navegador puede conservar borradores y copias de trabajo. Puedes descargar los registros disponibles de tu cuenta desde «Mis datos y privacidad», y solicitar acceso, rectificación, eliminación o revocar esta autorización a contacto@nucleovivo.net. La gestión de respaldos y registros técnicos requiere esa solicitud; no se promete un borrado inmediato de todas las copias. Revocar el tratamiento necesario supone dejar de utilizar el simulador. La revocación no invalida el tratamiento realizado legítimamente antes de ella."
+      },
+      {
+        "title": "Tu decisión y la investigación",
+        "text": "Puedes rechazar estas condiciones y cerrar sesión; en ese caso no ingresarás al simulador. Aceptarlas habilita únicamente el uso educativo y el tratamiento necesario descrito. No autoriza usar tus prácticas para una investigación, publicidad o testimonios. Si hay una invitación a un estudio, tendrá información y consentimiento propios: puedes rechazarla o retirarte sin perder el acceso educativo por esa decisión."
+      }
+    ],
+    "declarations": {
+      "adult": "Confirmo que tengo 18 años o más.",
+      "educationalUse": "He leído y acepto las condiciones de uso educativo y sus límites.",
+      "dataProcessing": "Autorizo el tratamiento de mis datos para las finalidades de funcionamiento descritas, incluidos los proveedores y el tratamiento fuera de Chile informados."
+    }
+  }
+}

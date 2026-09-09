@@ -1,3 +1,4 @@
+import { readAccessConsent } from "../src/engine/accessConsentPolicy.js";
 import { cases } from "../src/data/cases.js";
 import { patientFacts } from "../src/data/patientFacts.js";
 import { patientMasterRecords } from "../src/data/patients/index.js";
@@ -406,6 +407,13 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
   }
   if (!profile?.approved) {
     return usageError("ACCESS_NOT_APPROVED", "Tu acceso aun no esta aprobado para iniciar sesiones.", 403);
+  }
+
+  try {
+    const access = await readAccessConsent(serviceClient, user.id);
+    if (!access.receipt) return usageError("ACCESS_CONSENT_REQUIRED", "Debes aceptar las condiciones de ingreso. Recarga el simulador para revisarlas.", 403);
+  } catch {
+    return usageError("ACCESS_CONSENT_LOOKUP_FAILED", "No pudimos verificar tu aceptación. Reintenta antes de continuar.", 503, true);
   }
 
   const appointmentId = sanitizeId(payload.appointmentId);
