@@ -7,7 +7,7 @@ import {
 } from "../engine/sessionHistory.js";
 import { isSupabaseConfigured } from "../lib/supabaseClient.js";
 
-export function SavedSessions({ authSession, onBackHome, onHistoryChange }) {
+export function SavedSessions({ authSession, onBackHome, onHistoryChange, onResumeSession }) {
   const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -158,6 +158,11 @@ export function SavedSessions({ authSession, onBackHome, onHistoryChange }) {
                   </div>
                   <p>{getSessionFeedback(session).briefSummary || session.summary?.brief || session.summary?.closure}</p>
                   <div className="saved-session-actions">
+                    {onResumeSession && ["in_progress", "closure_pending"].includes(session.status) && (
+                      <button className="primary-action" type="button" onClick={() => onResumeSession(session.caseId, session.sessionNumber)}>
+                        {session.status === "closure_pending" ? "Completar cierre" : "Retomar entrevista"}
+                      </button>
+                    )}
                     <button
                       className="secondary-action"
                       type="button"

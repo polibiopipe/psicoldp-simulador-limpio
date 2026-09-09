@@ -1,7 +1,7 @@
 import { readClinicalCache, writeClinicalCache } from "./clinicalStorage.js";
 import { getPatientMasterRecord } from "../data/patients/index.js";
 import { getSessionStage } from "../data/sessionPrompts.js";
-import { formatClinicalDecision } from "./clinicalPlanning.js";
+import { decisionAllowsNextSession, formatClinicalDecision } from "./clinicalPlanning.js";
 import {
   buildProcessSummary,
   getSessionSummariesForCase,
@@ -64,8 +64,9 @@ export function buildClinicalAgendaItem(caseItem) {
     derivePlannedSessions({ latestSummary, agendaEntry, patientRecord }),
     completedSessions
   );
-  const nextSessionNumber = completedSessions < plannedSessions ? completedSessions + 1 : null;
   const latestDecision = latestSummary?.clinicalDecision || null;
+  const continuationAllowed = !latestDecision?.action || decisionAllowsNextSession(latestDecision.action);
+  const nextSessionNumber = continuationAllowed && completedSessions < plannedSessions ? completedSessions + 1 : null;
   const processMemory = processSummary.processMemory || {};
   const noteStatus = deriveClinicalNoteStatus(latestSummary);
   const task = derivePendingTask({ latestSummary, processMemory });
@@ -608,10 +609,10 @@ function deriveProcessState({
   if (risk?.status === "open") return CLINICAL_PROCESS_STATES.riskOpen;
   if (latestDecision?.action === "refer") return CLINICAL_PROCESS_STATES.referred;
   if (latestDecision?.action === "follow_up") return CLINICAL_PROCESS_STATES.followUpPending;
-  if (["request_supervision", "apply_instruments", "beyond_simulator"].includes(latestDecision?.action)) {
+  if (["request_supervision", "apply_instruments", "beyond_simulator", "request_complementary_evaluation", "reformulate_hypothesis", "start_intervention_design"].includes(latestDecision?.action)) {
     return CLINICAL_PROCESS_STATES.needsReevaluation;
   }
-  if (latestDecision?.action === "close_process" && completedSessions >= plannedSessions) {
+  if (["close_process", "close_or_refer"].includes(latestDecision?.action)) {
     return CLINICAL_PROCESS_STATES.closed;
   }
   if (!noteStatus?.completed) return CLINICAL_PROCESS_STATES.clinicalNotePending;

@@ -26,7 +26,8 @@
     "audit:narrative-disclosure": "node scripts/audit-narrative-disclosure.mjs",
     "audit:narrative-integration": "node scripts/audit-local-narrative-integration.mjs",
     "audit:conversation-scenarios": "node scripts/audit-avatar-conversation-scenarios.mjs",
-    "audit:all": "node scripts/audit-all.mjs"
+    "audit:all": "node scripts/audit-all.mjs",
+    "audit:simulator-flow": "node scripts/audit-simulator-flow.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",

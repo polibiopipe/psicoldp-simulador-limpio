@@ -1,17 +1,13 @@
 import React from "react";
 
-export function ProgressBar({ turnCount, maxTurns = 10 }) {
-  const percentage = Math.min(100, Math.round((turnCount / maxTurns) * 100));
-
+export function ProgressBar({ turnCount }) {
   return (
-    <div className="progress-wrap" aria-label={`Progreso de sesión ${percentage}%`}>
+    <div className="progress-wrap" aria-label="Actividad de la entrevista">
       <div className="progress-meta">
-        <span>Progreso formativo</span>
-        <strong>{turnCount} turnos</strong>
+        <span>Intervenciones realizadas</span>
+        <strong>{turnCount}</strong>
       </div>
-      <div className="progress-track">
-        <div style={{ width: `${percentage}%` }} />
-      </div>
+      <p>El aprendizaje se revisa al cerrar la sesión.</p>
     </div>
   );
 }

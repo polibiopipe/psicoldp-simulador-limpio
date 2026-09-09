@@ -9525,3 +9525,44 @@ body,
     min-height: 140px;
   }
 }
+
+/* The completed interview has two deliberate steps, preserving drafts between them. */
+.session-results-flow {
+  grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
+}
+.session-results-flow > [hidden] { display: none; }
+.results-view-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.results-view-switch button {
+  flex: 1 1 220px;
+  border: 1px solid #aac5c8;
+  border-radius: 14px;
+  padding: 15px 20px;
+  background: #fffdf8;
+  color: #173e46;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.results-view-switch button[aria-pressed="true"] { background: #216c76; color: #fff; }
+.results-view-switch button:focus-visible,
+.brief-reference-details > summary:focus-visible,
+.interview-writing-help > summary:focus-visible { outline: 3px solid #247e8c; outline-offset: 3px; }
+.session-results-flow .results-summary { position: static; margin-bottom: 20px; }
+.session-results-flow .feedback-panel { margin-top: 20px; }
+.brief-reference-details > summary,
+.interview-writing-help > summary { cursor: pointer; padding: 10px 0; font-weight: 700; }
+.interview-writing-help { margin-bottom: 10px; }
+.clinical-plan-form > details { grid-column: 1 / -1; }
+.clinical-plan-form > details label { display: grid; gap: 8px; margin-block: 14px; }
+.progress-wrap > p { font-size: .85rem; color: #52676c; margin-bottom: 0; }
+@media (max-width: 760px) {
+  .results-view-switch { gap: 8px; }
+  .results-view-switch button { padding: 12px; }
+}

@@ -19,6 +19,7 @@ export function SessionSelector({
             type="button"
             className={currentSession === stage.number ? "selected" : ""}
             disabled={!enabled}
+            aria-pressed={currentSession === stage.number}
             onClick={() => enabled && onSelect?.(stage.number)}
             title={stage.description}
           >

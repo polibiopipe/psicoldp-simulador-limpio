@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, RotateCcw } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 import { EmailShare } from "./EmailShare.jsx";
 
@@ -8,8 +8,8 @@ export function FeedbackPanel({
   caseItem,
   history,
   sessionNumber = 1,
-  onRestart,
   onBackToInterview,
+  onReviewClosure,
   onSelectCase
 }) {
   const visibleHistory = history.filter((entry) => !entry.isSessionPrelude);
@@ -65,10 +65,6 @@ export function FeedbackPanel({
               Volver a entrevista
             </button>
           )}
-          <button className="primary-action" type="button" onClick={onRestart}>
-            <RotateCcw aria-hidden="true" />
-            Repetir simulación
-          </button>
         </div>
       </section>
     );
@@ -109,11 +105,6 @@ export function FeedbackPanel({
       </section>
 
       <div className="feedback-sections feedback-brief-grid">
-        <section className="feedback-block">
-          <h2>Síntesis breve</h2>
-          <p>{sessionFeedback.briefSummary}</p>
-        </section>
-
         <section className="feedback-block">
           <h2>Fortalezas observadas</h2>
           <ul>
@@ -280,17 +271,21 @@ export function FeedbackPanel({
         </ol>
       </details>
 
-      <EmailShare report={report} caseItem={caseItem} history={visibleHistory} />
+      <details className="history-details">
+        <summary>Exportar o compartir la retroalimentación</summary>
+        <EmailShare report={report} caseItem={caseItem} history={visibleHistory} />
+      </details>
 
       <div className="action-row">
         <button className="secondary-action" type="button" onClick={onSelectCase}>
           Elegir otro caso
           <ArrowRight aria-hidden="true" />
         </button>
-        <button className="primary-action" type="button" onClick={onRestart}>
-          <RotateCcw aria-hidden="true" />
-          Repetir simulación
-        </button>
+        {onReviewClosure && (
+          <button className="primary-action" type="button" onClick={onReviewClosure}>
+            Revisar mi cierre
+          </button>
+        )}
       </div>
     </section>
   );

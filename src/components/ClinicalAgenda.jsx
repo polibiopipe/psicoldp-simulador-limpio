@@ -825,7 +825,7 @@ function AgendaPatientCard({
   onOpenReminder
 }) {
   const canStart = item.nextSessionNumber && item.completedSessions > 0;
-  const actionLabel = item.completedSessions ? "Iniciar próxima sesión" : "Preparar caso";
+  const actionLabel = item.completedSessions ? "Preparar próxima sesión" : "Preparar caso";
 
   return (
     <article
@@ -895,7 +895,7 @@ function AgendaPatientCard({
             disabled={item.completedSessions > 0 && !item.nextSessionNumber}
           >
             <Play aria-hidden="true" />
-            {item.nextSessionNumber ? actionLabel : "Proceso cerrado"}
+            {item.nextSessionNumber ? actionLabel : "Sin entrevista pendiente"}
           </button>
         )}
         <button className="secondary-action" type="button" onClick={onSchedule}>

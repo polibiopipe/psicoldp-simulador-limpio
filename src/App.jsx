@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cases, difficultyOptions } from "./data/cases.js";
 import { createPatientResponse } from "./utils/responseEngine.js";
 import { buildEducationalReport } from "./utils/scoring.js";
@@ -40,6 +40,7 @@ import {
   buildInitialPreSessionPlan,
   normalizePreSessionPlan
 } from "./engine/clinicalPreparation.js";
+import { buildClinicalAgendaItem } from "./engine/clinicalAgenda.js";
 import { getNextSessionNumber, getSessionOpening } from "./data/sessionPrompts.js";
 import {
   getAvailableSessionNumbers,
@@ -49,10 +50,8 @@ import {
 import { CaseSelector } from "./components/CaseSelector.jsx";
 import { CaseBrief } from "./components/CaseBrief.jsx";
 import { SimulationChat } from "./components/SimulationChat.jsx";
-import { FeedbackPanel } from "./components/FeedbackPanel.jsx";
-import { ResultsSummary } from "./components/ResultsSummary.jsx";
+import { SessionResults } from "./components/SessionResults.jsx";
 import { EthicalNotice } from "./components/EthicalNotice.jsx";
-import { SessionClosure } from "./components/SessionClosure.jsx";
 import { SavedSessions } from "./components/SavedSessions.jsx";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { IntroVideo } from "./components/IntroVideo.jsx";
@@ -120,6 +119,19 @@ export default function App() {
   const authIdentityRef = useRef("");
   const approvalVerificationRef = useRef(0);
   const closureSavingRef = useRef(false);
+  const interviewBusyRef = useRef(false);
+  const navigationSavingRef = useRef(false);
+  const openingPracticeRef = useRef(false);
+  const closureDraftRef = useRef(null);
+  const [interviewBusy, setInterviewBusy] = useState(false);
+  const [navigationSaving, setNavigationSaving] = useState(false);
+  const [openingPractice, setOpeningPractice] = useState(false);
+  const handleInterviewBusy = useCallback((busy) => {
+    if (isSupabaseConfigured && authIdentityRef.current !== authSession?.user?.id) return;
+    interviewBusyRef.current = busy;
+    setInterviewBusy(busy);
+  }, [authSession?.user?.id]);
+  const captureClosureDraft = useCallback((draft) => { closureDraftRef.current = draft; }, []);
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
   const report = useMemo(() => buildEducationalReport(history, selectedCase), [history, selectedCase]);
@@ -222,6 +234,10 @@ export default function App() {
       authIdentityRef.current = nextUserId;
       if (getClinicalStorageOwner() !== nextUserId) {
         setClinicalStorageOwner(nextUserId);
+        interviewBusyRef.current = false;
+        setInterviewBusy(false);
+        closureDraftRef.current = null;
+        setPendingResultsExit(null);
         approvalStateRef.current = { status: "checking" };
         setHistory([]);
         setSessionSummaries([]);
@@ -450,16 +466,22 @@ export default function App() {
   }
 
   async function selectCase(...args) {
+    if (openingPracticeRef.current) return;
+    openingPracticeRef.current = true;
+    setOpeningPractice(true);
     try { return await selectCaseUnchecked(...args); }
     catch (error) { setConnectionNotice(error.message || "No pudimos abrir la práctica. Revisa la conexión y reintenta."); }
+    finally { openingPracticeRef.current = false; setOpeningPractice(false); }
   }
 
   async function selectCaseUnchecked(caseId) {
+    const openingOwner = authIdentityRef.current;
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
     const resumeRecord =
       await getLatestInProgressSessionForCase(authSession, caseId) ||
       findLatestResumableSessionRecord(sessionRecords, caseId);
+    if (openingOwner !== authIdentityRef.current) return false;
     if (resumeRecord) {
       await openResumeRecord({
         caseId,
@@ -478,11 +500,13 @@ export default function App() {
             latestSummary.clinicalDecision?.proposedSessions || latestSummary.preSessionPlan?.proposedSessionCount
         }
       : null;
+    const targetSession = buildClinicalAgendaItem(nextCase).nextSessionNumber || 1;
+    const previousSummary = getPreviousSessionSummary({ caseId, sessionNumber: targetSession, sessionSummaries: summaries });
     setSelectedCaseId(caseId);
-    setSessionNumber(1);
+    setSessionNumber(targetSession);
     setSessionSummaries(summaries);
-    setSessionSummary(null);
-    setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: nextCase, sessionNumber: 1, basePlan }));
+    setSessionSummary(previousSummary);
+    setPreSessionPlan(buildInitialPreSessionPlan({ caseItem: nextCase, sessionNumber: targetSession, basePlan }));
     setHistory([]);
     updateActiveSessionRecordId("");
     updateActiveAppointmentId("");
@@ -492,11 +516,16 @@ export default function App() {
   }
 
   async function openCaseFromAgenda(...args) {
+    if (openingPracticeRef.current) return;
+    openingPracticeRef.current = true;
+    setOpeningPractice(true);
     try { return await openCaseFromAgendaUnchecked(...args); }
     catch (error) { setConnectionNotice(error.message || "No pudimos abrir la práctica. Revisa la conexión y reintenta."); }
+    finally { openingPracticeRef.current = false; setOpeningPractice(false); }
   }
 
   async function openCaseFromAgendaUnchecked(caseId, targetSession = 1, nextScreen = screens.brief) {
+    const openingOwner = authIdentityRef.current;
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
     const safeSession = Math.max(1, Number(targetSession) || 1);
@@ -516,6 +545,7 @@ export default function App() {
     const resumeRecord =
       await getLatestInProgressSessionForCase(authSession, caseId, safeSession) ||
       findResumableSessionRecord(sessionRecords, caseId, safeSession);
+    if (openingOwner !== authIdentityRef.current) return false;
     if (resumeRecord) {
       await openResumeRecord({
         caseId,
@@ -526,6 +556,8 @@ export default function App() {
       return;
     }
 
+    nextScreen = screens.brief;
+    setClosureSaveState("idle");
     setSelectedCaseId(caseId);
     setSessionNumber(safeSession);
     setSessionSummaries(summaries);
@@ -551,11 +583,16 @@ export default function App() {
   }
 
   async function startSession(...args) {
+    if (openingPracticeRef.current) return;
+    openingPracticeRef.current = true;
+    setOpeningPractice(true);
     try { return await startSessionUnchecked(...args); }
     catch (error) { setConnectionNotice(error.message || "No pudimos abrir la práctica. Revisa la conexión y reintenta."); }
+    finally { openingPracticeRef.current = false; setOpeningPractice(false); }
   }
 
   async function startSessionUnchecked(session, planOverride = null) {
+    const openingOwner = authIdentityRef.current;
     const summary = getPreviousSessionSummary({
       caseId: selectedCase.id,
       sessionNumber: session,
@@ -568,15 +605,15 @@ export default function App() {
     const resumeRecord =
       await getLatestInProgressSessionForCase(authSession, selectedCase.id, session) ||
       findResumableSessionRecord(sessionRecords, selectedCase.id, session);
+    if (openingOwner !== authIdentityRef.current) return false;
     if (resumeRecord) {
-      await openResumeRecord({
+      return await openResumeRecord({
         caseId: selectedCase.id,
         nextCase: selectedCase,
         summaries: sessionSummaries,
         resumeRecord,
         preSessionPlanOverride: normalizedPlan
       });
-      return;
     }
     setSessionNumber(session);
     setSessionSummary(summary);
@@ -595,6 +632,7 @@ export default function App() {
     setClosureSaveState("idle");
     clearSessionEndTracking();
     setScreen(screens.simulation);
+    return true;
   }
 
   async function openResumeRecord({
@@ -604,6 +642,7 @@ export default function App() {
     resumeRecord,
     preSessionPlanOverride = null
   }) {
+    const resumeOwner = authIdentityRef.current;
     const resumeSession = Number(resumeRecord.sessionNumber) || 1;
     const previousSummary = getPreviousSessionSummary({
       caseId,
@@ -611,7 +650,7 @@ export default function App() {
       sessionSummaries: summaries
     });
     const latestSummary = summaries.at(-1);
-    const basePlan = buildBasePlanFromSummary(previousSummary || latestSummary);
+    const basePlan = resumeRecord.feedback?.preSessionPlan || resumeRecord.summary?.preSessionPlan || buildBasePlanFromSummary(previousSummary || latestSummary);
     const nextPlan =
       preSessionPlanOverride ||
       buildInitialPreSessionPlan({
@@ -641,6 +680,7 @@ export default function App() {
       resumeAppointment = resumeValidation.appointment;
     }
 
+    if (resumeOwner !== authIdentityRef.current) return false;
     console.log("[sessions] resume open chat", {
       caseId,
       sessionNumber: resumeSession,
@@ -671,9 +711,10 @@ export default function App() {
     }
     if (resumeRecord.status === "closure_pending") {
       setScreen(screens.results);
-      return;
+      return true;
     }
     setScreen(screens.simulation);
+    return true;
   }
 
   function beginSessionFromPreparation(session, preparationState = {}) {
@@ -684,7 +725,7 @@ export default function App() {
       },
       { caseItem: selectedCase, sessionNumber: session }
     );
-    startSession(session, nextPlan);
+    return startSession(session, nextPlan);
   }
 
   function chooseSessionForBrief(session) {
@@ -781,7 +822,7 @@ export default function App() {
         conversationStage: conversationContext.conversationStage || null
       });
     } catch (error) {
-      if (error?.errorType === "AUTH_INVALID") {
+      if (error?.errorType === "AUTH_INVALID" && authIdentityRef.current === currentAuthSession?.user?.id) {
         setAuthSession(null);
         setApprovalState({ status: "signed_out", profile: null, error: null });
         setAuthLoading(false);
@@ -813,6 +854,10 @@ export default function App() {
           : null,
         createdAt
       };
+    if (activeSessionRecordIdRef.current !== sessionRecordId ||
+        (isSupabaseConfigured && authIdentityRef.current !== currentAuthSession?.user?.id)) {
+      throw new Error("La sesión cambió mientras llegaba la respuesta. Retoma la práctica desde el inicio.");
+    }
     const nextHistory = [...history, nextEntry];
     setHistory(nextHistory);
     void persistSessionProgress(nextHistory, { recordId: sessionRecordId, appointment });
@@ -888,7 +933,10 @@ export default function App() {
     }
 
     const result = await saveSimulationAppointment(currentAuthSession, nextAppointment);
-    const savedAppointment = result.data || nextAppointment;
+    if (!result.cloudSaved || !result.data) {
+      throw new Error(result.error?.message || result.error || "No pudimos confirmar el inicio de la cita. Reintenta desde la agenda.");
+    }
+    const savedAppointment = result.data;
     updateActiveAppointmentId(savedAppointment.id, savedAppointment);
     setAppointmentRecords((current) => mergeAppointmentRecordList(current, savedAppointment));
     return savedAppointment;
@@ -967,7 +1015,7 @@ export default function App() {
     });
 
     const saveResult = await saveSessionHistory(sessionRecord, { userId: authSession?.user?.id || "local" });
-    if (activeSessionRecordIdRef.current !== nextRecordId || (isSupabaseConfigured && authIdentityRef.current !== authSession?.user?.id)) return;
+    if (activeSessionRecordIdRef.current !== nextRecordId || (isSupabaseConfigured && authIdentityRef.current !== authSession?.user?.id)) return { cloudSaved: false, error: "La sesión cambió durante el guardado." };
     updateActiveSessionRecordId(nextRecordId, sessionRecord);
     setSessionRecords((current) => mergeSessionRecordList(current, sessionRecord));
     if (!saveResult.cloudSaved && saveResult.error) {
@@ -975,9 +1023,12 @@ export default function App() {
       console.warn("[sessions] save error message", saveResult.error?.message || saveResult.error);
       console.warn("[sessions] save error code", saveResult.error?.code || null);
     }
+    return saveResult;
   }
 
   async function finishSession(requestedReason = "") {
+    if (interviewBusyRef.current || closureSavingRef.current) return;
+    closureDraftRef.current = null;
     const endedAt = new Date();
     const appointment = getCurrentAppointmentForSession({ includeExpired: true });
     sessionEndReasonRef.current = resolveSessionEndReason({
@@ -1022,6 +1073,9 @@ export default function App() {
         type: "saving",
         message: "Guardando sesion..."
       });
+      if (status === "completed" && clinicalDecision && !clinicalDecision.justification?.trim()) {
+        throw new Error("Fundamenta tu decisión antes de guardar los cambios del cierre.");
+      }
       const appointment = getCurrentAppointmentForSession({ includeExpired: true });
       const endedAt = sessionEndedAtRef.current || new Date().toISOString();
       const endReason = sessionEndReasonRef.current || resolveSessionEndReason({
@@ -1089,12 +1143,17 @@ export default function App() {
   }
 
   async function saveClosurePendingSession() {
-    return saveCompletedSession({ status: "closure_pending" });
+    const status = activeSessionRecordSnapshot?.status === "completed" ? "completed" : "closure_pending";
+    return saveCompletedSession({ ...(closureDraftRef.current || {}), status });
   }
 
   async function handleSignOut() {
     if (supabase) {
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        setConnectionNotice("No pudimos cerrar tu sesión de acceso. Revisa la conexión y vuelve a intentarlo.");
+        return;
+      }
     }
     setHistory([]);
     updateActiveSessionRecordId("");
@@ -1135,19 +1194,39 @@ export default function App() {
   }
 
   function navigateWorkspace(targetScreen) {
-    requestExitFromResults(targetScreen);
+    return requestExitFromResults(targetScreen);
   }
 
-  function requestExitFromResults(destination = screens.home, exitAction = null) {
+  async function requestExitFromResults(destination = screens.home, exitAction = null) {
+    if (interviewBusyRef.current || closureSavingRef.current || navigationSavingRef.current || openingPracticeRef.current) {
+      setConnectionNotice("Espera a que termine la respuesta o el guardado antes de cambiar de pantalla.");
+      return false;
+    }
+    if (destination === screen && !exitAction) return true;
+    if (screen === screens.simulation && destination === screens.results) {
+      await finishSession();
+      return true;
+    }
     if (shouldWarnBeforeLeavingResults()) {
       setPendingResultsExit({ targetScreen: destination, exitAction });
       return false;
     }
-    if (typeof exitAction === "function") {
-      exitAction();
-      return true;
+    if (screen === screens.simulation && history.some((entry) => !entry.isSessionPrelude)) {
+      navigationSavingRef.current = true;
+      setNavigationSaving(true);
+      try {
+        const result = await persistSessionProgress(history);
+        if (!isSessionSaveConfirmed(result)) return false;
+      } catch {
+        setConnectionNotice("No pudimos guardar el avance. Conservamos la entrevista; vuelve a intentarlo antes de salir.");
+        return false;
+      } finally {
+        navigationSavingRef.current = false;
+        setNavigationSaving(false);
+      }
     }
-    performWorkspaceNavigation(destination);
+    if (typeof exitAction === "function") await exitAction();
+    else performWorkspaceNavigation(destination);
     return true;
   }
 
@@ -1174,7 +1253,7 @@ export default function App() {
   }
 
   function shouldWarnBeforeLeavingResults() {
-    return screen === screens.results && history.length > 0 && closureSaveState !== "saved";
+    return screen === screens.results && history.some((entry) => !entry.isSessionPrelude) && closureSaveState !== "saved";
   }
 
   async function leaveResultsWithPendingClosure() {
@@ -1239,7 +1318,8 @@ export default function App() {
           email={authSession.user.email}
           error={approvalState.error}
           onRetry={refreshApproval}
-          onSignOut={handleSignOut}
+          onSignOut={() => requestExitFromResults(screens.home, handleSignOut)}
+        navigationBusy={interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
         />
         <AppFooter onOpenTrust={openTrustCenter} />
       </main>
@@ -1274,9 +1354,13 @@ export default function App() {
         isLocalMode={!isSupabaseConfigured}
         hasEvaluation={history.length > 0}
         onNavigate={navigateWorkspace}
-        onSignOut={handleSignOut}
+        onSignOut={() => requestExitFromResults(screens.home, handleSignOut)}
+        navigationBusy={interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
       >
 
+      {(navigationSaving || openingPractice) && <div className="connection-status-banner" role="status">
+        {navigationSaving ? "Guardando tu avance antes de salir…" : "Preparando la sesión…"}
+      </div>}
       {(appointmentsStatus.loading || appointmentsStatus.error) && (
         <div className="connection-status-banner" role={appointmentsStatus.error ? "alert" : "status"}>
           {appointmentsStatus.loading ? "Estamos verificando tus citas…" : appointmentsStatus.error}
@@ -1307,7 +1391,8 @@ export default function App() {
       )}
 
       {screen === screens.savedSessions && (
-        <SavedSessions authSession={authSession} onBackHome={goHome} onHistoryChange={(records) => {
+        <SavedSessions authSession={authSession} onBackHome={goHome}
+          onResumeSession={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.simulation)} onHistoryChange={(records) => {
           syncSessionSummariesFromHistory(records, authSession?.user?.id || "local");
           setSessionRecords(records);
           setSessionSummaries(getSessionSummariesForCase(selectedCase.id));
@@ -1380,8 +1465,9 @@ export default function App() {
           onFinish={finishSession}
           onRestart={() => resetConversation(screens.simulation)}
           onStartNewPractice={startNewPracticeAfterExpiration}
-          onChangeCase={() => setScreen(screens.select)}
-          onOpenTrust={openTrustCenter}
+          onChangeCase={() => requestExitFromResults(screens.home)}
+          onOpenTrust={() => requestExitFromResults(screens.trustCenter)}
+          onBusyChange={handleInterviewBusy}
         />
       )}
 
@@ -1397,35 +1483,32 @@ export default function App() {
               )}
             </div>
           )}
-          <ResultsSummary report={report} caseItem={selectedCase} history={history} sessionNumber={sessionNumber} />
-          <FeedbackPanel
+          <SessionResults
             report={report}
             caseItem={selectedCase}
             history={history}
             sessionNumber={sessionNumber}
-            onRestart={() =>
-              requestExitFromResults(screens.simulation, () => resetConversation(screens.simulation))
-            }
-            onBackToInterview={() => requestExitFromResults(screens.simulation)}
-            onSelectCase={() => requestExitFromResults(screens.select)}
-          />
-          <SessionClosure
-            caseItem={selectedCase}
-            history={history}
-            report={report}
-            sessionNumber={sessionNumber}
-            totalSessions={sessionTotal}
-            previousSessionSummaries={sessionSummaries}
-            preSessionPlan={normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber })}
-            userId={userId}
-            userEmail={userEmail}
-            sessionRecordId={activeSessionRecordId}
-            onContinueSession={advanceToNextSession}
-            onScheduleNextSession={(targetSession) => openClinicalAgenda(selectedCase.id, { scheduleSessionNumber: targetSession })}
-            onBackHome={goHome}
-            onRequestExit={requestExitFromResults}
-            onSaveSessionRecord={saveCompletedSession}
-            onDraftChange={() => { setClosureSaveState("open"); setSaveStatus(null); }}
+            feedbackProps={{
+              onBackToInterview: () => requestExitFromResults(screens.simulation),
+              onSelectCase: () => requestExitFromResults(screens.select)
+            }}
+            closureProps={{
+              totalSessions: sessionTotal,
+              previousSessionSummaries: sessionSummaries,
+              preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
+              userId,
+              userEmail,
+              sessionRecordId: activeSessionRecordId,
+              onContinueSession: advanceToNextSession,
+              onScheduleNextSession: (targetSession) => openClinicalAgenda(selectedCase.id, { scheduleSessionNumber: targetSession }),
+              onBackHome: goHome,
+              onRequestExit: requestExitFromResults,
+              onSaveSessionRecord: saveCompletedSession,
+              onDraftSnapshot: captureClosureDraft,
+              initialClinicalDecision: activeSessionRecordSnapshot?.feedback?.clinicalDecision,
+              initialClinicalArtifacts: activeSessionRecordSnapshot?.feedback?.clinicalArtifacts,
+              onDraftChange: () => { setClosureSaveState("open"); setSaveStatus(null); }
+            }}
           />
         </section>
       )}
@@ -1440,17 +1523,18 @@ export default function App() {
             aria-labelledby="closure-pending-title"
           >
             <span className="eyebrow">Cierre pendiente</span>
-            <h2 id="closure-pending-title">Falta registrar la decisión clínica</h2>
+            <h2 id="closure-pending-title">{activeSessionRecordSnapshot?.status === "completed" ? "Tienes cambios del cierre sin guardar" : "Falta registrar la decisión clínica"}</h2>
             <p>
-              Puedes volver y completar la decisión, o dejar el cierre pendiente para
-              retomarlo después.
+              {activeSessionRecordSnapshot?.status === "completed"
+                ? "Guarda tus cambios antes de salir. La sesión conservará su estado completado."
+                : "Puedes volver y completar la decisión, o dejar el cierre pendiente para retomarlo después."}
             </p>
             <div className="modal-actions">
-              <button className="primary-action" type="button" onClick={cancelResultsExit}>
+              <button className="primary-action" type="button" onClick={cancelResultsExit} disabled={saveStatus?.type === "saving"}>
                 Volver y registrar decisión
               </button>
-              <button className="secondary-action" type="button" onClick={leaveResultsWithPendingClosure}>
-                Salir y dejar pendiente
+              <button className="secondary-action" type="button" onClick={leaveResultsWithPendingClosure} disabled={saveStatus?.type === "saving"}>
+                {activeSessionRecordSnapshot?.status === "completed" ? "Guardar cambios y salir" : "Salir y dejar pendiente"}
               </button>
             </div>
           </section>
