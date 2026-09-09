@@ -56,6 +56,7 @@ import { SavedSessions } from "./components/SavedSessions.jsx";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { IntroVideo } from "./components/IntroVideo.jsx";
 import { PendingApprovalScreen } from "./components/PendingApprovalScreen.jsx";
+import { ResearchInvitation } from "./components/ResearchConsent.jsx";
 import { TrustCenter } from "./components/TrustCenter.jsx";
 import { AppFooter } from "./components/AppFooter.jsx";
 import { ClinicalAgenda } from "./components/ClinicalAgenda.jsx";
@@ -81,6 +82,9 @@ const screens = {
 
 export default function App() {
   const [screen, setScreen] = useState(screens.home);
+  const [consentBusy, setConsentBusy] = useState(false);
+  const consentBusyRef = useRef(false);
+  const handleConsentBusy = useCallback((value) => { consentBusyRef.current = value; setConsentBusy(value); }, []);
   const [selectedCaseId, setSelectedCaseId] = useState(cases[0].id);
   const [difficulty, setDifficulty] = useState("intermedio");
   const [history, setHistory] = useState([]);
@@ -1198,7 +1202,7 @@ export default function App() {
   }
 
   async function requestExitFromResults(destination = screens.home, exitAction = null) {
-    if (interviewBusyRef.current || closureSavingRef.current || navigationSavingRef.current || openingPracticeRef.current) {
+    if (consentBusyRef.current || interviewBusyRef.current || closureSavingRef.current || navigationSavingRef.current || openingPracticeRef.current) {
       setConnectionNotice("Espera a que termine la respuesta o el guardado antes de cambiar de pantalla.");
       return false;
     }
@@ -1310,6 +1314,10 @@ export default function App() {
     );
   }
 
+  if (isAccessGateRequired && authSession && approvalState.status !== "approved" && screen === screens.trustCenter) {
+    return <main className="app-shell"><TrustCenter key={authSession.user.id} userId={authSession.user.id} canParticipate={false} onBack={closeTrustCenter} onBusyChange={handleConsentBusy} /></main>;
+  }
+
   if (isAccessGateRequired && authSession && approvalState.status !== "approved") {
     return (
       <main className="app-shell">
@@ -1319,7 +1327,7 @@ export default function App() {
           error={approvalState.error}
           onRetry={refreshApproval}
           onSignOut={() => requestExitFromResults(screens.home, handleSignOut)}
-        navigationBusy={interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
+        navigationBusy={consentBusy || interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
         />
         <AppFooter onOpenTrust={openTrustCenter} />
       </main>
@@ -1355,7 +1363,7 @@ export default function App() {
         hasEvaluation={history.length > 0}
         onNavigate={navigateWorkspace}
         onSignOut={() => requestExitFromResults(screens.home, handleSignOut)}
-        navigationBusy={interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
+        navigationBusy={consentBusy || interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
       >
 
       {(navigationSaving || openingPractice) && <div className="connection-status-banner" role="status">
@@ -1372,6 +1380,8 @@ export default function App() {
         </div>
       )}
 
+      {screen === screens.home && <ResearchInvitation key={userId || "local"} userId={userId} onOpen={openTrustCenter} />}
+
       {screen === screens.home && (
         <ClinicalDashboard
           cases={cases}
@@ -1387,7 +1397,7 @@ export default function App() {
       )}
 
       {screen === screens.trustCenter && (
-        <TrustCenter onBack={goHome} />
+        <TrustCenter key={userId || "local"} userId={userId} onBack={goHome} onBusyChange={handleConsentBusy} />
       )}
 
       {screen === screens.savedSessions && (

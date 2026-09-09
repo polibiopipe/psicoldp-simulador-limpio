@@ -1,269 +1,82 @@
-import React, { useState } from "react";
-import {
-  ArrowLeft,
-  BrainCircuit,
-  CheckCircle2,
-  Database,
-  ExternalLink,
-  FileText,
-  Globe2,
-  LifeBuoy,
-  LockKeyhole,
-  Scale,
-  ShieldCheck
-} from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { ArrowLeft, BrainCircuit, Download, FileCheck2, LockKeyhole, Scale } from "lucide-react";
+import { ResearchConsent } from "./ResearchConsent.jsx";
+import { exportOwnSimulatorData } from "../engine/researchConsent.js";
+import { downloadTextFile, PRIVACY_CONTACT } from "../data/researchConsent.js";
 
 const tabs = [
-  {
-    id: "privacidad",
-    label: "Privacidad",
-    icon: LockKeyhole,
-    title: "Privacidad desde el diseno",
-    intro: "Datos minimizados, finalidad formativa y controles claros para usuarios e instituciones.",
-    points: [
-      "Uso exclusivo para simulacion educativa.",
-      "Recomendacion explicita: no ingresar datos reales de pacientes.",
-      "Derechos del titular preparados para acceso, correccion, eliminacion o bloqueo."
-    ]
-  },
-  {
-    id: "seguridad",
-    label: "Seguridad",
-    icon: ShieldCheck,
-    title: "Seguridad operacional",
-    intro: "Arquitectura preparada para control de acceso, trazabilidad y resguardo de sesiones.",
-    points: [
-      "Acceso con cuenta y aprobacion manual.",
-      "Separacion entre usuarios, sesiones y perfiles.",
-      "Base para registro de accesos, incidentes y administracion futura."
-    ]
-  },
-  {
-    id: "ia",
-    label: "Uso responsable de IA",
-    icon: BrainCircuit,
-    title: "IA formativa, no atencion clinica",
-    intro: "Pacientes simulados asistidos por IA para entrenar criterio, escucha y habilidades iniciales.",
-    points: [
-      "No reemplaza atencion profesional de salud mental.",
-      "No debe usarse para diagnostico, tratamiento o supervision clinica real.",
-      "Las respuestas se orientan a aprendizaje y retroalimentacion formativa."
-    ]
-  },
-  {
-    id: "chile",
-    label: "Cumplimiento Chile",
-    icon: Scale,
-    title: "Base normativa chilena",
-    intro: "Marco de referencia para privacidad, salud digital y uso responsable de tecnologia.",
-    sections: [
-      {
-        title: "Ley 19.628",
-        text: "Tratamiento de datos personales y sensibles, finalidad, deber de confidencialidad y derechos de acceso, rectificacion, cancelacion o bloqueo."
-      },
-      {
-        title: "Ley 20.584",
-        text: "Trato digno, privacidad, informacion comprensible, seguridad en la atencion y resguardo en el uso de tecnologias."
-      }
-    ]
-  },
-  {
-    id: "internacional",
-    label: "Internacional",
-    icon: Globe2,
-    title: "Preparacion internacional",
-    intro: "Enfoque privacy-first, compliance-ready y jurisdiction-aware, sin prometer cumplimiento universal.",
-    sections: [
-      {
-        title: "GDPR",
-        text: "Transparencia, minimizacion, limitacion de finalidad, derechos del usuario, seguridad y control del tratamiento."
-      },
-      {
-        title: "CCPA / CPRA",
-        text: "Derecho a saber, eliminar, corregir, avisos al recolectar datos y no discriminacion por ejercer derechos."
-      },
-      {
-        title: "LGPD",
-        text: "Base legal, finalidad, necesidad, derechos del titular y medidas de seguridad proporcionales."
-      }
-    ]
-  },
-  {
-    id: "terminos",
-    label: "Terminos",
-    icon: FileText,
-    title: "Politicas y condiciones",
-    intro: "Estructura documental lista para crecer con clientes, instituciones y nuevos modulos.",
-    policies: [
-      "Politica de privacidad",
-      "Terminos y condiciones",
-      "Politica de tratamiento de datos",
-      "Politica de seguridad de la informacion",
-      "Politica de uso responsable de IA",
-      "Retencion y eliminacion de datos",
-      "Politica de cookies, si aplica",
-      "Procedimiento de derechos del titular",
-      "Procedimiento de incidentes y contacto de seguridad"
-    ]
-  },
-  {
-    id: "datos",
-    label: "Gestion de datos",
-    icon: Database,
-    title: "Gestion responsable de datos",
-    intro: "Controles preparados para ciclo de vida, acceso, exportacion y eliminacion de informacion.",
-    points: [
-      "Sesiones guardadas asociadas a usuario autenticado.",
-      "Base para exportacion o eliminacion a solicitud del titular.",
-      "Advertencia permanente para no ingresar informacion sensible de terceros."
-    ]
-  },
-  {
-    id: "contacto",
-    label: "Soporte",
-    icon: LifeBuoy,
-    title: "Contacto y soporte",
-    intro: "Canal institucional para privacidad, seguridad, soporte y solicitudes de acceso.",
-    points: [
-      "Contacto: contacto@nucleovivo.net",
-      "Sitio institucional: nucleovivo.net",
-      "Futuro: area de administracion, roles y trazabilidad ampliada."
-    ]
-  }
+  { id: "consentimiento", label: "Consentimiento", icon: FileCheck2 },
+  { id: "datos", label: "Mis datos y privacidad", icon: LockKeyhole },
+  { id: "ia", label: "Inteligencia artificial", icon: BrainCircuit },
+  { id: "normativa", label: "Marco de protección", icon: Scale }
 ];
 
-export function TrustCenter({ onBack }) {
-  const [activeTab, setActiveTab] = useState(tabs[0].id);
-  const active = tabs.find((tab) => tab.id === activeTab) || tabs[0];
-  const ActiveIcon = active.icon;
-
-  return (
-    <section className="screen trust-center-screen">
-      <button className="secondary-action trust-back-action" type="button" onClick={onBack}>
-        <ArrowLeft aria-hidden="true" />
-        Volver
-      </button>
-
-      <header className="trust-hero">
-        <span className="eyebrow">Nucleo Vivo Trust Center</span>
-        <h1>Centro de confianza y cumplimiento</h1>
-        <p>
-          Privacidad, seguridad, etica y cumplimiento para una formacion responsable
-          con pacientes simulados.
-        </p>
-        <div className="trust-chip-row" aria-label="Principios de confianza">
-          <span>privacy-first</span>
-          <span>compliance-ready</span>
-          <span>jurisdiction-aware</span>
-          <span>uso formativo</span>
-        </div>
-      </header>
-
-      <div className="trust-layout">
-        <nav className="trust-tabs" aria-label="Secciones de confianza">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                className={tab.id === activeTab ? "selected" : ""}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-              >
-                <Icon aria-hidden="true" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <article className="trust-panel">
-          <div className="trust-panel-heading">
-            <span><ActiveIcon aria-hidden="true" /></span>
-            <div>
-              <h2>{active.title}</h2>
-              <p>{active.intro}</p>
-            </div>
+export function TrustCenter({ onBack, userId = "", canParticipate = true, onBusyChange }) {
+  const [activeTab, setActiveTab] = useState("consentimiento");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const mounted = useRef(false);
+  const downloading = useRef(false);
+  const callback = useRef(onBusyChange);
+  callback.current = onBusyChange;
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; callback.current?.(false); }; }, []);
+  function changeBusy(value) { setBusy(value); callback.current?.(value); }
+  async function downloadData() {
+    if (downloading.current) return;
+    downloading.current = true;
+    changeBusy(true);
+    setError("");
+    try {
+      const data = await exportOwnSimulatorData(userId);
+      if (mounted.current) downloadTextFile("escucha-viva-mis-datos.json", JSON.stringify(data, null, 2), "application/json");
+    } catch (failure) { if (mounted.current) setError(failure.message); }
+    finally { downloading.current = false; if (mounted.current) changeBusy(false); }
+  }
+  return <section className="screen trust-center-screen">
+    <button className="secondary-action trust-back-action" type="button" disabled={busy} onClick={onBack}><ArrowLeft aria-hidden="true" />Volver</button>
+    <header className="trust-hero"><span className="eyebrow">Escucha Viva</span><h1>Privacidad y consentimiento</h1>
+      <p>Conoce qué se guarda, decide sobre tu participación en investigaciones y gestiona tus datos.</p></header>
+    <div className="trust-layout">
+      <nav className="trust-tabs" aria-label="Secciones de privacidad">{tabs.map(({ id, label, icon: Icon }) =>
+        <button key={id} type="button" className={activeTab === id ? "selected" : ""} aria-current={activeTab === id ? "page" : undefined} disabled={busy} onClick={() => setActiveTab(id)}><Icon aria-hidden="true" />{label}</button>
+      )}</nav>
+      <article className="trust-panel consent-panel">
+        {activeTab === "consentimiento" && <ResearchConsent key={userId || "public"} userId={userId} canParticipate={canParticipate} onBusyChange={changeBusy} />}
+        {activeTab === "datos" && <>
+          <h2>Tus datos en el simulador</h2>
+          <p>La cuenta utiliza tu nombre y correo. Las citas, disponibilidad, conversaciones, preparación, cierres y resultados de práctica se asocian a tu usuario para guardar y retomar el trabajo. Estos registros son identificables.</p>
+          <h3>Almacenamiento y acceso</h3>
+          <p>La base de datos y autenticación se gestionan en Supabase, en la región Este de Estados Unidos. Vercel aloja la aplicación y procesa sus solicitudes. Algunas funciones mantienen borradores y copias de trabajo en el navegador de este dispositivo.</p>
+          <p>Tu cuenta consulta sus propios registros. El personal que administra la infraestructura puede tener acceso técnico para soporte y gestión. La participación en un estudio debe informar, además, quién accederá a sus datos y con qué finalidad.</p>
+          <h3>Conservación y solicitudes</h3>
+          <p>Las sesiones permanecen en tu historial hasta que las elimines desde «Sesiones» o solicites su gestión. El retiro de una investigación se registra por separado y no borra ese historial. El plazo y la gestión de respaldos y copias del estudio deben indicarse en su consentimiento.</p>
+          <p>Puedes solicitar acceso, rectificación, eliminación u otra gestión de tus datos al contacto de privacidad. Indica el tipo de solicitud y el correo de tu cuenta; evita incluir contraseñas o antecedentes clínicos.</p>
+          <div className="consent-actions">
+            {userId && canParticipate && <button className="secondary-action" type="button" disabled={busy} onClick={() => void downloadData()}><Download aria-hidden="true" />{busy ? "Preparando copia…" : "Descargar mis datos"}</button>}
+            <a className="secondary-action" href={`mailto:${PRIVACY_CONTACT}?subject=Solicitud%20sobre%20mis%20datos%20en%20Escucha%20Viva`}>Solicitar gestión de mis datos</a>
           </div>
-
-          {active.points && (
-            <div className="trust-point-grid">
-              {active.points.map((point) => (
-                <div className="trust-point" key={point}>
-                  <CheckCircle2 aria-hidden="true" />
-                  <span>{point}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {active.sections && (
-            <div className="trust-section-grid">
-              {active.sections.map((section) => (
-                <section key={section.title}>
-                  <h3>{section.title}</h3>
-                  <p>{section.text}</p>
-                </section>
-              ))}
-            </div>
-          )}
-
-          {active.policies && (
-            <div className="policy-grid" aria-label="Politicas base">
-              {active.policies.map((policy) => (
-                <article key={policy}>
-                  <FileText aria-hidden="true" />
-                  <span>{policy}</span>
-                </article>
-              ))}
-            </div>
-          )}
-        </article>
-      </div>
-
-      <aside className="trust-legal-note">
-        <strong>Nota normativa</strong>
-        <p>
-          La adecuacion normativa final puede variar segun el pais, tipo de cliente
-          y modalidad de uso contratada.
-        </p>
-      </aside>
-
-      <section className="trust-disclaimer-grid" aria-label="Avisos clave">
-        <article>
-          <ShieldCheck aria-hidden="true" />
-          <h2>Entorno simulado</h2>
-          <p>
-            Pacientes ficticios asistidos por IA con fines formativos. No constituye
-            atencion clinica real.
-          </p>
-        </article>
-        <article>
-          <LockKeyhole aria-hidden="true" />
-          <h2>Datos reales</h2>
-          <p>
-            No ingreses informacion identificable ni datos sensibles de pacientes
-            reales dentro de las practicas.
-          </p>
-        </article>
-        <article>
-          <LifeBuoy aria-hidden="true" />
-          <h2>Riesgo vital</h2>
-          <p>
-            Ante riesgo vital o emergencia de salud mental, acude a servicios de
-            emergencia o redes profesionales disponibles.
-          </p>
-        </article>
-      </section>
-
-      <div className="trust-contact-strip">
-        <span>Soporte institucional y seguridad</span>
-        <a href="mailto:contacto@nucleovivo.net">contacto@nucleovivo.net</a>
-        <a href="https://nucleovivo.net/" target="_blank" rel="noopener noreferrer">
-          Nucleo Vivo
-          <ExternalLink aria-hidden="true" />
-        </a>
-      </div>
-    </section>
-  );
+          {error && <p role="alert" className="consent-error">{error}</p>}
+          <p className="consent-small">La descarga incluye los registros de tu cuenta disponibles en la base de datos. Para borradores del dispositivo, registros técnicos, respaldos u otras copias, utiliza el contacto de privacidad. El enlace de solicitud abre tu aplicación de correo; debes enviar el mensaje para cursarla.</p>
+        </>}
+        {activeTab === "ia" && <>
+          <h2>Cómo interviene la IA</h2>
+          <p>Google Gemini genera respuestas de los personajes a partir del mensaje que escribes, el contexto de la conversación y el caso ficticio. Estas solicitudes se procesan a través del servidor de Escucha Viva. Cuando corresponde, el simulador puede utilizar respuestas locales.</p>
+          <p>La IA puede producir información incorrecta o poco pertinente. Las respuestas y la retroalimentación apoyan la práctica; no constituyen atención clínica ni una evaluación definitiva de tu competencia profesional.</p>
+          <h3>Qué información evitar</h3>
+          <p>Trabaja con los casos ficticios. No incluyas nombres ni antecedentes de pacientes reales, ni información sobre tu propia salud. Este módulo de consentimiento no autoriza grabaciones de audio, video o biometría.</p>
+          <h3>Información para una investigación</h3>
+          <p>Antes de abrir un estudio, su información debe precisar los proveedores, destinatarios, condiciones de conservación y garantías para el tratamiento fuera de Chile. El consentimiento del estudio no incluye una autorización general para entrenar modelos.</p>
+        </>}
+        {activeTab === "normativa" && <>
+          <h2>Protección de datos en Chile</h2>
+          <p>La Ley 19.628 regula el tratamiento de datos personales. La Ley 21.719 reforma ese marco y contempla obligaciones de transparencia, seguridad y protección desde el diseño, junto con derechos de las personas sobre sus datos.</p>
+          <p>El consentimiento de cada estudio debe corresponder a su protocolo y a la normativa aplicable al momento de realizarlo. La revisión institucional, los acuerdos con proveedores y las medidas operativas forman parte de esa preparación.</p>
+          <div className="consent-actions"><a href="https://www.bcn.cl/leychile/navegar?idNorma=141599" target="_blank" rel="noopener noreferrer">Consultar Ley 19.628</a>
+            <a href="https://www.bcn.cl/leychile/navegar?idNorma=1209272" target="_blank" rel="noopener noreferrer">Consultar Ley 21.719</a></div>
+          <p>Para consultar el procedimiento institucional y los modelos de consentimiento, puedes revisar los <a href="https://www.uniacc.cl/investigacion/documentos/" target="_blank" rel="noopener noreferrer">documentos del Comité Ético Científico de UNIACC</a>. Este enlace no implica aprobación del simulador ni de un estudio.</p>
+        </>}
+      </article>
+    </div>
+    <div className="trust-contact-strip"><span>Privacidad y soporte · Núcleo Vivo</span><a href={`mailto:${PRIVACY_CONTACT}`}>{PRIVACY_CONTACT}</a></div>
+  </section>;
 }
