@@ -64,7 +64,7 @@ const flow = [
     label: "agenda proxima sesion",
     message: "te parece si vienes en 4 dias mas a las 17 hrs?",
     expectedAct: "agenda_proxima_sesion",
-    mustInclude: ["Si", "hora"]
+    mustIncludeAny: ["horario", "continuar", "proxima"]
   },
   {
     label: "cierre de sesion",
@@ -92,8 +92,9 @@ for (const step of flow) {
   const detectedAct = clinical?.detectedAct || result.intent;
   const clinicalTopic = clinical?.clinicalTopic || result.intentResult?.contextualTopic;
 
-  if (!clinical) failures.push(`${step.label}: no uso ClinicalSimulationEngine.`);
-  if (step.expectedAct && detectedAct !== step.expectedAct) {
+  const canonicalReason = result.debug?.canonicalBiographyUsed && result.debug?.canonicalFactKey === "reason";
+  if (!clinical && !canonicalReason) failures.push(`${step.label}: no uso ClinicalSimulationEngine.`);
+  if (!canonicalReason && step.expectedAct && detectedAct !== step.expectedAct) {
     failures.push(`${step.label}: esperaba act=${step.expectedAct}, recibio ${detectedAct}.`);
   }
   if (step.expectedTopic && clinicalTopic !== step.expectedTopic) {

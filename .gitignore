@@ -21,3 +21,6 @@ vite-dev.err
 .vercel
 .env*
 !.env.example
+
+supabase/.temp/
+.audit-*/

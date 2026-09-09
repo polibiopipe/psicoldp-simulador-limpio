@@ -429,7 +429,7 @@ for (const caseId of Object.keys(patientFacts)) {
     social: buildCanonicalSocialFact(biography),
     habits: biography.dailyLife.sleep,
     preferences: buildCanonicalPreferencesFact(biography),
-    motive: biography.consultation.immediateReason,
+    motive: biography.directAnswers.reason[0],
     concern: biography.consultation.concerns || biography.internalConflict,
     expectation: biography.consultation.expectations,
     canonicalProgram: biography.education.program,
@@ -468,10 +468,7 @@ function buildCanonicalWorkFact(biography) {
 }
 
 function buildCanonicalFamilyFact(biography) {
-  const home = biography.identity.livingWith?.length
-    ? `Vivo con ${biography.identity.livingWith.join(", ")}.`
-    : "";
-  return `${home} ${biography.family.familyRole || ""}`.trim();
+  return biography.directAnswers.household[0];
 }
 
 function buildCanonicalSocialFact(biography) {

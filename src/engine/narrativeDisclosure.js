@@ -190,17 +190,17 @@ function selectDisclosureLevel({
 function buildDisclosureContext({ patientId, narrative, disclosureLevel }) {
   const levelIndex = LEVEL_ORDER.indexOf(disclosureLevel);
   const safeLevelIndex = levelIndex >= 0 ? levelIndex : 0;
-  const currentAge = Number(narrative.currentAge);
+  const currentAge = Number(narrative.age ?? narrative.currentAge);
 
   const availableFacts = [
     `Edad actual: ${currentAge}`,
-    `Tema central: ${cleanString(narrative.centralTheme)}`,
-    `Motivo/desencadenante reciente: ${cleanString(narrative.recentTrigger)}`,
+    `Tema central: ${cleanString(narrative.centralTheme || narrative.disclosure.initial[0])}`,
     ...cloneStringArray(narrative.disclosure.initial)
   ];
 
   if (safeLevelIndex >= 1) {
     availableFacts.push(
+      `Motivo/desencadenante reciente: ${cleanString(narrative.recentTrigger)}`,
       `Forma habitual de protegerse o vincularse: ${cleanString(narrative.relationalPattern)}`,
       ...cloneStringArray(narrative.disclosure.developing)
     );
@@ -219,7 +219,7 @@ function buildDisclosureContext({ patientId, narrative, disclosureLevel }) {
     currentAge,
     disclosureLevel,
     internalGuidance: {
-      centralTheme: cleanString(narrative.centralTheme),
+      centralTheme: cleanString(narrative.centralTheme || narrative.disclosure.initial[0]),
       responseStyle: [
         "Hablar siempre en primera persona y con lenguaje cotidiano.",
         "No recitar la ficha ni ordenar la respuesta como informe.",
@@ -227,7 +227,7 @@ function buildDisclosureContext({ patientId, narrative, disclosureLevel }) {
         "Responder solo a lo que el estudiante explora o contiene.",
         "Reservarse o dudar si la pregunta llega demasiado pronto."
       ],
-      boundaries: cloneStringArray(narrative.narrativeBoundaries)
+      boundaries: cloneStringArray(narrative.privacyBoundaries || narrative.narrativeBoundaries)
     },
     availableFacts,
     availableTimeline: cloneTimeline(selectTimeline(narrative.timeline, disclosureLevel)),
@@ -236,16 +236,16 @@ function buildDisclosureContext({ patientId, narrative, disclosureLevel }) {
 }
 
 function selectTimeline(timeline = [], disclosureLevel) {
-  if (!Array.isArray(timeline)) return [];
-  if (disclosureLevel === "deep") return timeline;
-  if (disclosureLevel === "developing") return timeline.slice(0, Math.min(3, timeline.length));
-  return timeline.slice(0, Math.min(1, timeline.length));
+  if (!Array.isArray(timeline) || disclosureLevel !== "deep") return [];
+  // Canonical timelines are plain events. Their deeper meaning is only available
+  // after the disclosure gate, rather than inferred from their list position.
+  return timeline;
 }
 
 function extractStudentMessages(conversationHistory) {
   if (!Array.isArray(conversationHistory)) return [];
   return conversationHistory
-    .filter((entry) => entry && !entry.isSessionPrelude)
+    .filter((entry) => entry && !entry.isSessionPrelude && !["patient", "assistant", "system"].includes(entry.role))
     .map((entry) => {
       if (typeof entry === "string") return extractMessageText(entry);
       return extractMessageText(
@@ -278,7 +278,7 @@ function hasPattern(text, patterns) {
 function isUsableNarrative(narrative) {
   return Boolean(
     narrative &&
-      Number.isFinite(Number(narrative.currentAge)) &&
+      Number.isFinite(Number(narrative.age ?? narrative.currentAge)) &&
       narrative.disclosure &&
       Array.isArray(narrative.disclosure.initial) &&
       Array.isArray(narrative.disclosure.developing) &&
@@ -313,7 +313,7 @@ function cloneStringArray(value) {
 
 function cloneTimeline(value) {
   return Array.isArray(value)
-    ? value.map((item) => ({
+    ? value.map((item) => typeof item === "string" ? { period: "", event: cleanString(item), meaning: "" } : ({
         period: cleanString(item?.period),
         event: cleanString(item?.event),
         meaning: cleanString(item?.meaning)

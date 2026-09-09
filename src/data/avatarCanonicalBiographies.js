@@ -873,7 +873,7 @@ export function buildCanonicalBiographyPromptContext(patientId) {
   };
 }
 
-export function selectCanonicalDirectResponse({ patientId, studentMessage }) {
+export function selectCanonicalDirectResponse({ patientId, studentMessage, history = [] }) {
   const biography = avatarCanonicalBiographies[normalizePatientId(patientId)];
   if (!biography) return null;
 
@@ -881,7 +881,8 @@ export function selectCanonicalDirectResponse({ patientId, studentMessage }) {
   if (!factKey) return null;
 
   const responses = biography.directAnswers?.[factKey] || [];
-  const responseText = responses.find(Boolean);
+  const previous = history.map((turn) => turn.answer || turn.content || turn.text || "");
+  const responseText = responses.find((text) => text && !previous.includes(text)) || responses.find(Boolean);
   if (!responseText) return null;
 
   return {
@@ -951,6 +952,7 @@ const FACT_PATHS = {
 function makeCanonicalBiography(id, biography) {
   const directAnswers = {
     ...buildDirectAnswers(biography),
+    reason: buildConsultationResponses(id),
     ...(biography.directAnswers || {})
   };
 
@@ -980,7 +982,7 @@ function buildDirectAnswers(bio) {
     age: [`Tengo ${identity.age} anos.`],
     birthDate: [`Naci el ${formatBirthDate(identity.birthDate)}.`],
     location: [`Vivo en ${identity.commune || identity.city}${identity.commune && identity.city && identity.commune !== identity.city ? `, ${identity.city}` : ""}.`],
-    household: [`Vivo con ${joinPeople(identity.livingWith)}.`],
+    household: [identity.livingWith?.length === 1 && /^vive sol/i.test(identity.livingWith[0]) ? `Vivo ${identity.pronouns === "ella" ? "sola" : "solo"}.` : `Vivo con ${joinPeople(identity.livingWith)}.`],
     studies: [isStudying ? `Estudio ${education.program}.` : `Ahora no estudio formalmente. ${hasWork ? `Trabajo como ${lowerFirst(employment.role)}.` : "Mi ocupacion principal es otra en este momento."}`],
     institution: [isStudying ? `Estudio en ${education.institution}${education.campus ? `, en el campus de ${education.campus}` : ""}.` : "No estoy estudiando actualmente."],
     program: [isStudying ? `Estudio ${education.program}.` : "No estoy cursando una carrera actualmente."],
@@ -1024,6 +1026,7 @@ function makeSchoolTransitionProfile(input) {
   return makeAdultProfile({
     ...input,
     educationStatus: "ensenanza media en curso",
+    recentTrigger: input.recentEvent,
     workStatus: "sin empleo formal",
     employerIsFictional: true,
     role: "estudiante escolar",
@@ -1050,7 +1053,7 @@ function makeAdultProfile(input) {
   const partner = input.partner || null;
   const children = input.children || [];
   const educationStatus = input.educationStatus || "no cursa estudios actuales";
-  const workStatus = input.workStatus || input.employer ? "trabaja actualmente" : "sin empleo formal";
+  const workStatus = input.workStatus || (input.employer ? "trabaja actualmente" : "sin empleo formal");
 
   return {
     identity: {
@@ -1173,7 +1176,7 @@ function formatBirthDate(value) {
 }
 
 function joinPeople(items = []) {
-  return joinList(items.map((item) => String(item).replace(/, (madre|padre|hermano|hermana|hijo|hija|pareja)$/i, "")));
+  return joinList(items.map((item) => String(item).replace(/^(.+), (madre|padre|hermano|hermana|hijo|hija|pareja)$/i, "mi $2 $1")));
 }
 
 function joinList(items = []) {
@@ -1225,4 +1228,25 @@ function deepFreeze(value) {
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function buildConsultationResponses(id) {
+  const responses = {
+    tomas: ["Vine por una discusión en mi casa sobre el computador y lo que voy a hacer después del colegio.", "Me cuesta decidir si estudiar una carrera técnica o trabajar, y en mi familia estamos discutiendo por eso."],
+    valentina: ["Me saqué un 4,7 en Métodos de Investigación y me afectó más de lo que esperaba. Pasé la noche sin dormir y cancelé una salida.", "Me quedé horas revisando la prueba y la pauta. Sé que aprobé, pero no consigo dejar de darle vueltas."],
+    marcos: ["Estoy cansado e irritable. Le respondí mal a Paula por una pregunta cotidiana y después me dio vergüenza.", "Con el cambio de jefatura asumí más tareas. Llego cansado a la casa y estoy perdiendo la paciencia con mi pareja."],
+    elena: ["En una reunión familiar descubrí que todos conocían una decisión de mi hijo menos yo. Me dolió quedar fuera.", "Desde que mis hijos son más independientes, siento que tengo menos lugar en sus vidas."],
+    nicolas: ["Me mandaron del colegio. Dicen que estoy más callado y que bajé las notas.", "No fue idea mía venir. Me gustaría que me escucharan antes de retarme por el colegio."],
+    camila: ["Cancelé otra vez una actividad personal para ayudar a mi hermano. Sentí rabia y después mucha culpa.", "Me cuesta poner un límite cuando mi familia necesita algo, incluso cuando tengo planes propios."],
+    rodrigo: ["Uno de mis hijos me preguntó por qué parecía triste. Desde la separación han cambiado mucho mis rutinas.", "Me está costando adaptarme a la vivienda y a la convivencia con mis hijos después de separarme."],
+    fernanda: ["Recibí el correo que confirma mi retorno al trabajo y empecé a imaginar errores y críticas de mis compañeros.", "Me preocupa volver al trabajo y no saber cómo responder a las preguntas de los demás."],
+    hector: ["Visité mi antiguo trabajo y varias personas nuevas no sabían quién era. Me afectó más de lo que esperaba.", "Desde que me jubilé perdí la rutina y muchos contactos del día a día. Me cuesta encontrar mi lugar."],
+    daniela: ["Me quedé dormida preparando una evaluación y olvidé una actividad de mi hijo. Sentí que estaba fallando en las dos cosas.", "Estoy intentando compatibilizar los estudios y la crianza, pero me siento sobrepasada."],
+    andres: ["En un trabajo grupal no entendí una referencia que mis compañeros daban por obvia. Me sentí expuesto y fuera de lugar.", "Me cuesta sentir que encajo con mis compañeros, sobre todo cuando parece que todos entienden algo menos yo."],
+    patricia: ["Mi hija llegó tarde y no respondió el teléfono durante una hora. Terminamos discutiendo y me dijo que no confío en ella.", "Me preocupa que le pase algo a mi hija, pero mis intentos de cuidarla nos están llevando a discutir."],
+    miguel: ["Un compañero recibió reconocimiento por una idea que yo había planteado antes. Me hizo sentir que mi voz pesa menos.", "Desde que migré me cuesta sentir que mis aportes tienen el mismo valor para los demás."],
+    sofia: ["Publiqué un logro, recibí menos reacciones de las que esperaba y borré la publicación. Después pasé horas comparándome.", "Me preocupa lo mucho que cambia cómo me siento según las reacciones que recibo en redes."],
+    claudio: ["Dejé pasar una oportunidad laboral mientras analizaba los riesgos. Después sentí alivio, pero también arrepentimiento.", "Me cuesta decidir sin revisar todos los riesgos. Esta vez lo postergué tanto que la oportunidad se venció."]
+  };
+  return responses[id] || ["Vine porque hay algo que me está costando ordenar."];
 }

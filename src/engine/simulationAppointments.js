@@ -1,3 +1,4 @@
+import { readClinicalCache, writeClinicalCache } from "./clinicalStorage.js";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 import {
   SESSION_DURATION_MINUTES,
@@ -31,7 +32,7 @@ export async function getSimulationAppointments(authSession = null) {
 
   if (!Array.isArray(data)) throw new Error("La respuesta de la agenda está incompleta. Vuelve a cargar tus citas.");
   const records = data.map(mapAppointmentRowToRecord);
-  cacheAppointmentsForReadOnlyDisplay(records);
+  cacheAppointmentsForReadOnlyDisplay(records, authSession.user.id);
   return records;
 }
 
@@ -48,11 +49,11 @@ export async function getSimulationAppointmentById(authSession = null, appointme
   if (error) {
     console.warn("[appointments] single load error message", error.message);
     console.warn("[appointments] single load error code", error.code || null);
-    return null;
+    throw new Error("No pudimos verificar la cita. Revisa la conexión y vuelve a intentarlo.");
   }
 
   const record = mapAppointmentRowToRecord(data);
-  if (record) cacheAppointmentsForReadOnlyDisplay([record, ...getReadOnlyCachedAppointments()]);
+  if (record) cacheAppointmentsForReadOnlyDisplay([record, ...getReadOnlyCachedAppointments(authSession.user.id)], authSession.user.id);
   return record;
 }
 
@@ -100,7 +101,7 @@ async function persistSimulationAppointment(authSession, appointment, scheduleEd
   if (!record) {
     return { localSaved: false, cloudSaved: false, error: "La cita cambió o no pudo confirmarse. Actualiza la agenda antes de volver a intentarlo." };
   }
-  cacheAppointmentsForReadOnlyDisplay([record, ...getReadOnlyCachedAppointments()]);
+  cacheAppointmentsForReadOnlyDisplay([record, ...getReadOnlyCachedAppointments(authSession.user.id)], authSession.user.id);
   return { localSaved: true, cloudSaved: true, data: record };
 }
 
@@ -136,7 +137,7 @@ export async function cancelSimulationAppointment(authSession = null, appointmen
   if (!record) {
     return { localSaved: false, cloudSaved: false, error: "La cita ya no está programada o no pudo confirmarse su cancelación. Actualiza la agenda." };
   }
-  cacheAppointmentsForReadOnlyDisplay([record, ...getReadOnlyCachedAppointments()]);
+  cacheAppointmentsForReadOnlyDisplay([record, ...getReadOnlyCachedAppointments(authSession.user.id)], authSession.user.id);
   return { localSaved: true, cloudSaved: true, data: record };
 }
 
@@ -353,24 +354,24 @@ function mapAppointmentRowToRecord(row) {
   };
 }
 
-export function getReadOnlyCachedAppointments() {
+export function getReadOnlyCachedAppointments(userId) {
   if (!canUseStorage()) return [];
   try {
-    const parsed = JSON.parse(localStorage.getItem(LOCAL_APPOINTMENTS_KEY) || "[]");
+    const parsed = readClinicalCache(LOCAL_APPOINTMENTS_KEY, [], userId);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function cacheAppointmentsForReadOnlyDisplay(records = []) {
+function cacheAppointmentsForReadOnlyDisplay(records = [], userId) {
   if (!canUseStorage()) return;
   const merged = new Map();
   for (const record of records.filter(Boolean)) {
     if (!merged.has(record.id)) merged.set(record.id, record);
   }
   try {
-    localStorage.setItem(LOCAL_APPOINTMENTS_KEY, JSON.stringify(Array.from(merged.values())));
+    writeClinicalCache(LOCAL_APPOINTMENTS_KEY, Array.from(merged.values()), userId);
   } catch {
     // A full local cache must not turn a confirmed server write into a failure.
   }

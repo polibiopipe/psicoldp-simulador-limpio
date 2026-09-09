@@ -144,7 +144,7 @@ check("boundaries siempre se incluyen", () => {
   assert.ok(context.internalGuidance.boundaries.length > 0);
   assertContainsAny(
     JSON.stringify(context.internalGuidance.boundaries),
-    avatarNarratives.tomas.narrativeBoundaries,
+    avatarNarratives.tomas.privacyBoundaries,
     "boundaries"
   );
 });
@@ -165,12 +165,12 @@ check("contexto no contiene contenido de niveles bloqueados", () => {
 check("objeto retornado no muta avatarNarratives", () => {
   const context = getNarrativeDisclosureContext({ patientId: "tomas", currentUserMessage: "Hola" });
   const originalInitial = avatarNarratives.tomas.disclosure.initial[0];
-  const originalBoundary = avatarNarratives.tomas.narrativeBoundaries[0];
+  const originalBoundary = avatarNarratives.tomas.privacyBoundaries[0];
   context.availableFacts[0] = "MUTADO";
   context.internalGuidance.boundaries[0] = "MUTADO";
-  context.availableTimeline[0].period = "MUTADO";
+  context.availableTimeline.push({ period: "MUTADO", event: "test", meaning: "" });
   assert.equal(avatarNarratives.tomas.disclosure.initial[0], originalInitial);
-  assert.equal(avatarNarratives.tomas.narrativeBoundaries[0], originalBoundary);
+  assert.equal(avatarNarratives.tomas.privacyBoundaries[0], originalBoundary);
 });
 
 check("mensajes vacios o saludos no cuentan como sustantivos", () => {
@@ -206,7 +206,7 @@ check("fragmento inicial de prompt esta filtrado", () => {
   assert.ok(!fragment.includes("lockedLevels"));
   assert.ok(!fragment.includes(avatarNarratives.tomas.lifeHistory));
   assertDoesNotContainAny(fragment, disclosureTexts("tomas", "deep"), "fragmento inicial");
-  assertContainsAny(fragment, avatarNarratives.tomas.narrativeBoundaries, "fragmento inicial boundaries");
+  assertContainsAny(fragment, avatarNarratives.tomas.privacyBoundaries, "fragmento inicial boundaries");
   assert.ok(!fragment.includes("Valentina"));
   assert.ok(!fragment.includes(avatarNarratives.valentina.recentTrigger));
 });

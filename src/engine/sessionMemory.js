@@ -1,3 +1,4 @@
+import { readClinicalCache, writeClinicalCache } from "./clinicalStorage.js";
 import { patientFacts } from "../data/patientFacts.js";
 import { getClinicalSessionPlan } from "./clinicalPlanning.js";
 import { evaluatePreSessionPlan, normalizePreSessionPlan } from "./clinicalPreparation.js";
@@ -73,25 +74,21 @@ export function buildSessionSummary({
   };
 }
 
-export function saveSessionSummary(summary) {
-  if (!canUseStorage()) return false;
-  const sessions = readStoredSessions();
+export function saveSessionSummary(summary, userId) {
+  const sessions = readClinicalCache(STORAGE_KEY, [], userId);
   const filtered = sessions.filter(
     (item) => !(item.caseId === summary.caseId && item.sessionNumber === summary.sessionNumber)
   );
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...filtered, summary]));
-  return true;
+  return writeClinicalCache(STORAGE_KEY, [...filtered, summary], userId);
 }
 
 export function getLatestSessionSummary(caseId, sessionNumber = 1) {
-  if (!canUseStorage()) return null;
   return readStoredSessions()
     .filter((item) => item.caseId === caseId && item.sessionNumber === sessionNumber)
     .sort((a, b) => new Date(b.simulatedDate).getTime() - new Date(a.simulatedDate).getTime())[0] || null;
 }
 
 export function getSessionSummariesForCase(caseId) {
-  if (!canUseStorage()) return [];
   return mergeSessionSummaryList(readStoredSessions().filter((item) => item.caseId === caseId));
 }
 
@@ -246,12 +243,15 @@ export function formatSessionAgreement(summary) {
   ].join("\n");
 }
 
+export function syncSessionSummariesFromHistory(records, userId) {
+  const summaries = records.filter((record) => record.status === "completed" && record.sessionSummary)
+    .map((record) => ({ ...record.sessionSummary, caseId: record.caseId, sessionNumber: record.sessionNumber }));
+  writeClinicalCache(STORAGE_KEY, summaries, userId);
+}
+
 function readStoredSessions() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
+  const value = readClinicalCache(STORAGE_KEY, []);
+  return Array.isArray(value) ? value : [];
 }
 
 function uniqueFlatMap(items, key) {

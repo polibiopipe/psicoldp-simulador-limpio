@@ -19,7 +19,14 @@
     "audit:session-expiration": "node scripts/audit-session-expiration.mjs",
     "audit:session-resume-auth": "node scripts/audit-session-resume-auth.mjs",
     "audit:session-duration-policy": "node scripts/audit-session-duration-policy.mjs",
-    "audit:agenda": "node scripts/audit-agenda.mjs"
+    "audit:agenda": "node scripts/audit-agenda.mjs",
+    "audit:persistence-ui": "node scripts/audit-persistence-ui.mjs",
+    "audit:canonical-biographies": "node scripts/audit-avatar-canonical-biographies.mjs",
+    "audit:narratives": "node scripts/audit-avatar-narratives.mjs",
+    "audit:narrative-disclosure": "node scripts/audit-narrative-disclosure.mjs",
+    "audit:narrative-integration": "node scripts/audit-local-narrative-integration.mjs",
+    "audit:conversation-scenarios": "node scripts/audit-avatar-conversation-scenarios.mjs",
+    "audit:all": "node scripts/audit-all.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",
@@ -28,5 +35,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "vite": "^7.0.0"
+  },
+  "devDependencies": {
+    "react-test-renderer": "19.2.6"
   }
 }

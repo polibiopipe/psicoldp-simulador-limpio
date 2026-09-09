@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CalendarClock, Eye, FileText, Trash2 } from "lucide-react";
 import {
   clearAllSessionHistory,
@@ -7,12 +7,14 @@ import {
 } from "../engine/sessionHistory.js";
 import { isSupabaseConfigured } from "../lib/supabaseClient.js";
 
-export function SavedSessions({ authSession, onBackHome }) {
+export function SavedSessions({ authSession, onBackHome, onHistoryChange }) {
   const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [deleteRequest, setDeleteRequest] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const requestRef = useRef(0);
+  const [loadError, setLoadError] = useState("");
   const [deleteNotice, setDeleteNotice] = useState("");
   const selectedSession = useMemo(
     () => sessions.find((session) => session.id === selectedId) || null,
@@ -20,25 +22,39 @@ export function SavedSessions({ authSession, onBackHome }) {
   );
 
   useEffect(() => {
-    loadSessions();
+    setSessions([]);
+    setSelectedId("");
+    setDeleteRequest(null);
+    void loadSessions();
+    return () => { requestRef.current += 1; };
   }, [authSession?.user?.id]);
 
   async function loadSessions() {
+    const requestId = ++requestRef.current;
     setIsLoading(true);
-    const nextSessions = await getSessionHistoryForUser(authSession);
-    setSessions(nextSessions);
-    setIsLoading(false);
+    setLoadError("");
+    try {
+      const nextSessions = await getSessionHistoryForUser(authSession);
+      if (requestId === requestRef.current) { setSessions(nextSessions); onHistoryChange?.(nextSessions); }
+    } catch (error) {
+      if (requestId === requestRef.current) setLoadError(error.message || "No pudimos cargar tu historial.");
+    } finally {
+      if (requestId === requestRef.current) setIsLoading(false);
+    }
   }
 
   async function removeSession(sessionId) {
     await deleteSessionHistory(sessionId, authSession);
-    await loadSessions();
+    const remaining = sessions.filter((session) => session.id !== sessionId);
+    setSessions(remaining);
+    onHistoryChange?.(remaining);
     if (selectedId === sessionId) setSelectedId("");
   }
 
   async function removeAllSessions() {
     await clearAllSessionHistory(authSession);
     setSessions([]);
+    onHistoryChange?.([]);
     setSelectedId("");
   }
 
@@ -60,15 +76,21 @@ export function SavedSessions({ authSession, onBackHome }) {
   async function confirmDeleteRequest() {
     if (!deleteRequest || isDeleting) return;
     setIsDeleting(true);
-    if (deleteRequest.type === "single") {
-      await removeSession(deleteRequest.session.id);
-      setDeleteNotice("Sesion eliminada correctamente.");
-    } else {
-      await removeAllSessions();
-      setDeleteNotice("Todas las sesiones fueron eliminadas.");
+    try {
+      if (deleteRequest.type === "single") {
+        await removeSession(deleteRequest.session.id);
+        setDeleteNotice("Sesión eliminada correctamente.");
+      } else {
+        await removeAllSessions();
+        setDeleteNotice("Todas las sesiones fueron eliminadas.");
+      }
+      setDeleteRequest(null);
+    } catch (error) {
+      setDeleteNotice(error.message || "No pudimos eliminar el registro. Reintenta.");
+      setDeleteRequest(null);
+    } finally {
+      setIsDeleting(false);
     }
-    setIsDeleting(false);
-    setDeleteRequest(null);
   }
 
   return (
@@ -88,26 +110,26 @@ export function SavedSessions({ authSession, onBackHome }) {
         </div>
       </header>
 
+      {deleteNotice && <p role="status">{deleteNotice}</p>}
+      {loadError && <div role="alert"><p>{loadError}</p><button className="secondary-action" onClick={loadSessions}>Reintentar carga de historial</button></div>}
       {isLoading ? (
         <section className="saved-empty-state">
           <FileText aria-hidden="true" />
           <h2>Cargando sesiones</h2>
           <p>Estamos revisando el historial asociado a tu cuenta.</p>
         </section>
-      ) : sessions.length === 0 ? (
+      ) : sessions.length === 0 && !loadError ? (
         <section className="saved-empty-state">
           <FileText aria-hidden="true" />
           <h2>Aun no hay sesiones guardadas</h2>
           <p>
-            Finaliza una entrevista simulada para guardar automaticamente su resumen
-            local y poder revisarlo despues.
+            Guarda el cierre de una entrevista simulada para revisar aquí su resumen y conversación.
           </p>
         </section>
       ) : (
         <>
           <div className="saved-sessions-toolbar">
             <span>{sessions.length} sesion(es) guardada(s)</span>
-            {deleteNotice && <strong className="delete-notice">{deleteNotice}</strong>}
             <button className="danger-action" type="button" onClick={requestDeleteAll}>
               <Trash2 aria-hidden="true" />
               Eliminar todo
@@ -160,7 +182,7 @@ export function SavedSessions({ authSession, onBackHome }) {
             <aside className="saved-session-detail">
               {selectedSession ? (
                 <>
-                  <span className="eyebrow">Detalle local</span>
+                  <span className="eyebrow">Detalle de la sesión</span>
                   <h2>{selectedSession.caseName} - Sesion {selectedSession.sessionNumber}</h2>
                   <p>{getSessionFeedback(selectedSession).briefSummary || selectedSession.summary?.closure}</p>
                   <p>

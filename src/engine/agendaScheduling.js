@@ -85,6 +85,9 @@ export function validateAppointmentSchedule({ item, draft, appointments = [], ap
   if (!appointmentsStatus?.authoritative || appointmentsStatus.loading) {
     return { ok: false, type: "unverified_agenda", message: "La agenda aún no está verificada.", detail: "Espera a que se carguen tus citas o utiliza Reintentar carga de agenda antes de programar." };
   }
+  if (availabilityStatus?.dirty) {
+    return { ok: false, type: "unsaved_availability", message: "Tu disponibilidad tiene cambios sin guardar.", detail: "Pulsa Guardar disponibilidad para aplicar los días y horarios que acabas de activar.", actionLabel: "Editar disponibilidad" };
+  }
   if (availabilityStatus?.loading || availabilityStatus?.saving) {
     return { ok: false, type: "no_availability", message: "Estamos verificando tu disponibilidad.", detail: "Espera unos segundos antes de programar la sesión." };
   }
