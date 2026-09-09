@@ -1,3 +1,4 @@
+import { selectCanonicalDirectResponse } from "../data/avatarCanonicalBiographies.js";
 import { patientFacts as allPatientFacts } from "../data/patientFacts.js";
 import { getNarrativeDisclosureContext, normalizeNarrativeText } from "./narrativeDisclosure.js";
 
@@ -153,6 +154,13 @@ function composeNarrativeResponse({
   const disclosureLevel = narrativeContext.disclosureLevel;
   const turnSeed = history.length + String(message || "").length + String(patientId).length + (Number(sessionNumber) || 1);
   const available = narrativeContext.availableFacts || [];
+  // These are already spoken, case-specific lines. Narrative metadata remains
+  // context for Gemini and must not be emitted as third-person clinical notes.
+  const speechLines = (disclosureLevel === "deep"
+    ? [facts.concreteConcern, facts.followUpBridge, ...(facts.concreteDisclosures || [])]
+    : disclosureLevel === "developing"
+      ? [facts.followUpBridge, ...(facts.concreteDisclosures || []).slice(0, 3)]
+      : (facts.concreteDisclosures || []).slice(0, 1)).filter(Boolean);
 
   if (intent === "age") {
     const age = Number(facts.age) || narrativeContext.currentAge;
@@ -177,17 +185,11 @@ function composeNarrativeResponse({
   }
 
   if (intent === "reason") {
-    return joinNatural(
-      pickCanonical([facts.motive, selectInitialDisclosure(available, history)], turnSeed),
-      pickShortFact(getFactByPrefix(available, "Motivo/desencadenante reciente"))
-    );
+    return facts.motive || speechLines[0] || null;
   }
 
   if (intent === "recent_trigger") {
-    return joinNatural(
-      pickShortFact(getFactByPrefix(available, "Motivo/desencadenante reciente")),
-      selectInitialDisclosure(available, history)
-    );
+    return facts.motive || speechLines[0] || null;
   }
 
   if (DEEP_INTENTS.has(intent) && disclosureLevel !== "deep") {
@@ -206,6 +208,7 @@ function composeNarrativeResponse({
       available,
       history,
       disclosureLevel,
+      speechLines,
       fallback: facts.concern,
       turnSeed
     });
@@ -216,6 +219,7 @@ function composeNarrativeResponse({
       available,
       history,
       disclosureLevel,
+      speechLines,
       fallback: facts.social || facts.family,
       turnSeed
     });
@@ -226,6 +230,7 @@ function composeNarrativeResponse({
       available,
       history,
       disclosureLevel,
+      speechLines,
       fallback: facts.expectation || facts.motive,
       turnSeed
     });
@@ -253,6 +258,8 @@ function composeNarrativeResponse({
 }
 
 function familyResponse({ patientId, message, facts, narrativeContext, turnSeed }) {
+  const canonicalFamily = selectCanonicalDirectResponse({ patientId, studentMessage: message });
+  if (canonicalFamily && ["family", "household", "children", "siblings"].includes(canonicalFamily.factKey)) return canonicalFamily.responseText;
   const text = normalizeNarrativeText(message);
   if (patientId === "tomas" && /\b(herman|hermana|hermano)\b/.test(text)) {
     return pickVariant([
@@ -290,11 +297,15 @@ function reservedResponse({ patientId, intent, disclosureLevel, available, histo
   ], turnSeed + intent.length + patientId.length);
 }
 
-function selectNarrativeByDepth({ available, history, disclosureLevel, fallback, turnSeed }) {
+function selectNarrativeByDepth({ available, history, disclosureLevel, fallback, turnSeed, speechLines = [] }) {
+  if (speechLines.length) {
+    const fresh = speechLines.filter((line) => !wasAlreadyMentioned(line, history));
+    return pickVariant(fresh.length ? fresh : speechLines, turnSeed);
+  }
   const preferredPrefixes = disclosureLevel === "deep"
-    ? ["Tension interna disponible", "Lo que podria empeorar"]
+    ? ["Tension interna disponible", "Lo que podria empeorar si esto continua"]
     : disclosureLevel === "developing"
-    ? ["Forma habitual de protegerse"]
+    ? ["Forma habitual de protegerse o vincularse"]
     : [];
 
   const preferred = preferredPrefixes
@@ -329,6 +340,7 @@ function selectInitialDisclosure(available, history) {
 
 function selectAvailableFact(available = [], history = [], cues = []) {
   const candidates = available
+    .filter((line) => !/^(Edad actual|Tema central):/.test(line))
     .map(naturalizeFact)
     .filter((line) => line && !TECHNICAL_TERMS.some((term) => normalizeNarrativeText(line).includes(term)))
     .filter((line) => !cues.length || cues.some((cue) => normalizeNarrativeText(line).includes(normalizeNarrativeText(cue))));

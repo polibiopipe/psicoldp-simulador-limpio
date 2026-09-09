@@ -5003,3 +5003,13 @@ button.dashboard-metric-card:hover {
     min-width: 0;
   }
 }
+
+/* Weekly availability keeps every saved block editable, including narrow screens. */
+.availability-day-group { display: grid; gap: 10px; padding: 12px; border: 1px solid #d8e4e1; border-radius: 14px; background: #f7f8f6; }
+.availability-day-group.enabled { background: #eef8f6; }
+.availability-day-group > button { justify-self: start; }
+.availability-block-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.availability-block-row label { display: grid; gap: 4px; flex: 1 1 100px; min-width: 0; }
+.availability-block-row input { width: 100%; min-width: 0; padding: 8px; border: 1px solid #bdceca; border-radius: 8px; font: inherit; }
+
+.closure-editable-fields { display: contents; border: 0; padding: 0; margin: 0; min-width: 0; }

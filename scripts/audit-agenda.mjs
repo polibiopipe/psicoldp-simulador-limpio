@@ -129,13 +129,13 @@ try {
   failure = null;
   assert.equal((await service.saveScheduledAppointment(auth, appointment)).cloudSaved, true);
   assert.equal(row.scheduled_for, "2026-09-09T13:00:00.000Z");
-  const confirmedCache = service.getReadOnlyCachedAppointments();
+  const confirmedCache = service.getReadOnlyCachedAppointments(auth.user.id);
   failure = { code: "NETWORK_ERROR", message: "offline" };
   await assert.rejects(service.getSimulationAppointments(auth));
-  assert.deepEqual(service.getReadOnlyCachedAppointments(), confirmedCache, "una carga fallida no vacía la agenda verificada");
+  assert.deepEqual(service.getReadOnlyCachedAppointments(auth.user.id), confirmedCache, "una carga fallida no vacía la agenda verificada");
   failure = null;
   assert.equal((await service.saveScheduledAppointment(auth, { ...appointment, scheduledTime: "11:00" }, appointment.id)).cloudSaved, true);
-  assert.equal(service.getReadOnlyCachedAppointments()[0].scheduledTime, "11:00", "la caché conserva la versión nueva");
+  assert.equal(service.getReadOnlyCachedAppointments(auth.user.id)[0].scheduledTime, "11:00", "la caché conserva la versión nueva");
   row = { ...row, status: "in_progress", started_at: "2026-09-09T13:00:00Z" };
   assert.equal((await service.saveScheduledAppointment(auth, appointment, appointment.id)).cloudSaved, false);
   assert.equal((await service.cancelSimulationAppointment(auth, appointment.id)).cloudSaved, false);

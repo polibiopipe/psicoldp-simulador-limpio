@@ -5,13 +5,15 @@ import { buildEducationalReport } from "./utils/scoring.js";
 import {
   getLatestSessionSummary,
   getSessionSummariesForCase,
-  mergeSessionSummaryList
+  mergeSessionSummaryList,
+  syncSessionSummariesFromHistory
 } from "./engine/sessionMemory.js";
 import {
   buildSessionHistoryRecord,
   getLatestInProgressSessionForCase,
   getSessionHistoryForUser,
-  saveSessionHistory
+  saveSessionHistory,
+  isSessionSaveConfirmed
 } from "./engine/sessionHistory.js";
 import {
   buildAppointmentRecord,
@@ -63,6 +65,10 @@ import { ClinicalDashboard } from "./components/ClinicalDashboard.jsx";
 import { isAccessGateRequired, isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
 import { getOrCreateUserApproval } from "./lib/userApproval.js";
 
+import { getClinicalStorageOwner, setClinicalStorageOwner } from "./engine/clinicalStorage.js";
+
+setClinicalStorageOwner(isSupabaseConfigured ? "" : "local");
+
 const screens = {
   home: "home",
   select: "select",
@@ -111,6 +117,9 @@ export default function App() {
   const sessionEndedAtRef = useRef("");
   const sessionEndReasonRef = useRef("");
   const approvalStateRef = useRef(approvalState);
+  const authIdentityRef = useRef("");
+  const approvalVerificationRef = useRef(0);
+  const closureSavingRef = useRef(false);
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
   const report = useMemo(() => buildEducationalReport(history, selectedCase), [history, selectedCase]);
@@ -166,13 +175,15 @@ export default function App() {
 
   async function verifyApprovalForUser(user, { preserveActiveAccess = true } = {}) {
     if (!user) return;
+    const verificationId = ++approvalVerificationRef.current;
     const hadApprovedAccess = preserveActiveAccess && approvalStateRef.current.status === "approved";
     if (!hadApprovedAccess) {
       setAuthLoading(true);
       setApprovalState({ status: "checking", profile: null, error: null });
     }
 
-    const nextApprovalState = await getOrCreateUserApproval(user);
+    const nextApprovalState = await getOrCreateUserApproval(user).catch(() => ({ status: "transient_error", error: "No pudimos verificar el acceso. Revisa la conexión y reintenta." }));
+    if (authIdentityRef.current !== user.id || verificationId !== approvalVerificationRef.current) return;
     const shouldPreserveActiveAccess =
       hadApprovedAccess &&
       (
@@ -207,6 +218,23 @@ export default function App() {
       const requestId = ++approvalRequestId;
       if (!isMounted) return;
 
+      const nextUserId = nextSession?.user?.id || "";
+      authIdentityRef.current = nextUserId;
+      if (getClinicalStorageOwner() !== nextUserId) {
+        setClinicalStorageOwner(nextUserId);
+        approvalStateRef.current = { status: "checking" };
+        setHistory([]);
+        setSessionSummaries([]);
+        setSessionSummary(null);
+        setSessionRecords([]);
+        setAppointmentRecords([]);
+        updateActiveSessionRecordId("");
+        updateActiveAppointmentId("");
+        clearSessionEndTracking();
+        setSaveStatus(null);
+        setClosureSaveState("idle");
+        setScreen(screens.home);
+      }
       setAuthSession(nextSession);
       if (!nextSession?.user) {
         setApprovalState({ status: "signed_out", profile: null, error: null });
@@ -267,7 +295,13 @@ export default function App() {
       getSimulationAppointments(authSession)
     ]).then(([records, appointments]) => {
       if (cancelled) return;
-      if (records.status === "fulfilled") setSessionRecords(records.value);
+      if (records.status === "fulfilled") {
+        syncSessionSummariesFromHistory(records.value, authSession.user.id);
+        setSessionRecords(records.value);
+        setSessionSummaries(getSessionSummariesForCase(selectedCaseId));
+      } else {
+        setConnectionNotice("No pudimos cargar el historial de continuidad. Puedes reintentarlo en Mis sesiones guardadas.");
+      }
       if (requestId !== appointmentsRequestRef.current) return;
       if (appointments.status === "fulfilled") {
         setAppointmentRecords(appointments.value);
@@ -293,6 +327,10 @@ export default function App() {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     const currentUser = userData?.user || null;
 
+    if (userError && (userError.status === 0 || userError.status >= 500 || /fetch|network|timeout|retryable/i.test(`${userError.name} ${userError.message}`))) {
+      setConnectionNotice("No pudimos verificar tu acceso por un problema de conexión. Tu práctica se conserva; vuelve a intentarlo.");
+      throw new Error("No pudimos verificar tu acceso. Revisa la conexión y reintenta.");
+    }
     if (userError || !sessionData?.session || !currentUser) {
       console.warn("[auth] simulation user validation failed", {
         hasSession: Boolean(sessionData?.session),
@@ -411,7 +449,12 @@ export default function App() {
     setScreen(nextScreen);
   }
 
-  async function selectCase(caseId) {
+  async function selectCase(...args) {
+    try { return await selectCaseUnchecked(...args); }
+    catch (error) { setConnectionNotice(error.message || "No pudimos abrir la práctica. Revisa la conexión y reintenta."); }
+  }
+
+  async function selectCaseUnchecked(caseId) {
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
     const resumeRecord =
@@ -448,7 +491,12 @@ export default function App() {
     setScreen(screens.brief);
   }
 
-  async function openCaseFromAgenda(caseId, targetSession = 1, nextScreen = screens.brief) {
+  async function openCaseFromAgenda(...args) {
+    try { return await openCaseFromAgendaUnchecked(...args); }
+    catch (error) { setConnectionNotice(error.message || "No pudimos abrir la práctica. Revisa la conexión y reintenta."); }
+  }
+
+  async function openCaseFromAgendaUnchecked(caseId, targetSession = 1, nextScreen = screens.brief) {
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
     const safeSession = Math.max(1, Number(targetSession) || 1);
@@ -502,7 +550,12 @@ export default function App() {
     setScreen(nextScreen);
   }
 
-  async function startSession(session, planOverride = null) {
+  async function startSession(...args) {
+    try { return await startSessionUnchecked(...args); }
+    catch (error) { setConnectionNotice(error.message || "No pudimos abrir la práctica. Revisa la conexión y reintenta."); }
+  }
+
+  async function startSessionUnchecked(session, planOverride = null) {
     const summary = getPreviousSessionSummary({
       caseId: selectedCase.id,
       sessionNumber: session,
@@ -897,21 +950,6 @@ export default function App() {
     throw new Error("No se pudo preparar la cita de esta sesion. Revisa la agenda antes de iniciar.");
   }
 
-  async function updateAppointmentStatusForClosure(status) {
-    const appointment = getCurrentAppointmentForSession({ includeExpired: true });
-    if (!appointment) return;
-
-    const now = new Date().toISOString();
-    const nextAppointment = {
-      ...appointment,
-      status: status === "closure_pending" ? "closure_pending" : "completed",
-      completedAt: status === "closure_pending" ? appointment.completedAt || "" : now,
-      updatedAt: now
-    };
-    await saveSimulationAppointment(authSession, nextAppointment);
-    setAppointmentRecords((current) => mergeAppointmentRecordList(current, nextAppointment));
-  }
-
   async function persistSessionProgress(nextHistory, { recordId = "", appointment = null } = {}) {
     const nextRecordId = recordId || getOrCreateActiveSessionRecordId();
     const liveReport = buildEducationalReport(nextHistory, selectedCase);
@@ -928,10 +966,12 @@ export default function App() {
       status: "in_progress"
     });
 
-    const saveResult = await saveSessionHistory(sessionRecord);
+    const saveResult = await saveSessionHistory(sessionRecord, { userId: authSession?.user?.id || "local" });
+    if (activeSessionRecordIdRef.current !== nextRecordId || (isSupabaseConfigured && authIdentityRef.current !== authSession?.user?.id)) return;
     updateActiveSessionRecordId(nextRecordId, sessionRecord);
     setSessionRecords((current) => mergeSessionRecordList(current, sessionRecord));
     if (!saveResult.cloudSaved && saveResult.error) {
+      setConnectionNotice("El último avance aún no está confirmado en la nube. Conserva esta pantalla; se reintentará al continuar o guardar el cierre.");
       console.warn("[sessions] save error message", saveResult.error?.message || saveResult.error);
       console.warn("[sessions] save error code", saveResult.error?.code || null);
     }
@@ -953,50 +993,13 @@ export default function App() {
   }
 
   async function startNewPracticeAfterExpiration(requestedReason = SESSION_END_REASONS.MAXIMUM_TIME) {
-    const expiredAppointment = getCurrentAppointmentForSession({ includeExpired: true });
-    const expiredRecordId = activeSessionRecordIdRef.current;
-    const endedAt = new Date();
-    const endReason = resolveSessionEndReason({
-      requestedReason,
-      sessionOrAppointment: expiredAppointment,
-      history,
-      now: endedAt
-    });
-
-    if (history.length > 0 && expiredRecordId) {
-      const pendingRecord = buildSessionHistoryRecord({
-        id: expiredRecordId,
-        caseItem: selectedCase,
-        history,
-        report,
-        sessionNumber,
-        preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
-        appointmentId: expiredAppointment?.id || activeAppointmentIdRef.current || "",
-        startedAt: expiredAppointment?.startedAt || "",
-        endsAt: expiredAppointment?.endsAt || "",
-        endedAt: endedAt.toISOString(),
-        endReason,
-        status: "closure_pending"
-      });
-      const saveResult = await saveSessionHistory(pendingRecord);
-      setSessionRecords((current) => mergeSessionRecordList(current, pendingRecord));
-      if (!saveResult.cloudSaved && saveResult.error) {
-        console.warn("[sessions] save error message", saveResult.error?.message || saveResult.error);
-        console.warn("[sessions] save error code", saveResult.error?.code || null);
-      }
+    sessionEndedAtRef.current = new Date().toISOString();
+    sessionEndReasonRef.current = requestedReason;
+    const result = await saveCompletedSession({ status: "closure_pending" });
+    if (!isSessionSaveConfirmed(result)) {
+      setScreen(screens.results);
+      return;
     }
-
-    if (expiredAppointment?.id) {
-      const now = new Date().toISOString();
-      const pendingAppointment = {
-        ...expiredAppointment,
-        status: "closure_pending",
-        updatedAt: now
-      };
-      await saveSimulationAppointment(authSession, pendingAppointment);
-      setAppointmentRecords((current) => mergeAppointmentRecordList(current, pendingAppointment));
-    }
-
     setHistory(sessionNumber > 1 ? [createSessionPrelude(selectedCase, sessionNumber, sessionSummary, sessionTotal)] : []);
     updateActiveSessionRecordId("");
     updateActiveAppointmentId("");
@@ -1012,61 +1015,77 @@ export default function App() {
     clinicalArtifacts = null,
     status = "completed"
   } = {}) {
-    setSaveStatus({
-      type: "saving",
-      message: "Guardando sesion..."
-    });
-    const appointment = getCurrentAppointmentForSession({ includeExpired: true });
-    const endedAt = sessionEndedAtRef.current || new Date().toISOString();
-    const endReason = sessionEndReasonRef.current || resolveSessionEndReason({
-      sessionOrAppointment: appointment,
-      history,
-      now: new Date(endedAt)
-    });
-    const sessionRecord = buildSessionHistoryRecord({
-      id: activeSessionRecordIdRef.current || "",
-      caseItem: selectedCase,
-      history,
-      report,
-      sessionNumber,
-      preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
-      appointmentId: activeAppointmentIdRef.current || "",
-      startedAt: appointment?.startedAt || "",
-      endsAt: appointment?.endsAt || "",
-      endedAt,
-      endReason,
-      clinicalArtifacts,
-      clinicalDecision,
-      clinicalPlanEvaluation,
-      status
-    });
-    const saveResult = await saveSessionHistory(sessionRecord);
-    setSessionRecords((current) => mergeSessionRecordList(current, sessionRecord));
-    await updateAppointmentStatusForClosure(status);
-    updateActiveSessionRecordId("");
-    updateActiveAppointmentId("");
-    clearSessionEndTracking();
-    setClosureSaveState(status === "closure_pending" ? "pending" : "saved");
-    if (saveResult.cloudSaved) {
+    if (closureSavingRef.current) return { cloudSaved: false, error: "El guardado sigue en curso." };
+    closureSavingRef.current = true;
+    try {
       setSaveStatus({
-        type: "success",
-        message: status === "closure_pending" ? "Cierre pendiente guardado." : "Sesion guardada correctamente."
+        type: "saving",
+        message: "Guardando sesion..."
       });
-    } else if (saveResult.error) {
-      setSaveStatus({
-        type: "error",
-        message:
-          typeof saveResult.error === "string"
-            ? saveResult.error
-            : saveResult.error.message || "No se pudo guardar la sesion en Supabase."
+      const appointment = getCurrentAppointmentForSession({ includeExpired: true });
+      const endedAt = sessionEndedAtRef.current || new Date().toISOString();
+      const endReason = sessionEndReasonRef.current || resolveSessionEndReason({
+        sessionOrAppointment: appointment,
+        history,
+        now: new Date(endedAt)
       });
-    } else {
-      setSaveStatus({
-        type: "local",
-        message: "Modo local: Supabase no esta configurado. El historial no se guardara en la nube."
+      const sessionRecord = buildSessionHistoryRecord({
+        id: getOrCreateActiveSessionRecordId(),
+        caseItem: selectedCase,
+        history,
+        report,
+        sessionNumber,
+        preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
+        appointmentId: activeAppointmentIdRef.current || "",
+        startedAt: appointment?.startedAt || "",
+        endsAt: appointment?.endsAt || "",
+        endedAt,
+        endReason,
+        clinicalArtifacts,
+        clinicalDecision,
+        clinicalPlanEvaluation,
+        status
       });
+      const saveResult = await saveSessionHistory(sessionRecord, { userId: authSession?.user?.id || "local" });
+      if (isSupabaseConfigured && authIdentityRef.current !== authSession?.user?.id) return { cloudSaved: false, error: "La cuenta cambió durante el guardado." };
+      if (!isSessionSaveConfirmed(saveResult)) {
+        setSaveStatus({ type: "error", message: typeof saveResult.error === "string" ? saveResult.error : "No pudimos confirmar el cierre. Tu sesión y borrador se conservan; vuelve a guardar." });
+        return saveResult;
+      }
+      setSessionRecords((current) => mergeSessionRecordList(current, sessionRecord));
+      if (appointment && saveResult.cloudSaved) {
+        setAppointmentRecords((current) => mergeAppointmentRecordList(current, {
+          ...appointment, status, completedAt: saveResult.data?.[0]?.completed_at || "", updatedAt: saveResult.data?.[0]?.updated_at
+        }));
+      }
+      updateActiveSessionRecordId(sessionRecord.id, sessionRecord);
+      setClosureSaveState(status === "closure_pending" ? "pending" : "saved");
+      if (saveResult.cloudSaved) {
+        setSaveStatus({
+          type: "success",
+          message: status === "closure_pending" ? "Cierre pendiente guardado." : "Sesion guardada correctamente."
+        });
+      } else if (saveResult.error) {
+        setSaveStatus({
+          type: "error",
+          message:
+            typeof saveResult.error === "string"
+              ? saveResult.error
+              : saveResult.error.message || "No se pudo guardar la sesion en Supabase."
+        });
+      } else {
+        setSaveStatus({
+          type: "local",
+          message: "Modo local: Supabase no esta configurado. El historial no se guardara en la nube."
+        });
+      }
+      return saveResult;
+    } catch (error) {
+      setSaveStatus({ type: "error", message: error.message || "No pudimos guardar el cierre. Tu borrador se conserva." });
+      return { cloudSaved: false, error: error.message };
+    } finally {
+      closureSavingRef.current = false;
     }
-    return saveResult;
   }
 
   async function saveClosurePendingSession() {
@@ -1161,7 +1180,8 @@ export default function App() {
   async function leaveResultsWithPendingClosure() {
     const exitRequest = pendingResultsExit;
     const targetScreen = exitRequest?.targetScreen || screens.home;
-    await saveClosurePendingSession();
+    const result = await saveClosurePendingSession();
+    if (!isSessionSaveConfirmed(result)) return;
     setPendingResultsExit(null);
     if (typeof exitRequest?.exitAction === "function") {
       exitRequest.exitAction();
@@ -1287,13 +1307,18 @@ export default function App() {
       )}
 
       {screen === screens.savedSessions && (
-        <SavedSessions authSession={authSession} onBackHome={goHome} />
+        <SavedSessions authSession={authSession} onBackHome={goHome} onHistoryChange={(records) => {
+          syncSessionSummariesFromHistory(records, authSession?.user?.id || "local");
+          setSessionRecords(records);
+          setSessionSummaries(getSessionSummariesForCase(selectedCase.id));
+        }} />
       )}
 
       {screen === screens.clinicalAgenda && (
         <ClinicalAgenda
           cases={cases}
           authSession={authSession}
+          sessionRecords={sessionRecords}
           appointments={appointmentRecords}
           appointmentsStatus={appointmentsStatus}
           initialCaseId={agendaFocusCaseId}
@@ -1400,6 +1425,7 @@ export default function App() {
             onBackHome={goHome}
             onRequestExit={requestExitFromResults}
             onSaveSessionRecord={saveCompletedSession}
+            onDraftChange={() => { setClosureSaveState("open"); setSaveStatus(null); }}
           />
         </section>
       )}

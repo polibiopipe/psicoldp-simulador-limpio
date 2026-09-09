@@ -32,6 +32,7 @@ import {
   loadStudentWeeklyAvailability,
   addDays,
   saveStudentWeeklyAvailability,
+  validateWeeklyAvailabilityDraft,
   WEEK_DAYS
 } from "../engine/clinicalAgenda.js";
 import {
@@ -59,6 +60,7 @@ export function ClinicalAgenda({
   cases,
   authSession = null,
   appointments = [],
+  sessionRecords = [],
   appointmentsStatus = { loading: true, authoritative: false },
   initialCaseId = "",
   initialScheduleRequest = null,
@@ -71,7 +73,7 @@ export function ClinicalAgenda({
   const [refreshKey, setRefreshKey] = useState(0);
   const agendaItems = useMemo(
     () => applyAppointmentsToAgendaItems(buildClinicalAgendaItems(cases), appointments),
-    [cases, appointments, refreshKey]
+    [cases, appointments, sessionRecords, refreshKey]
   );
   const emptyAvailability = useMemo(() => getEmptyWeeklyAvailability(), []);
   const [availability, setAvailability] = useState(() => getEmptyWeeklyAvailability());
@@ -95,6 +97,8 @@ export function ClinicalAgenda({
   );
   const [scheduleCaseId, setScheduleCaseId] = useState("");
   const [scheduleDrafts, setScheduleDrafts] = useState({});
+  const [availabilityDirty, setAvailabilityDirty] = useState(false);
+  const availabilityValidationState = { ...availabilityState, dirty: availabilityDirty };
   const [availabilityReturnCaseId, setAvailabilityReturnCaseId] = useState("");
   const [reminderCaseId, setReminderCaseId] = useState("");
   const selectedItem =
@@ -195,6 +199,7 @@ export function ClinicalAgenda({
       });
       return finalResult;
     }
+    setAvailabilityDirty(false);
     setAvailability(finalResult.availability);
     setAvailabilityState({
       loading: false,
@@ -271,7 +276,7 @@ export function ClinicalAgenda({
     appointmentMutationRef.current = true;
     setAppointmentMutation({ pending: true, error: "", caseId: item.caseItem.id });
     try {
-      const validation = validateAppointmentSchedule({ item, draft: entry, appointments, appointmentsStatus, availability: scheduleAvailability, availabilityStatus: availabilityState, cases });
+      const validation = validateAppointmentSchedule({ item, draft: entry, appointments, appointmentsStatus, availability: scheduleAvailability, availabilityStatus: availabilityValidationState, cases });
       if (!validation.ok) throw new Error(validation.message);
       const existing = findDraftAppointment(item, entry, appointments);
       const baseAppointment = buildAppointmentRecord({
@@ -369,6 +374,7 @@ export function ClinicalAgenda({
           availability={availability}
           status={availabilityState}
           onChange={updateAvailability}
+          onDirtyChange={setAvailabilityDirty}
         />
       </section>
 
@@ -618,7 +624,7 @@ export function ClinicalAgenda({
           item={scheduleItem}
           cases={cases}
           availability={scheduleAvailability}
-          availabilityStatus={availabilityState}
+          availabilityStatus={availabilityValidationState}
           appointments={appointments}
           appointmentsStatus={appointmentsStatus}
           mutation={{ pending: appointmentMutation.pending, error: appointmentMutation.caseId === scheduleItem.caseItem.id ? appointmentMutation.error : "" }}
@@ -980,60 +986,49 @@ function ClinicalLanguagePanel({ preference, termCopy, onChange }) {
   );
 }
 
-function AvailabilityEditor({ availability, status, onChange }) {
+export function AvailabilityEditor({ availability, status, onChange, onDirtyChange }) {
   const [draft, setDraft] = useState(availability);
   const [localSaving, setLocalSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const dirty = JSON.stringify(draft) !== JSON.stringify(availability);
+  const busy = Boolean(status?.loading || status?.saving || localSaving);
+  const validation = validateWeeklyAvailabilityDraft(draft);
 
+  useEffect(() => { setDraft(availability); }, [availability]);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => {
-    setDraft(availability);
-  }, [availability]);
-
-  useEffect(() => {
-    if (!status?.saving) setLocalSaving(false);
-  }, [status?.saving]);
+    if (!dirty) return;
+    const warn = (event) => { event.preventDefault(); event.returnValue = ""; };
+    globalThis.addEventListener?.("beforeunload", warn);
+    return () => globalThis.removeEventListener?.("beforeunload", warn);
+  }, [dirty]);
 
   function updateDay(dayKey, patch) {
-    setDraft((current) => ({
-      ...current,
-      [dayKey]: {
-        ...current[dayKey],
-        ...patch
-      }
-    }));
+    setNotice("");
+    setDraft((current) => ({ ...current, [dayKey]: { ...current[dayKey], ...patch } }));
   }
 
   function toggleDay(dayKey, checked) {
     const current = draft[dayKey] || {};
-    updateDay(dayKey, checked
-      ? {
-          enabled: true,
-          start: current.start || "09:00",
-          end: current.end || "10:00",
-          blocks: [{ start: current.start || "09:00", end: current.end || "10:00" }]
-        }
-      : { enabled: false, start: "", end: "", blocks: [] });
-  }
-
-  function updateTime(dayKey, patch) {
-    const current = draft[dayKey] || {};
-    const next = {
-      ...current,
-      ...patch,
-      enabled: true
-    };
     updateDay(dayKey, {
-      ...next,
-      blocks: [{ start: next.start || "09:00", end: next.end || "10:00" }]
+      enabled: checked,
+      blocks: current.blocks?.length ? current.blocks : [{ start: "09:00", end: "10:00" }]
     });
   }
 
-  const configured = hasConfiguredAvailability(draft);
+  function updateBlock(dayKey, index, patch) {
+    updateDay(dayKey, { blocks: draft[dayKey].blocks.map((block, i) => i === index ? { ...block, ...patch } : block) });
+  }
 
   async function handleSave() {
-    if (localSaving || status?.saving) return;
+    if (busy || !validation.ok) return;
     setLocalSaving(true);
+    setNotice("");
     try {
-      await onChange(draft);
+      const result = await onChange(draft);
+      if (result?.ok) setNotice("Disponibilidad guardada. Ya puedes programar usando estos horarios.");
+    } catch {
+      setNotice("No pudimos confirmar el guardado. Tus cambios siguen pendientes; vuelve a intentarlo.");
     } finally {
       setLocalSaving(false);
     }
@@ -1043,78 +1038,50 @@ function AvailabilityEditor({ availability, status, onChange }) {
     <article className="availability-editor">
       <div className="agenda-panel-heading">
         <CalendarDays aria-hidden="true" />
-        <div>
-          <span className="eyebrow">Mi disponibilidad</span>
-          <h2>Horarios semanales</h2>
-        </div>
+        <div><span className="eyebrow">Mi disponibilidad</span><h2>Horarios semanales</h2></div>
       </div>
-      {status?.loading ? (
-        <p className="availability-status">Cargando tu disponibilidad...</p>
-      ) : status?.configured ? (
-        <p className="availability-status">Disponibilidad definida. Puedes editarla cuando lo necesites.</p>
-      ) : (
-        <p className="availability-status">
-          Aún no has definido tu disponibilidad. Configúrala para organizar tus próximas sesiones.
-        </p>
-      )}
-      {status?.error && (
-        <p className="availability-status warning">
-          No pudimos verificar tu disponibilidad en Supabase. {status.error}
-        </p>
-      )}
+      <p className="availability-status">Hora de Chile (Santiago). Activa los días, define tus horarios y pulsa Guardar disponibilidad.</p>
+      <p className={`availability-status ${dirty ? "warning" : ""}`} role="status">
+        {busy ? "Verificando tus horarios..." : dirty
+          ? "Tienes cambios sin guardar. Todavía no se aplican a tus citas."
+          : notice || (status?.configured ? "Estos son tus horarios guardados." : "Aún no tienes horarios guardados.")}
+      </p>
+      {(status?.error || !validation.ok) && <p className="availability-status warning" role="alert">{!validation.ok ? validation.error : status.error}</p>}
       <div className="availability-grid">
         {WEEK_DAYS.map((day) => {
-          const dayAvailability = draft[day.key] || {};
+          const value = draft[day.key] || {};
+          const blocks = value.blocks?.length ? value.blocks : [{ start: "09:00", end: "10:00" }];
           return (
-            <div className={`availability-day-row ${dayAvailability.enabled ? "enabled" : ""}`} key={day.key}>
+            <div className={`availability-day-group ${value.enabled ? "enabled" : ""}`} key={day.key}>
               <label className="availability-toggle">
-                <input
-                  type="checkbox"
-                  checked={Boolean(dayAvailability.enabled)}
-                  onChange={(event) => toggleDay(day.key, event.target.checked)}
-                />
-                <span>{day.shortLabel}</span>
+                <input type="checkbox" checked={Boolean(value.enabled)} disabled={busy}
+                  onChange={(event) => toggleDay(day.key, event.target.checked)} />
+                <span>{day.label}</span>
               </label>
-              <input
-                type="time"
-                value={dayAvailability.start || "09:00"}
-                onChange={(event) => updateTime(day.key, { start: event.target.value })}
-                disabled={!dayAvailability.enabled}
-              />
-              <span aria-hidden="true">-</span>
-              <input
-                type="time"
-                value={dayAvailability.end || "10:00"}
-                onChange={(event) => updateTime(day.key, { end: event.target.value })}
-                disabled={!dayAvailability.enabled}
-              />
-              <button
-                className="availability-clear"
-                type="button"
-                onClick={() => toggleDay(day.key, false)}
-                disabled={!dayAvailability.enabled}
-              >
-                Eliminar
-              </button>
-              <small>{formatAvailabilityForDay(dayAvailability)}</small>
+              {value.enabled && blocks.map((block, index) => (
+                <div className="availability-block-row" key={index}>
+                  <label>Desde<input type="time" aria-label={`${day.label}, inicio del horario ${index + 1}`} value={block.start} disabled={busy}
+                    onChange={(event) => updateBlock(day.key, index, { start: event.target.value })} /></label>
+                  <label>Hasta<input type="time" aria-label={`${day.label}, término del horario ${index + 1}`} value={block.end} disabled={busy}
+                    onChange={(event) => updateBlock(day.key, index, { end: event.target.value })} /></label>
+                  <button className="availability-clear" type="button" disabled={busy} aria-label={`Eliminar horario ${index + 1} de ${day.label}`}
+                    onClick={() => updateDay(day.key, { enabled: blocks.length > 1, blocks: blocks.filter((_, i) => i !== index) })}>Eliminar</button>
+                </div>
+              ))}
+              {value.enabled && <button className="availability-clear" type="button" disabled={busy}
+                onClick={() => updateDay(day.key, { blocks: [...blocks, { start: "", end: "" }] })}>Agregar horario</button>}
+              <small>{value.enabled ? "Se repite cada semana." : "Día desactivado"}</small>
             </div>
           );
         })}
       </div>
-      <button
-        className="primary-action availability-save"
-        type="button"
-        onClick={handleSave}
-        disabled={status?.saving || localSaving}
-      >
-        <CheckCircle2 aria-hidden="true" />
-        {status?.saving || localSaving
-          ? "Guardando..."
-          : status?.configured ? "Editar mi disponibilidad" : "Definir mi disponibilidad"}
-      </button>
-      {!configured && (
-        <p className="availability-status">Activa al menos un día y define un bloque horario para guardar.</p>
-      )}
+      <div className="modal-actions">
+        <button className="primary-action availability-save" type="button" onClick={handleSave} disabled={busy || !validation.ok || !dirty}>
+          <CheckCircle2 aria-hidden="true" />{localSaving || status?.saving ? "Guardando..." : "Guardar disponibilidad"}
+        </button>
+        {dirty && <button className="secondary-action" type="button" disabled={busy} onClick={() => { setDraft(availability); setNotice(""); }}>Descartar cambios</button>}
+      </div>
+      {dirty && !hasConfiguredAvailability(draft) && <p className="availability-status warning">Al guardar se desactivarán todos tus horarios. Las citas existentes se conservan.</p>}
     </article>
   );
 }

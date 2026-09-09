@@ -1,4 +1,5 @@
 import { generateLocalPatientResponse } from "./localMiniAI.js";
+import { getAvatarCanonicalBiography } from "../data/avatarCanonicalBiographies.js";
 import { normalizeText } from "../utils/textUtils.js";
 
 const CASE_ID = "marcos";
@@ -47,6 +48,10 @@ for (const test of SMOKE_TESTS) {
   });
 
   const clinical = result.debug?.clinicalSimulation;
+  const canonical = result.debug?.canonicalBiographyUsed;
+  const factKey = result.debug?.canonicalFactKey;
+  const expectedFacts = { identidad_nombre: ["name"], edad: ["age"], vivienda: ["location", "household"], ocupacion_estudios: ["work"], estado_civil_pareja: ["relationship"], familia_composicion: ["family", "children"], motivo_consulta: ["reason"] };
+  if (canonical && (!expectedFacts[test.expectedAct]?.includes(factKey) || !getAvatarCanonicalBiography(CASE_ID).directAnswers[factKey]?.includes(result.responseText))) failures.push(`${test.message}: dato canónico incorrecto.`);
   const response = result.responseText || "";
   const normalizedResponse = normalizeText(response);
   const patientDataUsed = clinical?.patientDataUsed || {};
@@ -65,25 +70,25 @@ for (const test of SMOKE_TESTS) {
     response
   }, null, 2));
 
-  if (!clinical) {
+  if (!clinical && !canonical) {
     failures.push(`${test.message}: no paso por ClinicalSimulationEngine.`);
   }
-  if (clinical?.detectedAct !== test.expectedAct) {
+  if (!canonical && clinical?.detectedAct !== test.expectedAct) {
     failures.push(`${test.message}: esperaba act=${test.expectedAct}, recibio ${clinical?.detectedAct}.`);
   }
-  if (test.expectedTopic && clinical?.clinicalTopic !== test.expectedTopic) {
+  if (!canonical && test.expectedTopic && clinical?.clinicalTopic !== test.expectedTopic) {
     failures.push(`${test.message}: esperaba topic=${test.expectedTopic}, recibio ${clinical?.clinicalTopic}.`);
   }
   if (fellBackToConfusion) {
     failures.push(`${test.message}: cayo en fallback de confusion.`);
   }
-  if (!usedHandler.startsWith("marcos_basic.")) {
+  if (!canonical && !usedHandler.startsWith("marcos_basic.")) {
     failures.push(`${test.message}: no uso handler explicito de Marcos (${usedHandler || "sin handler"}).`);
   }
-  if (!Object.keys(patientDataUsed).length) {
+  if (!canonical && !Object.keys(patientDataUsed).length) {
     failures.push(`${test.message}: no registro patientDataUsed.`);
   }
-  if (test.mustMention?.length && !test.mustMention.every((term) => normalizedResponse.includes(normalizeText(term)))) {
+  if (!canonical && test.mustMention?.length && !test.mustMention.every((term) => normalizedResponse.includes(normalizeText(term)))) {
     failures.push(`${test.message}: respuesta no contiene datos esperados (${test.mustMention.join(", ")}).`);
   }
 

@@ -28,7 +28,8 @@ export function generateLocalPatientResponse({
   const workingMemory = buildPatientMemory({ caseId, history, difficulty, sessionNumber, memory });
   const canonicalResponse = selectCanonicalDirectResponse({
     patientId: caseId,
-    studentMessage
+    studentMessage,
+    history
   });
 
   if (canonicalResponse) {

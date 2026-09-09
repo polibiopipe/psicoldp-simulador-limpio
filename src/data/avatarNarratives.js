@@ -14,7 +14,8 @@ export const avatarNarratives = deepFreeze(
           internalConflict: biography.internalConflict,
           stakes: biography.stakes,
           timeline: biography.timeline,
-          disclosure: biography.disclosure
+          disclosure: biography.disclosure,
+          privacyBoundaries: biography.privacyBoundaries
         }
       ];
     })

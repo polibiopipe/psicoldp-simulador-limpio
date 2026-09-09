@@ -22,6 +22,7 @@ import {
   formatSessionAgreement,
   saveSessionSummary
 } from "../engine/sessionMemory.js";
+import { isSessionSaveConfirmed } from "../engine/sessionHistory.js";
 import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 import {
   buildContinuityAgreement,
@@ -68,8 +69,12 @@ export function SessionClosure({
   onScheduleNextSession,
   onBackHome,
   onRequestExit,
-  onSaveSessionRecord
+  onSaveSessionRecord,
+  onDraftChange
 }) {
+  const savingRef = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const savedSignatureRef = useRef("");
   const [copied, setCopied] = useState(false);
   const [processCopied, setProcessCopied] = useState(false);
   const [hasSavedSessionRecord, setHasSavedSessionRecord] = useState(false);
@@ -235,6 +240,15 @@ export function SessionClosure({
     () => buildProcessSummary({ caseItem, summaries: [...previousSessionSummaries, summary] }),
     [caseItem, previousSessionSummaries, summary]
   );
+  const closureSignature = JSON.stringify([clinicalDecision, clinicalArtifacts]);
+  useEffect(() => {
+    if (hasSavedSessionRecord && savedSignatureRef.current !== closureSignature) {
+      setHasSavedSessionRecord(false);
+      setHasSavedContinuityAgreement(false);
+      scrollPersistenceDisabledRef.current = false;
+      onDraftChange?.();
+    }
+  }, [closureSignature, hasSavedSessionRecord, onDraftChange]);
   const preSessionPlanKey = [
     preSessionPlan?.proposedSessionCount,
     preSessionPlan?.sessionCountJustification,
@@ -429,31 +443,44 @@ export function SessionClosure({
   }
 
   async function saveCurrentSummary({ includeHistory = false } = {}) {
-    saveSessionSummary(summary);
-    if (includeHistory && !hasSavedSessionRecord && onSaveSessionRecord) {
-      await onSaveSessionRecord({
-        clinicalDecision: normalizedClinicalDecision,
-        clinicalPlanEvaluation,
-        clinicalArtifacts: normalizedClinicalArtifacts
-      });
-      setHasSavedSessionRecord(true);
-    }
-    if (includeHistory) {
+    if (!includeHistory) return true;
+    if (savingRef.current) return false;
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      if (!hasSavedSessionRecord && onSaveSessionRecord) {
+        const result = await onSaveSessionRecord({
+          clinicalDecision: normalizedClinicalDecision,
+          clinicalPlanEvaluation,
+          clinicalArtifacts: normalizedClinicalArtifacts
+        });
+        if (!isSessionSaveConfirmed(result)) {
+          setDraftStatus({ type: "error", message: "El cierre no se ha confirmado. Tu borrador se conserva; vuelve a guardar." });
+          return false;
+        }
+        savedSignatureRef.current = closureSignature;
+        setHasSavedSessionRecord(true);
+      }
+      saveSessionSummary(summary, userId || "local");
       scrollPersistenceDisabledRef.current = true;
       clearClinicalDraft(decisionDraftKey);
       clearClinicalDraft(artifactsDraftKey);
       clearClinicalScrollPosition(closureScrollKey);
       setDraftStatus({ type: "saved", message: "Cambios guardados." });
-    }
+      return true;
+    } catch {
+      setDraftStatus({ type: "error", message: "No pudimos guardar. Tu borrador se conserva; vuelve a intentarlo." });
+      return false;
+    } finally { savingRef.current = false; setIsSaving(false); }
   }
 
   async function continueToNextSession() {
-    await saveCurrentSummary({ includeHistory: true });
+    if (!await saveCurrentSummary({ includeHistory: true })) return;
     if (canContinueInSimulator) onContinueSession(summary);
   }
 
   async function scheduleNextSession() {
-    await saveCurrentSummary({ includeHistory: true });
+    if (!await saveCurrentSummary({ includeHistory: true })) return;
     if (canContinueInSimulator) {
       if (onScheduleNextSession) onScheduleNextSession(nextSessionNumber);
       else onContinueSession(summary);
@@ -461,12 +488,12 @@ export function SessionClosure({
   }
 
   async function saveContinuityAgreement() {
-    await saveCurrentSummary({ includeHistory: true });
+    if (!await saveCurrentSummary({ includeHistory: true })) return;
     setHasSavedContinuityAgreement(true);
   }
 
   async function backHomeAfterSave() {
-    await saveCurrentSummary({ includeHistory: true });
+    if (!await saveCurrentSummary({ includeHistory: true })) return;
     onBackHome();
   }
 
@@ -550,6 +577,7 @@ export function SessionClosure({
 
   return (
     <section className="session-closure" aria-labelledby="session-closure-title">
+      <fieldset className="closure-editable-fields" disabled={isSaving}>
       <header className="session-closure-header">
         <span className="eyebrow">Proceso por sesiones</span>
         <h1 id="session-closure-title">{closureTitle}</h1>
@@ -1460,6 +1488,7 @@ export function SessionClosure({
         </details>
       </div>
 
+      </fieldset>
     </section>
   );
 }

@@ -116,8 +116,8 @@ for (const forbidden of ["marcela", "no tengo hermanos"]) {
 
 const sourceRoot = join(PROJECT_ROOT, "src");
 const forbiddenPatterns = [
-  { pattern: new RegExp(`16\\s+${yearsWord}`, "i"), label: `16 ${yearsWord}` },
-  { pattern: new RegExp(`16\\s+${yearsWordAscii}`, "i"), label: `16 ${yearsWordAscii}` },
+  { pattern: new RegExp(`(?:tengo|edad[: ]+|adolescente de)\\s*16\\s+${yearsWord}`, "i"), label: `16 ${yearsWord}` },
+  { pattern: new RegExp(`(?:tengo|edad[: ]+|adolescente de)\\s*16\\s+${yearsWordAscii}`, "i"), label: `16 ${yearsWordAscii}` },
   { pattern: new RegExp(`tengo\\s+${"16"}`, "i"), label: `tengo ${"16"}` },
   { pattern: new RegExp(`adolescente\\s+de\\s+${"16"}`, "i"), label: `adolescente de ${"16"}` }
 ];

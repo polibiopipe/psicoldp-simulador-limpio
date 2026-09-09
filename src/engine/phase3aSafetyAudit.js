@@ -37,6 +37,7 @@ const availabilityRollback = readFileSync(resolve(process.cwd(), "supabase/simul
 const runbook = readFileSync(resolve(process.cwd(), "docs/phase3a-migration-runbook.md"), "utf8");
 const endpoint = readFileSync(resolve(process.cwd(), "api/gemini-patient-response.js"), "utf8");
 const clinicalAgendaComponent = readFileSync(resolve(process.cwd(), "src/components/ClinicalAgenda.jsx"), "utf8");
+const agendaSchedulingEngine = readFileSync(resolve(process.cwd(), "src/engine/agendaScheduling.js"), "utf8");
 const clinicalAgendaEngine = readFileSync(resolve(process.cwd(), "src/engine/clinicalAgenda.js"), "utf8");
 const baseAppointment = {
   id: "appointment-1",
@@ -180,7 +181,7 @@ check("missing availability table is handled without blank screen", () =>
   clinicalAgendaEngine.includes("classifyAvailabilityError") &&
   clinicalAgendaEngine.includes("source: \"schema_missing\"") &&
   clinicalAgendaEngine.includes("La configuración de disponibilidad aún no está habilitada en este entorno") &&
-  clinicalAgendaComponent.includes("availabilityStatus?.authoritative")
+  agendaSchedulingEngine.includes("availabilityStatus?.authoritative")
 );
 
 check("availability network and permission errors are controlled", () =>
@@ -313,10 +314,10 @@ check("existing appointments remain valid after availability edits", () =>
 );
 
 check("localStorage cache does not authorize appointment scheduling", () =>
-  clinicalAgendaComponent.includes("availabilityStatus?.authoritative") &&
-  clinicalAgendaComponent.includes("availabilityState.authoritative ? availability : emptyAvailability") &&
+  agendaSchedulingEngine.includes("availabilityStatus?.authoritative") &&
+  clinicalAgendaComponent.includes("availabilityState.authoritative && appointmentsStatus.authoritative") &&
   clinicalAgendaComponent.includes("source: finalResult.source || \"supabase\"") &&
-  clinicalAgendaEngine.includes("if (!raw) return getEmptyWeeklyAvailability()")
+  clinicalAgendaEngine.includes("readClinicalCache(AVAILABILITY_STORAGE_KEY, {})")
 );
 
 check("availability save refreshes authoritative Supabase state", () =>
@@ -349,8 +350,8 @@ check("availability save failure keeps previous authoritative state visible", ()
 
 check("availability save blocks double click duplicates", () =>
   clinicalAgendaComponent.includes("const [localSaving, setLocalSaving]") &&
-  clinicalAgendaComponent.includes("if (localSaving || status?.saving) return") &&
-  clinicalAgendaComponent.includes("disabled={status?.saving || localSaving}") &&
+  clinicalAgendaComponent.includes("if (busy || !validation.ok) return") &&
+  clinicalAgendaComponent.includes("disabled={busy || !validation.ok || !dirty}") &&
   clinicalAgendaComponent.includes("Guardando...")
 );
 

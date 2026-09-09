@@ -1,3 +1,4 @@
+import { readClinicalCache, writeClinicalCache } from "./clinicalStorage.js";
 import { getPatientMasterRecord } from "../data/patients/index.js";
 import { getSessionStage } from "../data/sessionPrompts.js";
 import { formatClinicalDecision } from "./clinicalPlanning.js";
@@ -130,10 +131,10 @@ export function saveClinicalAgendaEntry(caseId, entry = {}) {
     ...normalized,
     updatedAt: new Date().toISOString()
   };
-  localStorage.setItem(AGENDA_STORAGE_KEY, JSON.stringify({
+  writeClinicalCache(AGENDA_STORAGE_KEY, {
     ...entries,
     [caseId]: nextEntry
-  }));
+  });
   return nextEntry;
 }
 
@@ -141,27 +142,25 @@ export function clearClinicalAgendaEntry(caseId) {
   if (!canUseStorage() || !caseId) return false;
   const entries = readAgendaEntries();
   delete entries[caseId];
-  localStorage.setItem(AGENDA_STORAGE_KEY, JSON.stringify(entries));
+  writeClinicalCache(AGENDA_STORAGE_KEY, entries);
   return true;
 }
 
 export function getWeeklyAvailability() {
   if (!canUseStorage()) return getEmptyWeeklyAvailability();
   try {
-    const raw = localStorage.getItem(AVAILABILITY_STORAGE_KEY);
-    if (!raw) return getEmptyWeeklyAvailability();
-    const parsed = JSON.parse(raw);
+    const parsed = readClinicalCache(AVAILABILITY_STORAGE_KEY, {});
     return normalizeWeeklyAvailability(parsed);
   } catch {
     return getEmptyWeeklyAvailability();
   }
 }
 
-export function saveWeeklyAvailability(availability = {}) {
+export function saveWeeklyAvailability(availability = {}, userId) {
   const normalized = normalizeWeeklyAvailability(availability);
   if (canUseStorage()) {
     try {
-      localStorage.setItem(AVAILABILITY_STORAGE_KEY, JSON.stringify(normalized));
+      writeClinicalCache(AVAILABILITY_STORAGE_KEY, normalized, userId);
     } catch {
       // The server remains authoritative when the local cache is unavailable.
     }
@@ -188,7 +187,8 @@ export async function loadStudentWeeklyAvailability(authSession = null) {
     .order("day_of_week", { ascending: true })
     .order("start_time", { ascending: true });
 
-  if (error) {
+  if (error || !Array.isArray(data)) {
+    if (!error) return { availability: getEmptyWeeklyAvailability(), configured: false, authoritative: false, source: "unconfirmed", error: "No pudimos confirmar tus horarios. Vuelve a cargar la agenda." };
     console.warn("[availability] load error message", error.message);
     console.warn("[availability] load error code", error.code || null);
     const classified = classifyAvailabilityError(error);
@@ -202,7 +202,7 @@ export async function loadStudentWeeklyAvailability(authSession = null) {
   }
 
   const availability = mapAvailabilityRowsToWeekly(data || []);
-  saveWeeklyAvailability(availability);
+  saveWeeklyAvailability(availability, authSession.user.id);
   return {
     availability,
     configured: hasConfiguredAvailability(availability),
@@ -213,6 +213,8 @@ export async function loadStudentWeeklyAvailability(authSession = null) {
 }
 
 export async function saveStudentWeeklyAvailability(authSession = null, availability = {}) {
+  const validation = validateWeeklyAvailabilityDraft(availability);
+  if (!validation.ok) return { ...validation, availability, source: "invalid_draft" };
   const normalized = normalizeWeeklyAvailability(availability);
   const { isSupabaseConfigured, supabase } = await getSupabaseRuntime();
   if (!isSupabaseConfigured || !supabase || !authSession?.user?.id) {
@@ -244,7 +246,7 @@ export async function saveStudentWeeklyAvailability(authSession = null, availabi
     return { ok: false, availability: normalized, error: "No pudimos confirmar todos tus horarios. Actualiza la agenda.", source: "unconfirmed" };
   }
   const saved = mapAvailabilityRowsToWeekly(data);
-  saveWeeklyAvailability(saved);
+  saveWeeklyAvailability(saved, authSession.user.id);
   return {
     ok: true,
     authoritative: true,
@@ -256,6 +258,26 @@ export async function saveStudentWeeklyAvailability(authSession = null, availabi
 
 export function getEmptyWeeklyAvailability() {
   return normalizeWeeklyAvailability(EMPTY_WEEKLY_AVAILABILITY);
+}
+
+export function validateWeeklyAvailabilityDraft(availability = {}) {
+  for (const day of WEEK_DAYS) {
+    const value = availability[day.key];
+    if (!value?.enabled) continue;
+    const blocks = Array.isArray(value.blocks) ? value.blocks : [{ start: value.start, end: value.end }];
+    if (!blocks.length) return { ok: false, error: `${day.label || day.shortLabel}: agrega al menos un horario.` };
+    const ordered = [...blocks].sort((a, b) => String(a.start).localeCompare(String(b.start)));
+    for (let index = 0; index < ordered.length; index += 1) {
+      const block = ordered[index];
+      if (!isValidTime(block.start) || !isValidTime(block.end) || block.end <= block.start) {
+        return { ok: false, error: `${day.label || day.shortLabel}: el término debe ser posterior al inicio y ambas horas deben ser válidas.` };
+      }
+      if (index > 0 && block.start < ordered[index - 1].end) {
+        return { ok: false, error: `${day.label || day.shortLabel}: los horarios no pueden superponerse.` };
+      }
+    }
+  }
+  return { ok: true };
 }
 
 export function hasConfiguredAvailability(availability = {}) {
@@ -456,7 +478,7 @@ export function formatAgendaDate(entry) {
 function readAgendaEntries() {
   if (!canUseStorage()) return {};
   try {
-    const parsed = JSON.parse(localStorage.getItem(AGENDA_STORAGE_KEY) || "{}");
+    const parsed = readClinicalCache(AGENDA_STORAGE_KEY, {});
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -782,13 +804,14 @@ function validateAvailability({ date, time, durationMinutes, availability }) {
   }
 
   const dayKey = getDayKey(date);
+  const dateLabel = formatDayLabel(new Date(`${date}T12:00:00`));
   const dayAvailability = normalizedAvailability[dayKey];
   if (!dayAvailability?.enabled) {
     return {
       ok: false,
       type: "outside_availability",
       message: "Este horario está fuera de tu disponibilidad.",
-      detail: "Ese día no tiene disponibilidad configurada.",
+      detail: `El ${dateLabel} no tiene disponibilidad guardada. Activa ese día y pulsa «Guardar disponibilidad».`,
       actionLabel: "Editar disponibilidad"
     };
   }
@@ -805,7 +828,7 @@ function validateAvailability({ date, time, durationMinutes, availability }) {
       ok: false,
       type: "outside_availability",
       message: "Este horario está fuera de tu disponibilidad.",
-      detail: `Disponibilidad del día: ${formatAvailabilityForDay(dayAvailability)}.`,
+      detail: `El ${dateLabel} tienes ${formatAvailabilityForDay(dayAvailability)}. La sesión completa de ${normalizeDuration(durationMinutes)} minutos debe quedar dentro de un horario.`,
       actionLabel: "Editar disponibilidad"
     };
   }
@@ -954,7 +977,7 @@ function normalizeDuration(value) {
 }
 
 function isValidTime(value) {
-  return /^\d{2}:\d{2}$/.test(String(value || ""));
+  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(value || ""));
 }
 
 function formatDayLabel(date) {

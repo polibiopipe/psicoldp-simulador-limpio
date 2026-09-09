@@ -22,7 +22,7 @@ export function ClinicalDashboard({
   onPrepareCase,
   onStartSession
 }) {
-  const agendaItems = useMemo(() => buildClinicalAgendaItems(cases), [cases]);
+  const agendaItems = useMemo(() => buildClinicalAgendaItems(cases), [cases, sessionRecords]);
   const appointmentItems = useMemo(
     () => buildAppointmentDashboardItems({ appointments, cases, agendaItems }),
     [appointments, cases, agendaItems]
