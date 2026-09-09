@@ -28,7 +28,7 @@ globalThis.__consentClient = {
       select() { return this; }, eq(k, v) { filters.push((r) => r[k] === v); return this; },
       order(k, options) { if (k === 'sequence') descending = options?.ascending === false; return this; },
       limit(n) { limit = n; return this; }, range(a,b) { start = a; end = b; return this; },
-      insert(value) { payload = value; return this; }, single() { single = true; return this; },
+      insert(value) { payload = value; return this; }, single() { single = true; return this; }, maybeSingle() { single = true; return this; },
       then(yes, no) {
         return (async () => {
           if (failRead || table === failExportTable) return { error: { message: 'offline' }, data: null };

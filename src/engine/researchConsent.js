@@ -45,7 +45,7 @@ export async function exportOwnSimulatorData(userId) {
   for (const [table, ownerColumn] of [
     ["user_profiles", "id"], ["simulation_sessions", "user_id"],
     ["simulation_appointments", "user_id"], ["simulation_student_availability", "user_id"],
-    ["simulation_interventions", "user_id"],
+    ["simulation_interventions", "user_id"], ["simulation_access_consents", "user_id"],
     ["simulation_research_consent_events", "user_id"]
   ]) {
     const rows = [];

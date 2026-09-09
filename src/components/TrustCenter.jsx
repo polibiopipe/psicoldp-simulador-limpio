@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ArrowLeft, BrainCircuit, Download, FileCheck2, LockKeyhole, Scale } from "lucide-react";
+import { AccessConsentSummary } from "./AccessConsentGate.jsx";
 import { ResearchConsent } from "./ResearchConsent.jsx";
 import { exportOwnSimulatorData } from "../engine/researchConsent.js";
 import { downloadTextFile, PRIVACY_CONTACT } from "../data/researchConsent.js";
@@ -41,7 +42,7 @@ export function TrustCenter({ onBack, userId = "", canParticipate = true, onBusy
         <button key={id} type="button" className={activeTab === id ? "selected" : ""} aria-current={activeTab === id ? "page" : undefined} disabled={busy} onClick={() => setActiveTab(id)}><Icon aria-hidden="true" />{label}</button>
       )}</nav>
       <article className="trust-panel consent-panel">
-        {activeTab === "consentimiento" && <ResearchConsent key={userId || "public"} userId={userId} canParticipate={canParticipate} onBusyChange={changeBusy} />}
+        {activeTab === "consentimiento" && <><AccessConsentSummary key={`access-${userId || "public"}`} userId={userId} /><ResearchConsent key={userId || "public"} userId={userId} canParticipate={canParticipate} onBusyChange={changeBusy} /></>}
         {activeTab === "datos" && <>
           <h2>Tus datos en el simulador</h2>
           <p>La cuenta utiliza tu nombre y correo. Las citas, disponibilidad, conversaciones, preparación, cierres y resultados de práctica se asocian a tu usuario para guardar y retomar el trabajo. Estos registros son identificables.</p>
