@@ -11,11 +11,13 @@ import {
   supabase,
   supabaseConfigStatus
 } from "../lib/supabaseClient.js";
+import { SIMULATORS, registrationSimulator, rememberSimulatorChoice, clearSimulatorChoice } from "../lib/simulatorEnrollment.js";
 
 const AUTH_REDIRECT_FALLBACK = "https://psicoldp-simulador-limpio.vercel.app";
 
 export function AuthScreen({ onOpenTrust }) {
-  const [mode, setMode] = useState("login");
+  const [mode, setMode] = useState(() => registrationSimulator() ? "register" : "login");
+  const [simulatorId, setSimulatorId] = useState(() => registrationSimulator() || "escucha-viva");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,6 +40,7 @@ export function AuthScreen({ onOpenTrust }) {
     setIsSubmitting(true);
     try {
       if (mode === "register") {
+        rememberSimulatorChoice(email, simulatorId);
         console.info("[auth] signUp started");
         let signUpResult;
         try {
@@ -66,14 +69,10 @@ export function AuthScreen({ onOpenTrust }) {
           email,
           fullName: name
         });
-        await notifyAccessRequest({
-          email,
-          fullName: name,
-          userId: signUpData?.user?.id
-        });
         setMessage(
-          "Tu solicitud quedó pendiente de aprobación. Revisa tu correo para confirmar tu cuenta; cuando el equipo habilite tu acceso, podrás ingresar."
+          `Revisa tu correo y confirma tu cuenta para activar ${SIMULATORS.find((item) => item.id === simulatorId).name}. Si confirmas desde otro navegador, podrás elegir el simulador al ingresar. Si ya tienes cuenta, inicia sesión.`
         );
+        setPassword("");
       } else if (mode === "reset") {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: getAuthRedirectUrl()
@@ -89,6 +88,7 @@ export function AuthScreen({ onOpenTrust }) {
         if (signInError) throw withAuthAction(signInError, "signIn");
       }
     } catch (authError) {
+      if (mode === "register") clearSimulatorChoice(email);
       const action = authError.authAction || (mode === "register" ? "signUp" : mode === "reset" ? "resetPassword" : "signIn");
       console.warn(`[auth] ${action} error: ${summarizeAuthError(authError)}`);
       setError(getAuthErrorMessage(authError, action));
@@ -157,7 +157,15 @@ export function AuthScreen({ onOpenTrust }) {
           </button>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} aria-busy={isSubmitting}>
+          {mode === "register" && <>
+            <label htmlFor="registration-simulator">Simulador que utilizarás
+              <select id="registration-simulator" value={simulatorId} onChange={(event) => setSimulatorId(event.target.value)} disabled={isSubmitting} aria-describedby="registration-simulator-help">
+                {SIMULATORS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+            <p id="registration-simulator-help" className="auth-message">Tu correo quedará asociado a un solo simulador. El acceso se activa después de confirmar tu correo. Las cuentas existentes conservan su asignación.</p>
+          </>}
           {mode === "register" && (
             <label>
               Nombre
@@ -412,41 +420,4 @@ function sanitizeProfileError(error) {
     message: safeLogValue(error?.message),
     details: safeLogValue(error?.details)
   };
-}
-
-async function notifyAccessRequest({ email, fullName, userId }) {
-  console.info("[access-request] started");
-  try {
-    const response = await fetch("/api/access-request", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        email,
-        fullName,
-        userId,
-        createdAt: new Date().toISOString()
-      })
-    });
-    const payload = await readAccessRequestPayload(response);
-    if (!response.ok || payload?.emailSent === false) {
-      console.warn("[access-request] email warning:", {
-        status: response.status,
-        reason: safeLogValue(payload?.reason || payload?.error || "unknown")
-      });
-      return;
-    }
-    console.info("[access-request] success");
-  } catch (error) {
-    console.warn("[access-request] email warning:", safeLogValue(error?.message || error));
-  }
-}
-
-async function readAccessRequestPayload(response) {
-  try {
-    return await response.json();
-  } catch {
-    return null;
-  }
 }

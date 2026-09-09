@@ -1330,6 +1330,9 @@ export default function App() {
       <main className="app-shell">
         <EthicalNotice compact />
         <PendingApprovalScreen
+          key={authSession.user.id}
+          user={authSession.user}
+          status={approvalState.status}
           email={authSession.user.email}
           error={approvalState.error}
           onRetry={refreshApproval}

@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from "./supabaseClient.js";
+import { resolveSimulatorAssignment } from "./simulatorEnrollment.js";
 
 const PROFILE_FIELDS = "id,email,approved";
 
@@ -6,6 +7,18 @@ export async function getOrCreateUserApproval(user) {
   if (!isSupabaseConfigured || !supabase || !user?.id) {
     return approvalError("No se pudo verificar el perfil de acceso.", "configuration");
   }
+
+  let assignment;
+  try {
+    assignment = await resolveSimulatorAssignment(supabase, user);
+  } catch (error) {
+    return isTransientApprovalError(error)
+      ? approvalTransientError("No pudimos comprobar tu simulador. Revisa la conexión y reintenta.")
+      : approvalError("No pudimos comprobar tu simulador. Confirma tu correo y vuelve a intentarlo.", "assignment");
+  }
+  if (!assignment) return { status: "needs_simulator", profile: null, error: null };
+  if (!assignment.enabled) return { status: "suspended", profile: null, error: null };
+  if (assignment.simulator_id !== "escucha-viva") return { status: "other_simulator", profile: null, error: null, assignment };
 
   console.info("[auth-gate] user id:", safeLogValue(user.id));
   console.info("[auth-gate] user email:", safeLogValue(user.email));

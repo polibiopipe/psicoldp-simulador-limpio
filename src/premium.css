@@ -446,6 +446,7 @@ summary:focus-visible {
 }
 
 .auth-form input,
+.auth-form select,
 .guided-intervention-panel select,
 textarea {
   border: 1px solid var(--nv-border);
@@ -455,12 +456,14 @@ textarea {
 }
 
 .auth-form input:hover,
+.auth-form select:hover,
 .guided-intervention-panel select:hover,
 textarea:hover {
   border-color: #b9ccca;
 }
 
 .auth-form input:focus,
+.auth-form select:focus,
 .guided-intervention-panel select:focus,
 textarea:focus {
   outline: none;

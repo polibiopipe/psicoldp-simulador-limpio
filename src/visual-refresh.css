@@ -96,7 +96,7 @@
   border-radius: 24px;
   box-shadow: 0 18px 48px #0d28350d;
 }
-.visual-auth-screen .auth-form input { min-height: 48px; font-size: 1rem; }
+.visual-auth-screen .auth-form input, .auth-form select { min-height: 48px; font-size: 1rem; width: 100%; min-width: 0; }
 .visual-auth-screen .auth-form label,
 .visual-auth-screen .auth-tabs button,
 .visual-auth-screen .auth-reset-action,
