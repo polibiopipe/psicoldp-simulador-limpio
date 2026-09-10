@@ -1,12 +1,11 @@
 export function buildResultsText({ report, caseItem, history }) {
   const date = new Date().toLocaleString("es-CL");
   const achieved = report.criteria
-    .filter((criterion) => criterion.level === "achieved")
-    .map((criterion) => `- ${criterion.title}`)
+    .map((criterion) => `- ${criterion.title}: ${criterion.levelLabel}`)
     .join("\n");
   const improvements = report.improvements.map((item) => `- ${item}`).join("\n");
   const conversation = history
-    .slice(0, 8)
+    .filter((entry) => !entry.isPendingResponse)
     .map((entry, index) => `${index + 1}. Estudiante: ${entry.question}\n   ${caseItem.name}: ${entry.answer}`)
     .join("\n");
 
@@ -21,24 +20,23 @@ ${report.summary}
 Apertura simulada observada:
 ${report.trust.label}. Esta es una lectura cualitativa formativa, no una medición clínica.
 
-Criterios logrados:
-${achieved || "- Sin criterios completamente logrados todavía."}
+Criterios y evidencia disponible:
+${achieved || "- Sin evidencia identificada para estos criterios."}
 
 Aspectos a mejorar:
-${improvements || "- Mantener calidad de entrevista y profundizar con supervisión docente."}
+${improvements || "- No hay observaciones específicas adicionales; revisa la conversación con tu docente."}
 
-Momentos que favorecieron el vínculo:
+Intervenciones y respuestas para revisar el vínculo:
 ${report.bondMoments.map((item) => `- ${item}`).join("\n")}
 
 Momentos que pudieron cerrar la comunicación:
 ${report.closingMoments.map((item) => `- ${item}`).join("\n")}
 
-Enfoque terapéutico observado:
-${report.therapeuticApproach?.feedbackText || "No observado con claridad."}
-Predominante: ${report.therapeuticApproach?.primaryApproach?.label || "No observado con claridad"}
-Secundarios: ${report.therapeuticApproach?.secondaryApproaches?.map((approach) => approach.label).join(", ") || "Sin señales secundarias claras"}
+Fundamentos educativos:
+${(report.academicReferences || []).map(source => `- ${source.label}. ${source.title}. ${source.url}`).join("\n") || "- Sin fuentes asociadas a intervenciones."}
+Versión de criterios: ${report.basisVersion || "Registro anterior a la versión académica"}.
 
-Conversación resumida:
+Conversación registrada:
 ${conversation || "- No hay conversación registrada."}
 
 Uso educativo:

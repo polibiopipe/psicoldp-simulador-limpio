@@ -104,7 +104,7 @@ export function evaluatePreSessionPlan({ preSessionPlan = null, report = {}, his
   }
 
   if (plan.evaluationObjective.trim().length >= 18) {
-    strengths.push("Definiste un objetivo inicial de evaluacion.");
+    strengths.push("Registraste un objetivo inicial; contrasta su precisión y pertinencia con el caso.");
   } else {
     gaps.push("Falto precisar el objetivo inicial antes de entrevistar.");
   }
@@ -116,7 +116,7 @@ export function evaluatePreSessionPlan({ preSessionPlan = null, report = {}, his
   }
 
   if (plan.interviewJustification.trim().length >= 18) {
-    strengths.push("Justificaste la modalidad de entrevista elegida.");
+    strengths.push("Registraste una justificación de modalidad; su adecuación requiere revisar el contenido.");
   } else {
     gaps.push("Falto justificar por que esa modalidad de entrevista era pertinente.");
   }
@@ -135,7 +135,7 @@ export function evaluatePreSessionPlan({ preSessionPlan = null, report = {}, his
 
   const coveredAreas = plan.explorationAreas.filter((area) => areaWasExplored(area, exploredText, report));
   if (coveredAreas.length) {
-    strengths.push(`Retomaste ${coveredAreas.length} area(s) planificada(s) durante la entrevista.`);
+    strengths.push(`Se detectaron menciones de ${coveredAreas.length} área(s) planificada(s). Revisa quién las introdujo y cómo se exploraron.`);
   }
   if (coveredAreas.length < Math.min(3, plan.explorationAreas.length)) {
     gaps.push("Varias areas planificadas no aparecen exploradas en la conversacion.");
@@ -143,13 +143,14 @@ export function evaluatePreSessionPlan({ preSessionPlan = null, report = {}, his
 
   return {
     title: "Preparacion antes de la sesion",
+    assessmentKind: "structure_and_topic_cues",
     interviewType: plan.interviewType,
     plannedAreas: plan.explorationAreas,
     coveredAreas,
     strengths,
     gaps,
     level: gaps.length <= 1 ? "achieved" : gaps.length <= 3 ? "partial" : "needsWork",
-    summary: `Planificaste una entrevista ${plan.interviewType}. Se observaron ${coveredAreas.length} de ${plan.explorationAreas.length} area(s) planificada(s) en la conversacion.`
+    summary: `Registraste una entrevista ${plan.interviewType}. Hay menciones de ${coveredAreas.length} de ${plan.explorationAreas.length} áreas previstas. El registro y las menciones no demuestran calidad del plan ni cumplimiento del objetivo.`
   };
 }
 

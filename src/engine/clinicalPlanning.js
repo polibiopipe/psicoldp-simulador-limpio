@@ -249,25 +249,25 @@ export function evaluateClinicalPlanDecision({
   const recommendations = [];
 
   if (hasJustification) {
-    strengths.push("Incluiste una justificacion clinica breve para la decision.");
+    strengths.push("Registraste una justificación; revisa qué datos específicos sostienen la decisión.");
   } else {
     concerns.push("La decision necesita una justificacion mas explicita basada en lo escuchado.");
   }
 
   if (hasKnownInformation) {
-    strengths.push("Nombraste información clínica ya disponible.");
+    strengths.push("Registraste información disponible; verifica su correspondencia con lo dicho por el paciente.");
   } else {
     concerns.push("Falta explicitar qué información clínica ya tienes.");
   }
 
   if (hasMissingInformation) {
-    strengths.push("Identificaste información faltante antes de decidir.");
+    strengths.push("Registraste información faltante; comprueba que sea relevante para esta decisión.");
   } else {
     concerns.push("Falta registrar qué información aún necesitas o por qué ya no es necesaria.");
   }
 
   if (hasEthicalConsiderations) {
-    strengths.push("Consideraste riesgos, dilemas eticos o aspectos contextuales.");
+    strengths.push("Registraste consideraciones éticas o riesgos pendientes; su pertinencia requiere revisión.");
   } else {
     recommendations.push("Agrega riesgos, dilemas eticos o elementos contextuales que condicionan la decision.");
   }
@@ -290,7 +290,7 @@ export function evaluateClinicalPlanDecision({
   }
 
   if (hasSupportExploration) {
-    strengths.push("La decision considera recursos o red de apoyo observados durante la entrevista.");
+    strengths.push("Se detectaron menciones de apoyo en la entrevista; contrasta si informan esta decisión.");
   } else {
     recommendations.push("Explora red de apoyo y recursos antes de decidir cierre, derivacion o continuidad.");
   }
@@ -309,7 +309,7 @@ export function evaluateClinicalPlanDecision({
 
   if (normalized.action === "close_or_refer" || normalized.action === "refer" || normalized.action === "risk_protocol") {
     if (hasPendingRiskNote || hasRiskExploration) {
-      strengths.push("La decision de cerrar o derivar queda vinculada a elementos observados.");
+      strengths.push("Hay menciones de riesgo o un pendiente escrito; esto no demuestra que la decisión esté justificada.");
     } else {
       recommendations.push("Si corresponde derivar o cerrar, registra indicadores, red de apoyo y limites del proceso.");
     }
@@ -317,7 +317,7 @@ export function evaluateClinicalPlanDecision({
 
   if (["request_complementary_evaluation", "reformulate_hypothesis", "start_intervention_design"].includes(normalized.action)) {
     if (hasObjectives) {
-      strengths.push("Nombraste un siguiente paso formativo coherente con la decision elegida.");
+      strengths.push("Registraste un siguiente paso; verifica su relación con la decisión elegida.");
     } else {
       concerns.push("Esta decision requiere explicitar que haras despues y para que.");
     }
@@ -335,20 +335,21 @@ export function evaluateClinicalPlanDecision({
     (normalized.action === "risk_protocol" && !hasPendingRiskNote && !hasRiskExploration);
   const level = risky ? "risky" : concerns.length === 0 ? "achieved" : concerns.length <= 2 ? "partial" : "needsWork";
   const levelLabel = {
-    achieved: "Logrado",
-    partial: "Parcialmente logrado",
+    achieved: "Registro completo por contrastar",
+    partial: "Registro parcial",
     needsWork: "Por fortalecer",
-    risky: "Riesgoso o apresurado"
+    risky: "Decisión que requiere revisión"
   }[level];
 
   return {
-    title: "Decision sobre continuidad del proceso",
+    title: "Registro de decisión sobre continuidad",
+    assessmentKind: "structure_only",
     decisionLabel: formatClinicalDecision(normalized),
     decision: normalized,
     level,
     levelLabel,
-    score: level === "achieved" ? 2 : level === "partial" ? 1 : level === "needsWork" ? 0.5 : 0,
-    summary: buildDecisionSummary(normalized, level, expected),
+    score: null,
+    summary: "La revisión identifica registros y condiciones del proceso. La justificación clínica debe contrastarse con la conversación; completar campos no demuestra competencia.",
     strengths,
     concerns,
     recommendations: recommendations.length ? recommendations : [

@@ -1,198 +1,53 @@
-import { rubricCriteria, levelLabels } from "../data/rubrics.js";
+import { buildSessionFeedback, getVisibleFeedbackTurns } from "../engine/sessionFeedback.js";
+import { rubricCriteria } from "../data/rubrics.js";
 import { guidedInterventionTypes } from "../data/guidedConversation.js";
-import { analyzeTherapeuticApproaches } from "../engine/therapeuticApproachAnalyzer.js";
 import { getTrustStage, summarizeConversationMemory } from "./analyzeStudentInput.js";
 
-function level(score) {
-  if (score >= 2) return "achieved";
-  if (score >= 1) return "partial";
-  if (score > 0) return "needsWork";
-  return "notObserved";
-}
-
-function labelFor(score) {
-  return levelLabels[level(score)];
-}
-
-export function buildEducationalReport(history, caseItem) {
-  const scoredHistory = history.filter((entry) => !entry.isSessionPrelude);
-  const turnCount = scoredHistory.length;
-
-  if (turnCount === 0) {
-    return buildNoInterventionReport(caseItem);
-  }
-
-  const isLimitedEvaluation = turnCount < 2;
-  const therapeuticApproach = analyzeTherapeuticApproaches(scoredHistory.map((entry) => entry.question));
-  const guidedInterventionFeedback = analyzeGuidedInterventionUsage(scoredHistory);
-  const memory = summarizeConversationMemory(scoredHistory);
-  const hasJudgment = memory.judgment > 0;
-  const hasRushedAdvice = memory.rushedAdvice > 0;
-  const hasPrematureInterpretation = memory.prematureInterpretation > 0;
-  const hasBoundaryPressure = memory.boundaryPressure > 0;
-  const facilitativeOpenQuestions = memory.facilitativeOpenQuestions ?? memory.openQuestions;
+export function buildEducationalReport(history = [], caseItem = {}) {
+  const scoredHistory = getVisibleFeedbackTurns(history);
+  if (!scoredHistory.length) return buildNoInterventionReport(caseItem);
+  const feedback = buildSessionFeedback({ conversation: history, caseItem });
+  const memory = summarizeConversationMemory(history);
+  const actions = feedback.observedActions;
+  const has = (...keys) => actions.some(action => keys.some(key => action[key]));
+  const evidenceByCriterion = {
+    encuadre: actions.filter(action => action.framing),
+    vinculo: actions.filter(action => action.validation || action.autonomyRespect),
+    preguntasAbiertas: actions.filter(action => action.facilitativeOpenQuestion),
+    escuchaValidacion: actions.filter(action => action.validation),
+    exploracionMotivo: scoredHistory.filter(turn => /que te trae|motivo de consulta|que te preocupa|que te gustaria contar/i.test(normalizeForFeedback(turn.question))),
+    seguimientoContextual: actions.filter(action => action.followUp),
+    eticaRiesgo: actions.filter(action => action.risk),
+    cierre: actions.filter(action => action.closure)
+  };
+  const criteria = rubricCriteria.map(criterion => {
+    const evidence = evidenceByCriterion[criterion.id] || [];
+    const concern = criterion.id === "vinculo" && has("judgment", "boundaryPressure", "pressure");
+    return { ...criterion, score: concern ? 0.5 : evidence.length ? 1 : 0, level: concern ? "needsWork" : evidence.length ? "partial" : "notObserved", levelLabel: concern ? "Contradicción por revisar" : evidence.length ? "Indicio por revisar" : "Sin evidencia identificada", evidenceQuotes: evidence.map(item => item.quote || item.question), assessmentKind: "textual_cue" };
+  });
   const finalTrust = memory.trustLevels.at(-1) ?? 0;
   const initialTrust = memory.trustLevels[0] ?? finalTrust;
-  const trustDelta = finalTrust - initialTrust;
   const trustStage = getTrustStage(finalTrust);
-  const specificHits = caseItem.specificCriteria.filter((criterion) => {
-    const text = criterion.toLowerCase();
-    if (text.includes("videojuegos")) return memory.contextExploration > 0;
-    if (text.includes("laborales")) return memory.contextExploration > 0;
-    if (text.includes("redes")) return memory.support > 0;
-    if (text.includes("familia")) return memory.contextExploration > 0;
-    return facilitativeOpenQuestions + memory.validation > 1;
-  }).length;
-
-  const rawScores = {
-    encuadre: memory.framing >= 1 ? 2 : memory.initialPresentation || memory.greeting ? 1 : 0,
-    vinculo: !hasJudgment && !hasBoundaryPressure && memory.pressure === 0 && (memory.validation || memory.paceRespect || memory.greeting)
-      ? 2
-      : !hasJudgment && !hasBoundaryPressure && memory.pressure === 0
-        ? 1
-        : 0.5,
-    preguntasAbiertas: facilitativeOpenQuestions >= 3 ? 2 : facilitativeOpenQuestions >= 1 ? 1 : 0,
-    escuchaValidacion: memory.validation + memory.empathicSummary >= 2
-      ? 2
-      : memory.validation + memory.empathicSummary >= 1
-        ? 1
-        : 0,
-    exploracionMotivo: memory.consultationReason >= 1 && (memory.emotion || memory.contextExploration)
-      ? 2
-      : memory.consultationReason >= 1
-        ? 1
-        : 0,
-    seguimientoContextual: memory.followUp >= 2 ? 2 : memory.followUp >= 1 ? 1 : 0,
-    eticaRiesgo: memory.riskExploration >= 1 || memory.framing >= 1
-      ? 2
-      : !hasJudgment && !hasRushedAdvice
-        ? 1
-        : 0,
-    cierre: memory.goodClosure >= 1 && memory.continuityAgreement >= 1
-      ? 2
-      : memory.closure >= 1
-        ? 1
-        : 0
-  };
-
-  let criteria = rubricCriteria.map((criterion) => {
-    const score = rawScores[criterion.id] ?? 0;
-    return {
-      ...criterion,
-      score,
-      level: level(score),
-      levelLabel: labelFor(score)
-    };
-  });
-  if (isLimitedEvaluation) {
-    criteria = criteria.map(limitCriterionForSparseEvidence);
-  }
-
-  const generalScore = isLimitedEvaluation
-    ? null
-    : Math.round(
-        (criteria.reduce((sum, criterion) => sum + criterion.score, 0) / (criteria.length * 2)) * 100
-      );
-  let objectiveEvaluation = evaluateLearningObjectives({ caseItem, memory, history: scoredHistory });
-  if (isLimitedEvaluation) {
-    objectiveEvaluation = objectiveEvaluation.map(limitObjectiveForSparseEvidence);
-  }
-  const reformulationSuggestions = buildReformulationSuggestions(scoredHistory, caseItem);
-  const skillClassification = buildSkillClassification(memory);
-
-  const strengths = [];
-  const improvements = [];
-
-  if (memory.framing) strengths.push("Presentaste algún encuadre o límite para ordenar la entrevista.");
-  if (facilitativeOpenQuestions >= 2) strengths.push("Usaste preguntas abiertas que facilitaron mayor elaboración.");
-  if (memory.autonomyRespect > 0) strengths.push("Respetaste un límite o el ritmo del paciente antes de seguir explorando.");
-  if (memory.validation) strengths.push("Incluiste validación emocional y un tono respetuoso.");
-  if (memory.contextExploration >= 2) strengths.push("Exploraste dimensiones contextuales relevantes para el caso.");
-  if (memory.empathicSummary || memory.followUp) strengths.push("Retomaste contenido del paciente ficticio y usaste seguimiento conversacional, favoreciendo continuidad.");
-  if (trustDelta > 8) strengths.push("La apertura simulada del paciente mostró una evolución favorable durante la entrevista.");
-  if (!hasJudgment && !isLimitedEvaluation) strengths.push("Evitaste juicios directos o etiquetas sobre el paciente ficticio.");
-
-  if (!memory.framing) improvements.push("Inicia con un encuadre más explícito: propósito, límites, ritmo y carácter educativo.");
-  if (memory.closedQuestions > memory.openQuestions) improvements.push("Hubo predominio de preguntas cerradas; alterna con preguntas abiertas para favorecer relato.");
-  if (facilitativeOpenQuestions < 2) improvements.push("Aumenta preguntas abiertas facilitadoras, cuidando que no presionen límites del paciente.");
-  if (!memory.validation) improvements.push("Refleja emociones antes de avanzar a hipótesis o nuevas áreas.");
-  if (memory.contextExploration < 2) improvements.push("Explora con más equilibrio familia, estudio/trabajo, redes y vida digital según el caso.");
-  if (memory.followUp < 1 && turnCount >= 3) improvements.push("Incluye preguntas de seguimiento sobre palabras del paciente para sostener una conversación más humana.");
-  if (hasJudgment) improvements.push("Cuida el lenguaje para evitar moralizar, etiquetar o responsabilizar al paciente ficticio.");
-  if (hasRushedAdvice) improvements.push("Evita consejos apresurados; prioriza comprensión del caso y formulación de preguntas.");
-  if (hasPrematureInterpretation) improvements.push("Evita interpretaciones cerradas demasiado pronto; formula hipótesis como preguntas tentativas.");
-  if (hasBoundaryPressure) improvements.push("Una pregunta abierta puede presionar si insiste sobre información que el paciente prefirió reservar.");
-  else if (memory.pressure) improvements.push("Reduce presión o insistencia: respeta silencios y permite que el paciente ficticio marque ritmo.");
-  if (!memory.goodClosure) improvements.push("Cierra con resumen empático, agradecimiento y una pregunta breve sobre cómo queda el paciente.");
-  if (!memory.continuityAgreement) improvements.push("Al cerrar, puedes dejar abierta una próxima sesión simulada sin prometer soluciones inmediatas.");
-
-  const bondMoments = scoredHistory
-    .filter((entry) =>
-      entry.analysis?.categories?.validation ||
-      entry.analysis?.categories?.empathicSummary ||
-      entry.analysis?.categories?.followUp ||
-      entry.analysis?.categories?.paceRespect ||
-      (entry.patientState?.trustLevel ?? 0) >= 60
-    )
-    .slice(0, 4)
-    .map((entry) => `“${entry.question}” favoreció mayor apertura o continuidad.`);
-
-  const closingMoments = scoredHistory
-    .filter((entry) =>
-      entry.analysis?.categories?.judgment ||
-      entry.analysis?.categories?.rushedAdvice ||
-      entry.analysis?.categories?.prematureInterpretation ||
-        entry.analysis?.categories?.pressure ||
-        entry.analysis?.categories?.boundaryPressure ||
-      (entry.analysis?.categories?.repeatedQuestion && !entry.analysis?.categories?.goodClosure) ||
-      (entry.analysis?.categories?.prematureClosure && !entry.analysis?.categories?.goodClosure)
-    )
-    .slice(0, 4)
-    .map((entry) => `“${entry.question}” pudo aumentar defensa, cierre o sensación de presión.`);
-
-  const trustLabels = {
-    closed: "baja/cerrada",
-    cautious: "cautelosa",
-    open: "abierta",
-    reflective: "reflexiva"
-  };
-
+  const trustLabels = { closed: "baja/cerrada", cautious: "cautelosa", open: "abierta", reflective: "reflexiva" };
   return {
-    caseName: caseItem.name,
-    turnCount,
-    evaluationStatus: isLimitedEvaluation ? "limited" : "complete",
-    isEvaluable: true,
-    isLimitedEvaluation,
-    generalScore,
-    trust: {
-      initial: initialTrust,
-      final: finalTrust,
-      delta: trustDelta,
-      stage: trustStage,
-      label: trustLabels[trustStage]
-    },
-    criteria,
-    objectiveEvaluation,
-    reformulationSuggestions,
-    skillClassification,
-    therapeuticApproach: isLimitedEvaluation ? null : therapeuticApproach,
-    guidedInterventionFeedback,
-    strengths: strengths.length ? strengths : ["Realizaste una primera intervención observable, aunque todavía insuficiente para una evaluación robusta."],
-    improvements,
-    bondMoments: bondMoments.length ? bondMoments : ["No se observaron momentos claros de aumento de apertura; prioriza validación y preguntas abiertas."],
-    closingMoments: closingMoments.length ? closingMoments : ["No se observaron intervenciones claramente cerradoras o juzgadoras."],
-    summary:
-      isLimitedEvaluation
-        ? `Retroalimentación limitada: se registró ${turnCount} intervención con ${caseItem.name}. Se requiere más material conversacional para evaluar habilidades clínicas con solidez.`
-        : `Se realizaron ${turnCount} intervenciones con ${caseItem.name}. La entrevista mostró ${facilitativeOpenQuestions} pregunta(s) abierta(s) facilitadora(s), ${memory.validation} validación(es), ${memory.contextExploration} exploración(es) contextuales, ${memory.followUp} seguimiento(s) conversacionales y una apertura final ${trustLabels[trustStage]}.`,
-    nextSuggestions: [
-      "Ensaya un encuadre inicial breve antes de explorar el motivo de consulta.",
-      "Formula una hipótesis solo como pregunta tentativa, no como conclusión.",
-      "Lleva la conversación desde relato general hacia emoción, contexto y recursos.",
-      "Comparte estos resultados con supervisión docente para recibir orientación académica."
-    ],
-    ethicalNotice:
-      "Informe formativo basado en una simulación con datos ficticios. No corresponde a diagnóstico, tratamiento ni intervención clínica real."
+    caseName: caseItem.name, turnCount: scoredHistory.length,
+    evaluationStatus: "limited", isEvaluable: true, isLimitedEvaluation: true,
+    // Text cues and simulation state are not a validated competence percentage.
+    generalScore: null, assessmentKind: "formative_textual_review", basisVersion: feedback.basisVersion,
+    trust: { initial: initialTrust, final: finalTrust, delta: finalTrust - initialTrust, stage: trustStage, label: trustLabels[trustStage], isSimulated: true },
+    criteria, objectiveEvaluation: evaluateLearningObjectives({ caseItem, memory, history: scoredHistory }),
+    reformulationSuggestions: actions.filter(item => item.evidenceStatus === "review").map(item => ({ insteadOf: item.quote, tryThis: item.reformulation })),
+    skillClassification: buildSkillClassification(memory),
+    // A word-frequency model cannot establish the approach actually delivered.
+    therapeuticApproach: null,
+    guidedInterventionFeedback: analyzeGuidedInterventionUsage(scoredHistory),
+    strengths: feedback.strengths, improvements: feedback.priorityImprovements,
+    bondMoments: actions.filter(item => item.validation || item.autonomyRespect || item.followUp).slice(0, 4).map(item => `Turno ${item.index}, “${item.quote}”. ${item.possibleEffect}`),
+    closingMoments: actions.filter(item => item.evidenceStatus === "review").map(item => `Turno ${item.index}, “${item.quote}”. ${item.possibleEffect}`),
+    summary: `Se registraron ${scoredHistory.length} intervenciones con ${caseItem.name || "el paciente"}. ${feedback.levelDescription}`,
+    nextSuggestions: feedback.nextSessionPriorities,
+    academicReferences: feedback.academicReferences,
+    ethicalNotice: "Informe formativo sobre una simulación con datos ficticios. Los indicios textuales requieren revisión docente y no constituyen una evaluación clínica validada."
   };
 }
 
@@ -234,32 +89,11 @@ function buildNoInterventionReport(caseItem) {
   };
 }
 
-function limitCriterionForSparseEvidence(criterion) {
-  const score = Math.min(criterion.score || 0, 1);
-  return {
-    ...criterion,
-    score,
-    level: level(score),
-    levelLabel: labelFor(score)
-  };
-}
-
-function limitObjectiveForSparseEvidence(item) {
-  if (!item || item.score <= 0) return item;
-  return {
-    ...item,
-    score: Math.min(item.score, 1),
-    status: "parcialmente observado",
-    level: "partial",
-    levelLabel: "Parcialmente observado"
-  };
-}
-
 function evaluateLearningObjectives({ caseItem, memory, history }) {
   const objectives = caseItem.learningObjectives || caseItem.objectives || [];
   return objectives.map((objective) => {
     const score = scoreObjective(objective, memory, history);
-    const status = score >= 2 ? "logrado" : score >= 1 ? "parcialmente logrado" : "no abordado";
+    const status = score > 0 ? "indicio por contrastar con el objetivo" : "sin evidencia específica identificada";
     return {
       objective,
       score,
@@ -286,9 +120,9 @@ function scoreObjective(objective, memory, history) {
   if (includesAnyObjective(text, ["preguntas abiertas", "seguimiento", "retomar", "profundizar"])) {
     checks.push((memory.facilitativeOpenQuestions ?? memory.openQuestions) >= 1 || memory.followUp >= 1);
   }
-  if (includesAnyObjective(text, ["familia", "familiar", "red", "apoyo", "recursos", "contexto", "responsabilidades", "pares"])) {
-    checks.push(memory.contextExploration >= 1 || memory.family >= 1 || memory.support >= 1);
-  }
+  if (includesAnyObjective(text, ["familia", "familiar"])) checks.push(memory.family >= 1);
+  if (includesAnyObjective(text, ["red de apoyo", "redes de apoyo", "recursos", "pares", "apoyo"])) checks.push(memory.support >= 1);
+  if (includesAnyObjective(text, ["contexto", "responsabilidades"])) checks.push(memory.contextExploration >= 1);
   if (includesAnyObjective(text, ["emocion", "culpa", "cansancio", "autoexigencia", "irritabilidad", "miedo", "ambivalencia", "perdida"])) {
     checks.push(memory.emotion >= 1 || memory.validation >= 1);
   }
@@ -308,73 +142,26 @@ function scoreObjective(objective, memory, history) {
     checks.push(memory.closure >= 1 || memory.continuityAgreement >= 1);
   }
   if (includesAnyObjective(text, ["evitar", "no entregar", "no idealizar", "no patologizar", "sin apresurar"])) {
-    checks.push(memory.rushedAdvice === 0 && memory.prematureInterpretation === 0 && memory.judgment === 0);
+    checks.push(memory.validation > 0 && memory.rushedAdvice === 0 && memory.prematureInterpretation === 0 && memory.judgment === 0);
   }
   if (includesAnyObjective(text, ["riesgo", "ética", "derivación"])) {
-    checks.push(memory.riskExploration >= 1 || memory.framing >= 1);
+    checks.push(memory.riskExploration >= 1);
   }
 
-  if (!checks.length) {
-    checks.push((memory.facilitativeOpenQuestions ?? memory.openQuestions) >= 1 || memory.validation >= 1 || memory.contextExploration >= 1);
-  }
-
-  const hits = checks.filter(Boolean).length;
-  if (hits === checks.length && hits > 0) return 2;
-  if (hits > 0 || history.length >= 4) return 1;
-  return 0;
-}
-
-function buildReformulationSuggestions(history, caseItem) {
-  const suggestions = [];
-  const questions = history.map((entry) => entry.question || "");
-  const firstJudgment = history.find((entry) => entry.analysis?.categories?.judgment);
-  const firstAdvice = history.find((entry) => entry.analysis?.categories?.rushedAdvice);
-  const firstClosed = history.find((entry) => entry.analysis?.categories?.closedQuestion && !entry.analysis?.categories?.openQuestion);
-
-  if (firstJudgment) {
-    suggestions.push({
-      insteadOf: firstJudgment.question,
-      tryThis: suggestionByCase(caseItem.id, "judgment")
-    });
-  }
-  if (firstAdvice) {
-    suggestions.push({
-      insteadOf: firstAdvice.question,
-      tryThis: "Antes de pensar en soluciones, ¿podrías contarme cómo has estado viviendo esto?"
-    });
-  }
-  if (firstClosed) {
-    suggestions.push({
-      insteadOf: firstClosed.question,
-      tryThis: "¿Cómo ha sido para ti vivir esta situación en el día a día?"
-    });
-  }
-  if (!questions.some((question) => normalizeForFeedback(question).includes("familia")) && caseItem.id !== "miguel") {
-    suggestions.push({
-      insteadOf: "Pregunta general sin contexto familiar.",
-      tryThis: "¿Cómo se vive esto en tu casa o con las personas cercanas a ti?"
-    });
-  }
-
-  if (!suggestions.length) {
-    suggestions.push({
-      insteadOf: "Pregunta amplia: ¿qué te pasa?",
-      tryThis: suggestionByCase(caseItem.id, "open")
-    });
-  }
-
-  return suggestions.slice(0, 3);
+  if (!checks.length) return 0;
+  // Mapping identifies possible evidence only, never mastery of a free-text objective.
+  return checks.some(Boolean) ? 1 : 0;
 }
 
 function buildSkillClassification(memory) {
   return [
     ["Saludo", memory.greeting],
     ["Encuadre", memory.framing],
-    ["Pregunta abierta facilitadora", memory.facilitativeOpenQuestions ?? memory.openQuestions],
+    ["Pregunta con forma abierta sin conflicto detectado", memory.facilitativeOpenQuestions ?? memory.openQuestions],
     ["Respeto de límites", memory.autonomyRespect],
     ["Presión sobre límite", memory.boundaryPressure],
     ["Pregunta cerrada", memory.closedQuestions],
-    ["Validación", memory.validation],
+    ["Indicio de reconocimiento", memory.validation],
     ["Reflejo o resumen", memory.empathicSummary],
     ["Seguimiento contextual", memory.followUp],
     ["Familia/contexto", memory.family],
@@ -382,33 +169,11 @@ function buildSkillClassification(memory) {
     ["Motivo de consulta", memory.consultationReason],
     ["Cierre", memory.closure],
     ["Posible juicio", memory.judgment],
-    ["Consejo prematuro", memory.rushedAdvice],
-    ["Ética/riesgo", memory.riskExploration]
+    ["Indicación por revisar", memory.rushedAdvice],
+    ["Mención de riesgo", memory.riskExploration]
   ]
     .filter(([, count]) => count > 0)
     .map(([label, count]) => ({ label, count }));
-}
-
-function suggestionByCase(caseId, type) {
-  if (type === "judgment") {
-    const byCase = {
-      tomas: "¿Qué lugar ocupa el juego para ti cuando estás en la casa?",
-      camila: "¿Qué pasa contigo cuando sientes que tienes que estar disponible para todos?",
-      marcos: "¿Cómo notas que el cansancio del trabajo se mete en tu vida fuera de la pega?",
-      valentina: "¿Qué ocurre contigo cuando intentas descansar y aparece la culpa?",
-      daniela: "¿Cómo conviven el amor por tu hijo y el cansancio que estás sintiendo?"
-    };
-    return byCase[caseId] || "¿Cómo estás viviendo esto, sin tener que justificarlo ahora?";
-  }
-
-  const byCase = {
-    tomas: "¿Qué te gustaría que entienda sobre el computador y lo que pasa fuera de él?",
-    camila: "¿En qué momentos notas más fuerte la culpa cuando intentas poner un límite?",
-    marcos: "¿Qué te preocupa de llegar a la casa con tan poca energía?",
-    valentina: "¿Cómo se siente para ti parar cuando todavía quedan pendientes?",
-    daniela: "¿Qué parte de todo esto te pesa más durante el día?"
-  };
-  return byCase[caseId] || "¿Qué sería importante que entienda de lo que estás viviendo?";
 }
 
 function includesAnyObjective(text, terms) {

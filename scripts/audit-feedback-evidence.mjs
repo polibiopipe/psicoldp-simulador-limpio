@@ -102,8 +102,8 @@ function testPrematureAdviceAndHypothesis() {
 function testClosureAndEvidenceLevels() {
   assert.equal(build([]).evidenceLevel.key, "not_evaluable");
   assert.equal(build(makeTurns(1)).evidenceLevel.key, "very_preliminary");
-  assert.equal(build(makeTurns(5)).evidenceLevel.key, "limited");
-  assert.equal(build(makeTurns(12)).evidenceLevel.key, "sufficient");
+  assert.equal(build(makeTurns(5)).evidenceLevel.key, "very_preliminary");
+  assert.equal(build(makeTurns(12)).evidenceLevel.key, "very_preliminary");
 
   const feedback = build([
     ...makeTurns(4),

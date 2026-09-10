@@ -1,8 +1,9 @@
 import {
+  detectFeedbackSignals,
   hasAutonomyRespect,
   hasPatientBoundarySignal,
   isBoundaryPressure
-} from "../engine/sessionFeedback.js";
+} from "../engine/feedbackSignals.js";
 
 const lexicon = {
   greeting: [
@@ -195,7 +196,7 @@ function isClosedQuestion(text) {
 }
 
 export function analyzeStudentInput(input, history = []) {
-  const text = normalize(input);
+  const text = normalize(String(input || ""));
   const previousPatientResponse = String(history.at(-1)?.answer || history.at(-1)?.patientResponse || "");
   const boundarySignalBefore = hasPatientBoundarySignal(previousPatientResponse);
   const boundaryPressure = isBoundaryPressure(input, previousPatientResponse);
@@ -241,6 +242,22 @@ export function analyzeStudentInput(input, history = []) {
     autonomyRespect
   };
 
+  const signals = detectFeedbackSignals(input, previousPatientResponse);
+  Object.assign(categories, {
+    framing: signals.framing,
+    validation: signals.validation,
+    judgment: signals.judgment,
+    rushedAdvice: signals.rushedAdvice,
+    prematureInterpretation: signals.prematureInterpretation,
+    pressure: signals.pressure,
+    boundaryPressure: signals.boundaryPressure,
+    autonomyRespect: signals.autonomyRespect,
+    openQuestion: signals.formalOpenQuestion,
+    followUp: signals.followUp,
+    riskExploration: signals.risk
+  });
+  categories.closedQuestion = isClosedQuestion(text) && !categories.openQuestion;
+
   categories.contextExploration =
     categories.familyExploration ||
     categories.academicExploration ||
@@ -257,7 +274,7 @@ export function analyzeStudentInput(input, history = []) {
     categories.habitsConcrete ||
     categories.videogamesConcrete ||
     categories.relationalConcrete;
-  categories.paceRespect = categories.framing || includesAny(text, ["si quieres", "a tu ritmo", "puedes no", "no tienes que", "sin apurarte"]);
+  categories.paceRespect = !categories.pressure && !categories.judgment && (categories.framing || categories.autonomyRespect || includesAny(text, ["sin apurarte"]));
   categories.facilitativeOpenQuestion =
     categories.openQuestion &&
     !categories.boundaryPressure &&
@@ -318,22 +335,22 @@ export function summarizeConversationMemory(history) {
 
   for (let index = 0; index < history.length; index += 1) {
       const turn = history[index];
+      if (!turn || turn.isSessionPrelude || turn.isPendingResponse || !String(turn.question || "").trim()) continue;
       const previousPatientResponse = String(history[index - 1]?.answer || "");
       const inferredCategories = analyzeStudentInput(
         turn.question,
         previousPatientResponse ? [{ answer: previousPatientResponse }] : []
       ).categories;
       const engineCategories = turn.analysis?.categories || {};
-      const categories = mergeCategories(inferredCategories, engineCategories);
+      const categories = { ...engineCategories, ...inferredCategories };
       categories.boundarySignalBefore = Boolean(
         categories.boundarySignalBefore || hasPatientBoundarySignal(previousPatientResponse)
       );
       categories.boundaryPressure = Boolean(
         categories.boundaryPressure || isBoundaryPressure(turn.question, previousPatientResponse)
       );
-      categories.autonomyRespect = Boolean(categories.autonomyRespect || hasAutonomyRespect(turn.question));
+      categories.autonomyRespect = inferredCategories.autonomyRespect;
       categories.facilitativeOpenQuestion = Boolean(
-        categories.facilitativeOpenQuestion ||
           (categories.openQuestion &&
             !categories.boundaryPressure &&
             !categories.judgment &&
@@ -379,16 +396,6 @@ export function summarizeConversationMemory(history) {
   }
 
   return memory;
-}
-
-function mergeCategories(...categorySets) {
-  const merged = {};
-  for (const set of categorySets) {
-    for (const [key, value] of Object.entries(set || {})) {
-      merged[key] = Boolean(merged[key] || value);
-    }
-  }
-  return merged;
 }
 
 export function getTrustStage(trustLevel) {

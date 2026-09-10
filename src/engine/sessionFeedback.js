@@ -1,21 +1,6 @@
-const EVIDENCE_LEVELS = {
-  not_evaluable: {
-    label: "No evaluable",
-    description: "No hay intervenciones suficientes para una devolución formativa."
-  },
-  very_preliminary: {
-    label: "Evidencia muy preliminar",
-    description: "Hay material inicial, pero todavía no permite inferencias estables."
-  },
-  limited: {
-    label: "Evidencia limitada",
-    description: "Se pueden analizar intervenciones concretas, sin generalizar rasgos del estudiante."
-  },
-  sufficient: {
-    label: "Evidencia suficiente",
-    description: "La conversación ofrece material suficiente para una lectura formativa más completa."
-  }
-};
+import { FEEDBACK_BASIS_VERSION, getAcademicCriterion } from "../data/feedbackAcademicBasis.js";
+import { detectFeedbackSignals, hasPatientBoundarySignal, normalizeFeedbackText } from "./feedbackSignals.js";
+export { hasPatientBoundarySignal, hasAutonomyRespect, isBoundaryPressure, isFormalOpenQuestion } from "./feedbackSignals.js";
 
 const SESSION_CRITERIA = {
   1: {
@@ -85,14 +70,6 @@ const SESSION_CRITERIA = {
   }
 };
 
-const TRANSVERSAL_REFERENCES = [
-  "Alianza terapéutica",
-  "Formulación clínica",
-  "Planificación de intervenciones",
-  "Adaptación contextual",
-  "Ética y seguimiento del proceso"
-];
-
 const ACTION_NEXT_STEPS = {
   continue_session:
     "La continuidad debe orientarse a profundizar motivo, antecedentes y objetivos de la sesión siguiente.",
@@ -114,587 +91,132 @@ const ACTION_NEXT_STEPS = {
     "La continuidad extendida requiere objetivos, límites del simulador y eventual trabajo en red."
 };
 
-const boundarySignals = [
-  "prefiero no",
-  "no quiero hablar",
-  "no quiero decir",
-  "prefiero no decir",
-  "no me siento comodo",
-  "no me siento cómoda",
-  "dejemos ese tema",
-  "no se si quiero contarlo",
-  "no sé si quiero contarlo",
-  "prefiero reservar",
-  "no quiero entrar en eso",
-  "me cuesta hablar de eso",
-  "no quiero mencionar",
-  "no quiero dar el nombre",
-  "prefiero no decir el nombre",
-  "no quiero decir el nombre exacto"
-];
 
-const pressureAfterBoundary = [
-  "por que no",
-  "por qué no",
-  "dime",
-  "dimelo",
-  "dímelo",
-  "necesito saber",
-  "necesito que me digas",
-  "necesito que lo digas",
-  "tienes que decir",
-  "no evadas",
-  "responde",
-  "pero por que",
-  "pero por qué",
-  "no puedes ocultarlo"
-];
-
-const autonomyRespectTerms = [
-  "esta bien",
-  "está bien",
-  "no necesitas",
-  "no hace falta",
-  "podemos dejar",
-  "si te parece",
-  "sin mencionar",
-  "sin decir",
-  "podemos hablar de como te afecta",
-  "podemos hablar de cómo te afecta",
-  "a tu ritmo",
-  "puedes no responder",
-  "no tienes que contar"
-];
-
-const validationTerms = [
-  "entiendo",
-  "comprendo",
-  "tiene sentido",
-  "debe ser",
-  "suena",
-  "gracias por contar",
-  "no quiero juzgar",
-  "es comprensible",
-  "me imagino"
-];
-
-const framingTerms = [
-  "confidencial",
-  "encuadre",
-  "proposito",
-  "propósito",
-  "limites",
-  "límites",
-  "puedes no responder",
-  "a tu ritmo"
-];
-
-const followUpTerms = [
-  "cuando dices",
-  "cuando mencionas",
-  "a que te refieres",
-  "a qué te refieres",
-  "cuentame mas",
-  "cuéntame más",
-  "me dijiste",
-  "retomando",
-  "en que sentido",
-  "en qué sentido"
-];
-
-const judgmentTerms = [
-  "flojo",
-  "exageras",
-  "es tu culpa",
-  "deberias simplemente",
-  "deberías simplemente",
-  "eso esta mal",
-  "eso está mal"
-];
-
-const rushedAdviceTerms = [
-  "tienes que",
-  "deberias",
-  "deberías",
-  "lo que tienes que hacer",
-  "te recomiendo",
-  "mi consejo",
-  "haz ejercicio",
-  "deja de"
-];
-
-const prematureInterpretationTerms = [
-  "lo que te pasa es",
-  "claramente",
-  "eso significa",
-  "el problema es que",
-  "parece que tienes",
-  "tu diagnóstico",
-  "tu diagnostico"
-];
-
-export function buildSessionFeedback({
-  sessionNumber = 1,
-  selectedCase = null,
-  caseItem = null,
-  conversation = [],
-  clinicalDecision = null,
-  studentPlan = null,
-  preSessionPlan = null,
-  selectedApproach = null,
-  report = null
-} = {}) {
-  const safeSessionNumber = Math.min(Math.max(Number(sessionNumber) || 1, 1), 4);
-  const sessionCriteria = SESSION_CRITERIA[safeSessionNumber] || SESSION_CRITERIA[1];
-  const currentCase = selectedCase || caseItem || {};
-  const visibleTurns = getVisibleTurns(conversation);
-  const observedActions = analyzeConversationEvidence(visibleTurns);
-  const evidenceLevel = resolveEvidenceLevel(visibleTurns.length);
-  const strengths = compactList(buildEvidenceStrengths(observedActions, report), 3);
-  const priorityImprovements = compactList(buildEvidenceImprovements(observedActions, report, visibleTurns.length), 3);
-  const pendingAreas = compactList(buildPendingAreas({ observedActions, sessionCriteria, studentPlan: studentPlan || preSessionPlan }), 4);
-  const nextSessionPriorities = compactList(
-    buildNextSessionPriorities({
-      observedActions,
-      pendingAreas,
-      clinicalDecision,
-      sessionCriteria
-    }),
-    3
-  );
-  const action = clinicalDecision?.action || "";
-  const nextStep = ACTION_NEXT_STEPS[action] || nextSessionPriorities[0] || sessionCriteria.nextStep;
-
-  return {
-    evidenceLevel,
-    level: evidenceLevel.key,
-    levelLabel: evidenceLevel.label,
-    levelDescription: evidenceLevel.description,
-    sessionSummary: buildBriefSummary({
-      caseName: currentCase?.name || report?.caseName || "el paciente",
-      turnCount: visibleTurns.length,
-      sessionCriteria,
-      evidenceLevel
-    }),
-    briefSummary: buildBriefSummary({
-      caseName: currentCase?.name || report?.caseName || "el paciente",
-      turnCount: visibleTurns.length,
-      sessionCriteria,
-      evidenceLevel
-    }),
-    observedActions,
-    strengths,
-    priorityImprovements,
-    improvements: priorityImprovements,
-    pendingAreas,
-    nextSessionPriorities,
-    nextStep,
-    formativeCriteria: sessionCriteria.criteria,
-    referencesUsed: unique([...sessionCriteria.references, ...TRANSVERSAL_REFERENCES]),
-    selectedApproach: selectedApproach?.primaryApproach?.label || selectedApproach?.label || "",
-    evidenceNote: buildEvidenceNote(visibleTurns.length)
-  };
+export function getVisibleFeedbackTurns(conversation = []) {
+  return (conversation || []).filter(entry => entry && !entry.isSessionPrelude && !entry.isPendingResponse && String(entry.question || "").trim());
 }
 
 export function analyzeConversationEvidence(conversation = []) {
-  const visibleTurns = getVisibleTurns(conversation);
-  return visibleTurns.map((turn, index) => {
+  const actions = [];
+  let previousPatientResponse = "";
+  for (const turn of conversation || []) {
+    if (!turn || turn.isPendingResponse) continue;
     const question = String(turn.question || "").trim();
-    const previousPatientResponse = String(visibleTurns[index - 1]?.answer || "").trim();
-    const patientAnswer = String(turn.answer || "").trim();
-    const normalizedQuestion = normalizeText(question);
-    const previousBoundarySignal = hasPatientBoundarySignal(previousPatientResponse);
-    const boundaryPressure = isBoundaryPressure(question, previousPatientResponse);
-    const autonomyRespect = previousBoundarySignal && hasAutonomyRespect(question);
-    const formalOpenQuestion = isFormalOpenQuestion(question);
-    const validation = includesAny(normalizedQuestion, validationTerms);
-    const followUp = includesAny(normalizedQuestion, followUpTerms);
-    const framing = includesAny(normalizedQuestion, framingTerms);
-    const judgment = includesAny(normalizedQuestion, judgmentTerms);
-    const rushedAdvice = includesAny(normalizedQuestion, rushedAdviceTerms);
-    const prematureInterpretation = includesAny(normalizedQuestion, prematureInterpretationTerms);
-    const closure = /\b(cerrar|terminar|resum|proxima sesion|próxima sesión|continuar|seguimiento)\b/.test(normalizedQuestion);
-    const risk = /\b(riesgo|suicid|hacerte dano|hacerte daño|morir|seguridad)\b/.test(normalizedQuestion);
-    const facilitativeOpenQuestion =
-      formalOpenQuestion && !boundaryPressure && !judgment && !rushedAdvice && !prematureInterpretation;
-    const recognizedSkill = resolveRecognizedSkill({
-      boundaryPressure,
-      autonomyRespect,
-      validation,
-      followUp,
-      framing,
-      facilitativeOpenQuestion,
-      risk,
-      closure,
-      rushedAdvice,
-      prematureInterpretation,
-      judgment
-    });
-
-    return {
-      index: index + 1,
-      quote: question,
-      previousPatientResponse,
-      patientAnswer,
-      formalOpenQuestion,
-      facilitativeOpenQuestion,
-      boundarySignalBefore: previousBoundarySignal,
-      boundaryPressure,
-      pressure: boundaryPressure || includesAny(normalizedQuestion, pressureAfterBoundary),
-      autonomyRespect: autonomyRespect || (!previousBoundarySignal && includesAny(normalizedQuestion, autonomyRespectTerms)),
-      validation,
-      followUp,
-      framing,
-      rushedAdvice,
-      prematureInterpretation,
-      judgment,
-      closure,
-      risk,
-      recognizedSkill,
-      formativeReading: buildFormativeReading({
-        boundaryPressure,
-        autonomyRespect,
-        validation,
-        followUp,
-        facilitativeOpenQuestion,
-        rushedAdvice,
-        prematureInterpretation,
-        judgment,
-        closure
-      }),
-      possibleEffect: buildPossibleEffect({
-        boundaryPressure,
-        autonomyRespect,
-        validation,
-        followUp,
-        facilitativeOpenQuestion,
-        patientAnswer
-      }),
-      suggestion: buildSuggestion({
-        boundaryPressure,
-        autonomyRespect,
-        validation,
-        followUp,
-        facilitativeOpenQuestion,
-        rushedAdvice,
-        prematureInterpretation,
-        judgment,
-        closure
-      }),
-      reformulation: buildReformulation({
-        boundaryPressure,
-        autonomyRespect,
-        validation,
-        followUp,
-        facilitativeOpenQuestion,
-        rushedAdvice,
-        prematureInterpretation,
-        judgment,
-        question
-      }),
-      criterion: resolveCriterion({
-        boundaryPressure,
-        autonomyRespect,
-        validation,
-        followUp,
-        framing,
-        facilitativeOpenQuestion,
-        risk,
-        closure
-      })
-    };
-  });
+    const patientAnswer = String(turn.answer || turn.patientResponse || "").trim();
+    if (!turn.isSessionPrelude && question) {
+      const flags = detectFeedbackSignals(question, previousPatientResponse);
+      const criterionId = flags.boundaryPressure ? "autonomy" : flags.judgment ? "judgment" : flags.rushedAdvice ? "advice" : flags.prematureInterpretation ? "formulation" : flags.pressure ? "autonomy" : flags.risk ? "risk" : flags.autonomyRespect ? "autonomy" : flags.validation ? "validation" : flags.framing ? "framing" : flags.closure ? "closure" : flags.followUp || flags.facilitativeOpenQuestion ? "inquiry" : "reflection";
+      const academic = getAcademicCriterion(criterionId);
+      const concern = flags.boundaryPressure || flags.judgment || flags.rushedAdvice || flags.prematureInterpretation || flags.pressure;
+      const evidenceStatus = concern ? "review" : criterionId === "reflection" ? "unclassified" : "textual_cue";
+      const action = {
+        index: actions.length + 1, turnId: turn.id || null, quote: question, previousPatientResponse, patientAnswer,
+        ...flags, criterionId, criterion: academic.label, sourceIds: academic.sourceIds, sources: academic.sources,
+        basisVersion: FEEDBACK_BASIS_VERSION, evidenceStatus,
+        // Ordering is a UI review priority, not a clinical severity score.
+        reviewPriority: flags.boundaryPressure || flags.judgment || flags.pressure ? 3 : flags.risk || concern ? 2 : evidenceStatus === "textual_cue" ? 1 : 0,
+        recognizedSkill: recognizedLabel(flags, criterionId),
+        formativeReading: reading(flags, academic, previousPatientResponse),
+        possibleEffect: observedResponse(patientAnswer),
+        suggestion: suggestion(flags, academic, previousPatientResponse),
+        reformulation: reformulation(flags, previousPatientResponse),
+        reflectionQuestion: `Turno ${actions.length + 1}: ${academic.reflection}`,
+        uncertainty: "Indicios textuales para revisión: no equivalen a una calificación de competencia ni demuestran un efecto causal."
+      };
+      actions.push(action);
+    }
+    if (patientAnswer) previousPatientResponse = patientAnswer;
+  }
+  return actions;
 }
 
-export function hasPatientBoundarySignal(text = "") {
-  const normalized = normalizeText(text);
-  return includesAny(normalized, boundarySignals);
+export function buildSessionFeedback({ sessionNumber = 1, selectedCase = null, caseItem = null, conversation = [], clinicalDecision = null, studentPlan = null, preSessionPlan = null, selectedApproach = null, report = null } = {}) {
+  const n = Math.min(Math.max(Number(sessionNumber) || 1, 1), 4);
+  const sessionCriteria = SESSION_CRITERIA[n];
+  const observedActions = analyzeConversationEvidence(conversation);
+  const evidenceLevel = resolveEvidenceLevel(observedActions);
+  const concerns = prioritizeFeedbackActions(observedActions.filter(item => item.evidenceStatus === "review"));
+  const promising = observedActions.filter(item => item.evidenceStatus === "textual_cue" && item.criterionId !== "risk");
+  const strengths = promising.slice(0, 3).map(item => `Turno ${item.index}: indicio de ${item.criterion.toLowerCase()} en “${item.quote}”. Contrasta su recepción con la respuesta del paciente.`);
+  if (!strengths.length && observedActions.length) strengths.push("No se identificaron indicios suficientemente específicos para destacar una fortaleza. Revisa los turnos sin clasificar con tu docente.");
+  const priorityImprovements = concerns.slice(0, 3).map(item => `Turno ${item.index}, “${item.quote}”: ${item.suggestion}`);
+  const unknown = observedActions.find(item => item.evidenceStatus === "unclassified");
+  if (!priorityImprovements.length && unknown) priorityImprovements.push(`Turno ${unknown.index}, “${unknown.quote}”: explica qué buscabas explorar; el análisis textual no permite identificar una habilidad específica.`);
+  const top = concerns[0] || promising[0] || observedActions[0];
+  const pendingAreas = [];
+  if (!observedActions.some(item => item.framing)) pendingAreas.push("Encuadre: no se identificó una explicación explícita en este registro; revisa si se realizó antes.");
+  if (!observedActions.some(item => item.followUp)) pendingAreas.push("Seguimiento: selecciona una respuesta del paciente e identifica qué dato necesitarías aclarar.");
+  const plan = studentPlan || preSessionPlan;
+  if (plan?.evaluationObjective || plan?.objective) pendingAreas.push(`Objetivo declarado: “${plan.evaluationObjective || plan.objective}”. Selecciona los turnos que permiten valorar su cumplimiento; no se infiere por la etapa de sesión.`);
+  const nextSessionPriorities = top ? [top.reflectionQuestion, `Ensaya una alternativa para el turno ${top.index} y contrasta qué información necesitarías observar para valorar su efecto.`] : ["Realiza una intervención y revisa la respuesta antes de evaluar el encuentro."];
+  if (clinicalDecision?.action && ACTION_NEXT_STEPS[clinicalDecision.action]) nextSessionPriorities.push(ACTION_NEXT_STEPS[clinicalDecision.action]);
+  const references = [...new Map(observedActions.flatMap(item => item.sources).map(source => [source.id, source])).values()];
+  const name = (selectedCase || caseItem)?.name || report?.caseName || "el paciente";
+  const summary = `Se registraron ${observedActions.length} intervenciones con ${name}; ${evidenceLevel.distinctCount} diferentes. Foco previsto de la sesión ${n}: ${sessionCriteria.focus.toLowerCase()}. Su cumplimiento debe contrastarse con el diálogo.`;
+  return {
+    evidenceLevel, level: evidenceLevel.key, levelLabel: evidenceLevel.label, levelDescription: evidenceLevel.description,
+    basisVersion: FEEDBACK_BASIS_VERSION, assessmentKind: "formative_textual_review", sessionSummary: summary, briefSummary: summary,
+    observedActions, priorityActions: prioritizeFeedbackActions(observedActions).slice(0, 4), strengths,
+    priorityImprovements, improvements: priorityImprovements, pendingAreas, nextSessionPriorities,
+    nextStep: nextSessionPriorities[0], formativeCriteria: sessionCriteria.criteria,
+    referencesUsed: references.map(source => `${source.label}. ${source.title}`), academicReferences: references,
+    selectedApproach: selectedApproach?.label || "",
+    evidenceNote: `Lectura de la conversación registrada, incluidos antecedentes de apertura. ${evidenceLevel.description} Las fuentes fundamentan los criterios educativos; no validan automáticamente cada detección.`,
+    metacognitivePrompt: top?.reflectionQuestion || "¿Qué quieres practicar en el próximo encuentro?"
+  };
 }
 
-export function hasAutonomyRespect(text = "") {
-  const normalized = normalizeText(text);
-  return includesAny(normalized, autonomyRespectTerms);
+export function prioritizeFeedbackActions(actions = []) {
+  return [...actions].sort((a, b) => b.reviewPriority - a.reviewPriority || a.index - b.index);
 }
 
-export function isBoundaryPressure(question = "", previousPatientResponse = "") {
-  if (!hasPatientBoundarySignal(previousPatientResponse)) return false;
-  const normalized = normalizeText(question);
-  if (hasAutonomyRespect(question)) return false;
-  return includesAny(normalized, pressureAfterBoundary) || /por que no .*decir/.test(normalized);
+function resolveEvidenceLevel(actions) {
+  const distinctCount = new Set(actions.map(item => normalizeFeedbackText(item.quote))).size;
+  const meaningful = new Set(actions.filter(item => item.evidenceStatus !== "unclassified").map(item => normalizeFeedbackText(item.quote))).size;
+  // No count certifies sufficiency or competence. These describe available material only.
+  const key = !actions.length ? "not_evaluable" : meaningful <= 3 ? "very_preliminary" : "limited";
+  const labels = { not_evaluable: "No evaluable", very_preliminary: "Evidencia muy preliminar", limited: "Evidencia limitada" };
+  return { key, label: labels[key], distinctCount, meaningfulCount: meaningful, description: !actions.length ? "No hay intervenciones del estudiante para analizar." : `Se reconocen indicios en ${meaningful} intervenciones diferentes. Las repeticiones no aumentan la evidencia; la suficiencia y la competencia requieren valoración docente.` };
 }
 
-export function isFormalOpenQuestion(question = "") {
-  const normalized = normalizeText(question).trim();
-  return (
-    /\b(que|como|cuando|donde|cual|cuanto|por que|por qué)\b/.test(normalized) ||
-    /\b(cuentame|ayudame a entender|me gustaria entender)\b/.test(normalized)
-  );
-}
-
-function resolveEvidenceLevel(turnCount) {
-  if (turnCount <= 0) return { key: "not_evaluable", ...EVIDENCE_LEVELS.not_evaluable };
-  if (turnCount <= 3) return { key: "very_preliminary", ...EVIDENCE_LEVELS.very_preliminary };
-  if (turnCount <= 7) return { key: "limited", ...EVIDENCE_LEVELS.limited };
-  return { key: "sufficient", ...EVIDENCE_LEVELS.sufficient };
-}
-
-function buildBriefSummary({ caseName, turnCount, sessionCriteria, evidenceLevel }) {
-  if (!turnCount) {
-    return "La sesión se cerró sin intervenciones suficientes para una devolución extensa.";
-  }
-
-  if (turnCount <= 3) {
-    return `Se registraron ${turnCount} intervención(es) con ${caseName}. La devolución se limita a conductas observables y no infiere rasgos del estudiante.`;
-  }
-
-  return `Se observa una entrevista de ${turnCount} turno(s) con ${caseName}, centrada en ${sessionCriteria.focus.toLowerCase()}. El nivel de evidencia es ${evidenceLevel.label.toLowerCase()}.`;
-}
-
-function buildEvidenceStrengths(observedActions, report) {
-  const strengths = [];
-
-  const autonomy = observedActions.find((item) => item.autonomyRespect);
-  if (autonomy) {
-    strengths.push(`En esta intervención respetaste autonomía: "${truncateQuote(autonomy.quote)}".`);
-  }
-
-  const validation = observedActions.find((item) => item.validation);
-  if (validation) {
-    strengths.push(`Validaste o legitimaste la experiencia antes de avanzar: "${truncateQuote(validation.quote)}".`);
-  }
-
-  const followUp = observedActions.find((item) => item.followUp);
-  if (followUp) {
-    strengths.push(`Retomaste material del paciente y favoreciste continuidad conversacional.`);
-  }
-
-  const facilitative = observedActions.find((item) => item.facilitativeOpenQuestion);
-  if (facilitative) {
-    strengths.push(`Usaste una pregunta abierta facilitadora, no solo formalmente abierta.`);
-  }
-
-  const framing = observedActions.find((item) => item.framing);
-  if (framing) strengths.push("Ofreciste encuadre o cuidado del ritmo de la entrevista.");
-
-  if (!strengths.length && observedActions.length > 0) {
-    strengths.push("Se observa material inicial para analizar foco, tono y pertinencia de las preguntas.");
-  }
-
-  return [...strengths, ...(report?.strengths || []).map(shortenBullet)];
-}
-
-function buildEvidenceImprovements(observedActions, report, turnCount) {
-  const improvements = [];
-  const boundaryPressure = observedActions.find((item) => item.boundaryPressure);
-  if (boundaryPressure) {
-    improvements.push(
-      `La intervención "${truncateQuote(boundaryPressure.quote)}" presionó un límite explicitado por el paciente; conviene validar autonomía antes de seguir.`
-    );
-  }
-
-  const rushedAdvice = observedActions.find((item) => item.rushedAdvice);
-  if (rushedAdvice) {
-    improvements.push(`Evita pasar a consejo o indicación antes de comprender mejor el problema.`);
-  }
-
-  const premature = observedActions.find((item) => item.prematureInterpretation);
-  if (premature) {
-    improvements.push(`Formula hipótesis como preguntas tentativas, no como conclusiones cerradas.`);
-  }
-
-  const judgment = observedActions.find((item) => item.judgment);
-  if (judgment) {
-    improvements.push("Cuida palabras que puedan sonar moralizantes o evaluativas para el paciente.");
-  }
-
-  if (!observedActions.some((item) => item.validation) && turnCount >= 2) {
-    improvements.push("Sería útil reflejar una emoción o dificultad antes de abrir nuevas áreas.");
-  }
-
-  if (!observedActions.some((item) => item.followUp) && turnCount >= 4) {
-    improvements.push("Incluye seguimiento sobre palabras del paciente para sostener una conversación más humana.");
-  }
-
-  return [...improvements, ...(report?.improvements || []).map(shortenBullet)];
-}
-
-function buildPendingAreas({ observedActions, sessionCriteria, studentPlan }) {
-  const pending = [];
-  if (!observedActions.some((item) => item.framing)) pending.push("Encuadre inicial explícito.");
-  if (!observedActions.some((item) => item.validation || item.autonomyRespect)) pending.push("Validación y respeto del ritmo del paciente.");
-  if (!observedActions.some((item) => item.facilitativeOpenQuestion || item.followUp)) pending.push("Preguntas facilitadoras con seguimiento.");
-  if (!observedActions.some((item) => item.risk) && sessionCriteria.criteria.some((item) => /riesgo/i.test(item))) {
-    pending.push("Exploración de riesgo si aparece material clínico que lo justifique.");
-  }
-  if (!studentPlan?.evaluationObjective && !studentPlan?.objective) {
-    pending.push("Foco de trabajo para la sesión siguiente.");
-  }
-  return pending;
-}
-
-function buildNextSessionPriorities({ observedActions, pendingAreas, clinicalDecision, sessionCriteria }) {
-  const priorities = [];
-  if (observedActions.some((item) => item.boundaryPressure)) {
-    priorities.push("Reparar el vínculo respetando el límite explicitado y retomando el tema sin exigir detalles.");
-  }
-  if (clinicalDecision?.action === "refer" || clinicalDecision?.action === "risk_protocol") {
-    priorities.push("Justificar la decisión clínica con red de apoyo, seguridad y límites del simulador.");
-  }
-  priorities.push(...pendingAreas.map((item) => item.replace(/\.$/, "")));
-  priorities.push(sessionCriteria.nextStep);
-  return priorities;
-}
-
-function resolveRecognizedSkill(flags) {
-  if (flags.boundaryPressure) return "Presión sobre un límite del paciente";
-  if (flags.autonomyRespect) return "Respeto de autonomía y consentimiento";
-  if (flags.validation) return "Validación emocional";
-  if (flags.followUp) return "Seguimiento clínico";
-  if (flags.framing) return "Encuadre";
-  if (flags.facilitativeOpenQuestion) return "Pregunta abierta facilitadora";
-  if (flags.risk) return "Exploración de riesgo";
-  if (flags.closure) return "Cierre o continuidad";
-  if (flags.rushedAdvice) return "Consejo prematuro";
-  if (flags.prematureInterpretation) return "Hipótesis cerrada prematura";
+function recognizedLabel(flags, id) {
+  if (flags.boundaryPressure) return "Posible presión sobre un límite del paciente";
   if (flags.judgment) return "Lenguaje potencialmente juzgador";
-  return "Intervención exploratoria";
+  if (flags.rushedAdvice) return "Indicación cuyo contexto debe revisarse";
+  if (flags.prematureInterpretation) return "Hipótesis expresada como conclusión";
+  if (flags.pressure) return "Posible insistencia";
+  if (id === "reflection") return "Intención no determinada por el análisis textual";
+  return `Indicio de ${getAcademicCriterion(id).label.toLowerCase()}`;
 }
 
-function buildFormativeReading(flags) {
-  if (flags.boundaryPressure) {
-    return "Aunque la frase tiene forma de pregunta abierta, en contexto presiona un límite y puede reducir seguridad clínica.";
-  }
-  if (flags.autonomyRespect) {
-    return "Reconoce el derecho del paciente a reservar información y conserva la posibilidad de seguir explorando efectos clínicos.";
-  }
-  if (flags.validation && flags.followUp) return "Combina reconocimiento emocional con exploración pertinente.";
-  if (flags.validation) return "La validación puede sostener alianza antes de profundizar.";
-  if (flags.facilitativeOpenQuestion) return "La pregunta abre relato sin imponer dirección cerrada.";
-  if (flags.rushedAdvice) return "El consejo prematuro puede desplazar comprensión por solución rápida.";
-  if (flags.prematureInterpretation) return "La hipótesis aparece como conclusión antes de suficiente evidencia.";
-  if (flags.judgment) return "El lenguaje puede sentirse evaluativo y afectar la alianza.";
-  if (flags.closure) return "Aporta a ordenar continuidad o cierre si se vincula con síntesis clínica.";
-  return "Intervención observable; conviene precisar intención clínica y efecto esperado.";
+function reading(flags, criterion, previous) {
+  const mixed = flags.mixedMessage ? "La frase combina una señal de comprensión con contenido que requiere revisión; no se cuenta como validación. " : "";
+  if (flags.boundaryPressure) return `${mixed}La intervención sigue al límite “${previous}”. Revisa si la insistencia está justificada por el contexto o requiere reparación.`;
+  return mixed + criterion.rationale;
 }
 
-function buildPossibleEffect(flags) {
-  if (flags.boundaryPressure) return "Pudo aumentar cautela, defensa o sensación de exigencia.";
-  if (flags.autonomyRespect) return "Pudo preservar seguridad, autonomía y disposición a continuar.";
-  if (flags.validation && flags.followUp) return "Pudo favorecer elaboración y continuidad narrativa.";
-  if (flags.validation) return "Pudo disminuir sensación de juicio y sostener vínculo.";
-  if (flags.facilitativeOpenQuestion) return "Pudo ampliar el relato sin cerrar prematuramente.";
-  return "El efecto depende de cómo el paciente recibió la intervención y de la continuidad posterior.";
+function observedResponse(answer) {
+  if (!answer) return "No hay una respuesta posterior registrada; no se puede valorar la recepción.";
+  const text = normalizeFeedbackText(answer);
+  if (hasPatientBoundarySignal(answer) || /no me (entiendes|comprendes)|me siento (juzgad|presionad)|no es (eso|asi)|no se si es tan simple/.test(text)) return `La respuesta posterior expresa reserva o desacuerdo: “${answer}”. Revisa el desajuste; no demuestra por sí sola que la intervención lo causara.`;
+  if (/me (siento|senti) (escuchad|comprendid)|eso me acomoda|gracias por (entender|escuchar)|si,? (eso|me hace sentido)/.test(text)) return `La respuesta posterior incluye una señal de aceptación: “${answer}”. Corrobora el significado sin equiparar acuerdo con beneficio clínico.`;
+  return `Respuesta posterior: “${answer}”. Este fragmento permite revisar la recepción, pero no atribuir una mejoría o deterioro clínico.`;
 }
 
-function buildSuggestion(flags) {
-  if (flags.boundaryPressure) return "Valida el límite, ofrece permiso para no responder y explora el significado sin exigir datos.";
-  if (flags.autonomyRespect) return "Puedes continuar desde el impacto emocional o contextual sin pedir el dato reservado.";
-  if (flags.rushedAdvice) return "Vuelve a exploración y pregunta qué ha intentado o qué le hace sentido.";
-  if (flags.prematureInterpretation) return "Transforma la hipótesis en una pregunta tentativa y verificable.";
-  if (flags.judgment) return "Reformula con lenguaje descriptivo y no moralizante.";
-  if (!flags.validation) return "Agrega una frase breve de validación antes de pasar a otro foco.";
-  return "Mantén seguimiento y verifica si la pregunta ayudó al paciente a elaborar.";
+function suggestion(flags, criterion, previous) {
+  if (flags.boundaryPressure) return `Vuelve al límite expresado (“${previous}”) y ofrece elegir otro foco; si hay una razón de seguridad para insistir, explicítala y revísala con supervisión.`;
+  if (flags.judgment) return "Retira la atribución de culpa o la descalificación de esta frase y pregunta por la experiencia concreta que necesitas comprender.";
+  if (flags.rushedAdvice) return "Revisa este consejo: identifica si el paciente pidió orientación, qué alternativas se exploraron y cómo puede decidir sobre la propuesta.";
+  if (flags.prematureInterpretation) return "Presenta esta hipótesis como tentativa; indica el dato que la sostiene y pregunta qué parte no encaja.";
+  return criterion.reflection;
 }
 
-function buildReformulation(flags) {
-  if (flags.boundaryPressure) {
-    return "Está bien, no necesitas decir el nombre. ¿Qué aspectos de esa carrera hacen que sientas que absorbe tanto de ti?";
-  }
-  if (flags.autonomyRespect) {
-    return "Podemos dejar ese dato fuera y hablar de cómo te afecta, si te parece.";
-  }
-  if (flags.rushedAdvice) {
-    return "Antes de pensar en soluciones, ¿qué has intentado y qué efecto ha tenido para ti?";
-  }
-  if (flags.prematureInterpretation) {
-    return "Me pregunto si esto podría relacionarse con lo que vienes sintiendo; ¿te hace sentido o lo ves distinto?";
-  }
-  if (flags.judgment) {
-    return "Quiero entender qué función cumple eso para ti, sin juzgarlo de entrada.";
-  }
-  if (!flags.validation) {
-    return "Tiene sentido que sea difícil hablar de esto. ¿Qué parte te pesa más ahora?";
-  }
-  return "Si te parece, podemos seguir por esa línea y mirar qué se repite en tu experiencia.";
-}
-
-function resolveCriterion(flags) {
-  if (flags.boundaryPressure || flags.autonomyRespect) return "Ética, autonomía y alianza terapéutica";
-  if (flags.validation) return "Alianza terapéutica y escucha activa";
-  if (flags.followUp || flags.facilitativeOpenQuestion) return "Pertinencia de preguntas y exploración clínica";
-  if (flags.framing) return "Encuadre inicial";
-  if (flags.risk) return "Evaluación de riesgo";
-  if (flags.closure) return "Cierre, continuidad y planificación";
-  return "Formulación clínica en desarrollo";
-}
-
-function buildEvidenceNote(turnCount) {
-  if (turnCount === 0) return "Sin evidencia conversacional.";
-  if (turnCount <= 3) return "La lectura es preliminar: describe intervenciones, no rasgos estables del estudiante.";
-  if (turnCount <= 7) return "La lectura permite orientar mejoras concretas, sin cerrar una evaluación global.";
-  return "La lectura integra patrones observables y momentos específicos de la entrevista.";
-}
-
-function getVisibleTurns(conversation = []) {
-  return (conversation || []).filter(
-    (entry) =>
-      !entry?.isSessionPrelude &&
-      !entry?.isPendingResponse &&
-      String(entry?.question || "").trim()
-  );
-}
-
-function normalizeText(text = "") {
-  return String(text)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function includesAny(normalizedText, terms = []) {
-  return terms.some((term) => normalizedText.includes(normalizeText(term)));
-}
-
-function compactList(items, limit) {
-  const seen = new Set();
-  return items
-    .map(shortenBullet)
-    .filter(Boolean)
-    .filter((item) => {
-      const key = normalizeText(item);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, limit);
-}
-
-function shortenBullet(value) {
-  const clean = String(value || "").replace(/\s+/g, " ").trim();
-  const words = clean.split(/\s+/).filter(Boolean);
-  if (words.length <= 22) return clean;
-  return `${words.slice(0, 22).join(" ")}.`;
-}
-
-function sentenceLimit(value, maxSentences = 2) {
-  const clean = String(value || "").replace(/\s+/g, " ").trim();
-  if (!clean) return "";
-  const sentences = clean.match(/[^.!?]+[.!?]?/g) || [clean];
-  return sentences
-    .slice(0, maxSentences)
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function truncateQuote(value, max = 90) {
-  const clean = String(value || "").replace(/\s+/g, " ").trim();
-  if (clean.length <= max) return clean;
-  return `${clean.slice(0, max - 1).trim()}…`;
-}
-
-function unique(items = []) {
-  return Array.from(new Set(items.filter(Boolean)));
+function reformulation(flags, previous) {
+  if (flags.boundaryPressure || flags.autonomyRespect) return /nombre/i.test(previous) ? "No necesitas decir el nombre. ¿Prefieres abordar otro aspecto o dejar este tema por ahora?" : "Podemos dejar ese tema por ahora. ¿Sobre qué te gustaría seguir hablando?";
+  if (flags.judgment) return "Quiero revisar cómo lo dije. ¿Qué necesitaría comprender mejor de tu experiencia?";
+  if (flags.rushedAdvice) return "¿Quieres que exploremos primero lo que has intentado y después valoremos opciones juntos?";
+  if (flags.prematureInterpretation) return "Tengo una hipótesis, pero necesito contrastarla contigo. ¿Qué parte de lo que planteé encaja y qué parte no?";
+  if (flags.risk) return "Revisa con tu docente cómo completar la exploración de seguridad según el contexto y el protocolo del caso; una frase aislada no sustituye esa evaluación.";
+  if (previous && (flags.followUp || flags.validation || flags.facilitativeOpenQuestion)) return `Punto de partida: el paciente dijo “${previous}”. Reformula retomando un dato de ese fragmento y permite que corrija tu comprensión.`;
+  return "Explica primero tu intención en este turno y el dato del paciente al que responde; con esa información podrás ensayar una alternativa pertinente.";
 }
