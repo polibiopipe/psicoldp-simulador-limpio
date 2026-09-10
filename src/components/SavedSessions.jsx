@@ -3,9 +3,16 @@ import { ArrowLeft, CalendarClock, Eye, FileText, Trash2 } from "lucide-react";
 import {
   clearAllSessionHistory,
   deleteSessionHistory,
-  getSessionHistoryForUser
+  getSessionHistoryForUser,
+  restoreSessionConversation
 } from "../engine/sessionHistory.js";
+import { buildSessionFeedback } from "../engine/sessionFeedback.js";
+import { FEEDBACK_BASIS_VERSION } from "../data/feedbackAcademicBasis.js";
+import { mediationPracticeText, validateMediationResult } from "../engine/feedbackMediation.js";
+import { downloadTextFile } from "../data/researchConsent.js";
 import { isSupabaseConfigured } from "../lib/supabaseClient.js";
+import { cases } from "../data/cases.js";
+import { buildEducationalReport } from "../utils/scoring.js";
 
 export function SavedSessions({ authSession, onBackHome, onHistoryChange, onResumeSession }) {
   const [sessions, setSessions] = useState([]);
@@ -20,6 +27,8 @@ export function SavedSessions({ authSession, onBackHome, onHistoryChange, onResu
     () => sessions.find((session) => session.id === selectedId) || null,
     [sessions, selectedId]
   );
+  const selectedReport = useMemo(() => selectedSession ? buildEducationalReport(restoreSessionConversation(selectedSession),
+    cases.find(item => item.id === selectedSession.caseId) || { name: selectedSession.caseName }) : null, [selectedSession]);
 
   useEffect(() => {
     setSessions([]);
@@ -151,7 +160,7 @@ export function SavedSessions({ authSession, onBackHome, onHistoryChange, onResu
                     <span>{formatDate(session.createdAt)}</span>
                     <span>{session.conversationHistory?.length || 0} turnos</span>
                     <span>{getSessionStatusLabel(session.status)}</span>
-                    <span>Nivel {getSessionFeedback(session).levelLabel}</span>
+                    <span>{getSessionFeedback(session).levelLabel}</span>
                     {getClinicalPlanEvaluation(session) && (
                       <span>{getClinicalPlanEvaluation(session).decisionLabel}</span>
                     )}
@@ -191,11 +200,12 @@ export function SavedSessions({ authSession, onBackHome, onHistoryChange, onResu
                   <h2>{selectedSession.caseName} - Sesion {selectedSession.sessionNumber}</h2>
                   <p>{getSessionFeedback(selectedSession).briefSummary || selectedSession.summary?.closure}</p>
                   <p>
-                    Nivel formativo: <strong>{getSessionFeedback(selectedSession).levelLabel}</strong>
+                    Material para revisar: <strong>{getSessionFeedback(selectedSession).levelLabel}</strong>
                   </p>
+                  {selectedSession.feedback?.sessionFeedback?.basisVersion !== FEEDBACK_BASIS_VERSION && <p>Lectura con los criterios actuales de la conversación conservada.</p>}
 
                   <section>
-                    <h3>Fortalezas observadas</h3>
+                    <h3>Indicios para reconocer fortalezas</h3>
                     <ul>
                       {getSessionFeedback(selectedSession).strengths.map((item) => (
                         <li key={item}>{item}</li>
@@ -310,11 +320,11 @@ export function SavedSessions({ authSession, onBackHome, onHistoryChange, onResu
                     </section>
                   </details>
 
-                  {selectedSession.feedback?.objectiveEvaluation?.length > 0 && (
+                  {selectedReport?.objectiveEvaluation?.length > 0 && (
                     <section>
                       <h3>Objetivos del caso</h3>
                       <ul>
-                        {selectedSession.feedback.objectiveEvaluation.slice(0, 6).map((item) => (
+                        {selectedReport.objectiveEvaluation.map((item) => (
                           <li key={item.objective}>
                             {item.objective}: {item.levelLabel || item.status}
                           </li>
@@ -323,11 +333,11 @@ export function SavedSessions({ authSession, onBackHome, onHistoryChange, onResu
                     </section>
                   )}
 
-                  {selectedSession.feedback?.reformulationSuggestions?.length > 0 && (
+                  {selectedReport?.reformulationSuggestions?.length > 0 && (
                     <section>
                       <h3>Reformulaciones sugeridas</h3>
                       <ul>
-                        {selectedSession.feedback.reformulationSuggestions.slice(0, 3).map((item) => (
+                        {selectedReport.reformulationSuggestions.slice(0, 3).map((item) => (
                           <li key={`${item.insteadOf}-${item.tryThis}`}>
                             Podrías decir: “{item.tryThis}”
                           </li>
@@ -337,10 +347,10 @@ export function SavedSessions({ authSession, onBackHome, onHistoryChange, onResu
                   )}
 
                   <section>
-                    <h3>Conversacion resumida</h3>
+                    <h3>Conversación completa</h3>
                     <ol>
-                      {(selectedSession.conversationHistory || []).slice(0, 8).map((turn) => (
-                        <li key={turn.id}>
+                      {(selectedSession.conversationHistory || []).map((turn, index) => (
+                        <li key={turn.id || index}>
                           <strong>Estudiante:</strong> {turn.question}
                           <br />
                           <strong>{selectedSession.caseName}:</strong> {turn.answer}
@@ -348,6 +358,7 @@ export function SavedSessions({ authSession, onBackHome, onHistoryChange, onResu
                       ))}
                     </ol>
                   </section>
+                  <SavedFeedbackPractice session={selectedSession} />
                 </>
               ) : (
                 <div className="saved-detail-placeholder">
@@ -440,43 +451,29 @@ function getClinicalArtifactsEvaluation(session) {
 
 function getSessionFeedback(session) {
   const feedback = session?.feedback?.sessionFeedback;
-  if (feedback) {
-    return {
-      levelLabel: feedback.levelLabel || "En desarrollo",
-      briefSummary: feedback.briefSummary || session?.summary?.brief || "",
-      strengths: ensureList(feedback.strengths, ["Se sostuvo una entrevista formativa."]),
-      improvements: ensureList(feedback.improvements, ["Profundizar el foco clinico en la siguiente revision."]),
-      nextStep: feedback.nextStep || "Revisar el motivo de consulta y definir un siguiente paso formativo.",
-      formativeCriteria: ensureList(feedback.formativeCriteria, ["Alianza", "Motivo de consulta", "Cierre"]),
-      referencesUsed: ensureList(feedback.referencesUsed, ["Apuntes formativos UNIACC"])
-    };
-  }
-
-  return {
-    levelLabel: resolveSavedLevel(session?.feedback?.generalScore ?? session?.patientOpenness?.final),
-    briefSummary: session?.summary?.brief || session?.summary?.closure || "Sesion guardada para revision formativa.",
-    strengths: ensureList((session?.feedback?.strengths || []).slice(0, 3), ["Se sostuvo una entrevista formativa."]),
-    improvements: ensureList(
-      (session?.feedback?.improvements || session?.feedback?.nextSuggestions || []).slice(0, 2),
-      ["Profundizar el foco clinico en la siguiente revision."]
-    ),
-    nextStep: (session?.feedback?.nextSuggestions || [])[0] || "Definir continuidad, cierre o derivacion segun lo observado.",
-    formativeCriteria: ["Alianza", "Motivo de consulta", "Decision clinica"],
-    referencesUsed: ["Apuntes formativos UNIACC"]
-  };
+  if (feedback?.basisVersion === FEEDBACK_BASIS_VERSION) return feedback;
+  return buildSessionFeedback({ sessionNumber: session?.sessionNumber, selectedCase: { name: session?.caseName },
+    conversation: restoreSessionConversation(session), studentPlan: session?.feedback?.preSessionPlan,
+    clinicalDecision: session?.feedback?.clinicalDecision });
 }
 
 function ensureList(value, fallback) {
   return Array.isArray(value) && value.length ? value : fallback;
 }
 
-function resolveSavedLevel(score) {
-  const numericScore = Number(score);
-  if (!Number.isFinite(numericScore)) return "En desarrollo";
-  if (numericScore >= 85) return "Destacado";
-  if (numericScore >= 65) return "Logrado";
-  if (numericScore >= 40) return "En desarrollo";
-  return "Inicial";
+function SavedFeedbackPractice({ session }) {
+  const practice = session?.feedback?.feedbackPractice;
+  const action = getSessionFeedback(session).observedActions?.find(item => item.index === practice?.turnIndex && item.quote === practice?.quote);
+  if (!action) return null;
+  const result = practice.result && validateMediationResult(practice.result, action);
+  return <section>
+    <h3>Mi reflexión y segundo intento</h3>
+    <p><strong>Intervención revisada:</strong> {action.quote}</p>
+    <p><strong>Mi lectura:</strong> {practice.reflection}</p>
+    <p><strong>Mi ensayo:</strong> {practice.rewrite}</p>
+    {result && <><p><strong>Lectura de IA por contrastar:</strong> {result.interpretation}</p><p><strong>Próxima práctica:</strong> {result.nextPractice}</p></>}
+    <button className="secondary-action" type="button" onClick={() => downloadTextFile("escucha-viva-segundo-intento.txt", mediationPracticeText({ action, ...practice, result }))}>Descargar mi ejercicio completo</button>
+  </section>;
 }
 
 function getSessionStatusLabel(status) {

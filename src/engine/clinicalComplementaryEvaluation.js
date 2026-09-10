@@ -1,3 +1,4 @@
+import { reviewWrittenFields } from "./writtenWorkFeedback.js";
 import { getClinicalInstrumentById } from "../data/clinicalWorkflow.js";
 
 export const EXTERNAL_REPORT_ETHICAL_NOTE =
@@ -119,7 +120,7 @@ export function evaluateComplementaryEvaluationRequest({
   }
 
   if (normalized.justification.length >= 35) {
-    strengths.push("Justificaste la solicitud con una razon clinica explicita.");
+    strengths.push("Registraste texto en la justificación; contrástalo con el dato del caso que motiva la solicitud.");
   } else if (normalized.justification.length >= 16) {
     recommendations.push("Iniciaste la justificacion del instrumento; conviene precisar pertinencia, limites y utilidad clinica.");
   } else if (normalized.justification.length > 0) {
@@ -129,7 +130,7 @@ export function evaluateComplementaryEvaluationRequest({
   }
 
   if (normalized.hypothesis.length >= 28) {
-    strengths.push("Vinculaste la solicitud con una hipotesis a explorar o contrastar.");
+    strengths.push("Registraste una hipótesis; falta contrastar qué hallazgo del caso la sostiene.");
   } else if (normalized.hypothesis.length >= 14) {
     recommendations.push("Nombraste una hipotesis inicial; seria util formular mejor que se quiere contrastar.");
   } else if (normalized.hypothesis.length > 0) {
@@ -139,7 +140,7 @@ export function evaluateComplementaryEvaluationRequest({
   }
 
   if (normalized.expectedInformation.length >= 24) {
-    strengths.push("Definiste que informacion esperas obtener.");
+    strengths.push("Registraste información esperada; revisa cómo cambiaría tu decisión clínica.");
   } else if (normalized.expectedInformation.length >= 12) {
     recommendations.push(
       "Explicaste la informacion que esperas obtener, aunque puedes precisar como modificaria tu hipotesis clinica."
@@ -151,7 +152,7 @@ export function evaluateComplementaryEvaluationRequest({
   }
 
   if (normalized.agePertinence.length >= 20 || isAgeCompatible(instrument, patientAge)) {
-    strengths.push("Consideraste pertinencia por edad y caracteristicas del caso.");
+    strengths.push("Hay una referencia etaria o una justificación registrada. Revisa rango, población y límites del instrumento con supervisión.");
   } else if (normalized.agePertinence.length > 0) {
     recommendations.push("Mencionaste pertinencia del instrumento; conviene explicitar edad, contexto y limites de uso.");
   } else {
@@ -159,7 +160,7 @@ export function evaluateComplementaryEvaluationRequest({
   }
 
   if (normalized.integrationPlan.length >= 24) {
-    strengths.push("Anticipaste como integraras los resultados al proceso.");
+    strengths.push("Registraste un plan de integración; contrasta su relación con hipótesis y objetivos.");
   } else if (normalized.integrationPlan.length >= 12) {
     recommendations.push("Anticipaste un uso del informe; falta precisar como se integrara sin cerrar diagnostico.");
   } else if (normalized.integrationPlan.length > 0) {
@@ -180,10 +181,11 @@ export function evaluateComplementaryEvaluationRequest({
   const level = !instrument ? "missing" : weak ? "weak" : "coherent";
 
   return {
-    title: "Solicitud de evaluacion complementaria",
+    title: "Registro de solicitud de evaluación complementaria",
+    assessmentKind: "structure_only",
     level,
     levelLabel: {
-      coherent: "Coherente",
+      coherent: "Registro disponible para revisión",
       weak: "Requiere mejor justificacion",
       missing: "Incompleta"
     }[level],
@@ -261,87 +263,34 @@ export function buildSimulatedExternalReport({
 }
 
 export function evaluateExternalReportIntegration(integration = {}) {
-  const normalized = normalizeExternalReportIntegration(integration);
-  const strengths = [];
-  const gaps = [];
-
-  if (normalized.newInformation.length >= 25) strengths.push("Identificaste informacion nueva aportada por el informe.");
-  else gaps.push("Falta nombrar que informacion nueva aporta el informe.");
-
-  if (normalized.hypothesisImpact.length >= 25) strengths.push("Relacionaste el informe con tu hipotesis clinica.");
-  else gaps.push("Debes indicar si el informe confirma, modifica o tensiona la hipotesis.");
-
-  if (normalized.interventionUse.length >= 25) strengths.push("Conectaste resultados con el diseno de intervencion.");
-  else gaps.push("Falta explicar como el informe orientara el trabajo posterior.");
-
-  if (normalized.ethicalRisks.length >= 20) strengths.push("Consideraste riesgos, limites o dilemas eticos.");
-  else gaps.push("Conviene explicitar limites eticos del informe complementario.");
-
-  if (normalized.limitations.length >= 20) strengths.push("Reconociste limitaciones del informe.");
-  else gaps.push("Falta reconocer que el informe no entrega una verdad definitiva.");
-
-  const level = gaps.length <= 1 ? "achieved" : gaps.length <= 3 ? "partial" : "needsWork";
-  return {
-    title: "Integracion del informe externo",
-    level,
-    levelLabel: {
-      achieved: "Lograda",
-      partial: "Parcial",
-      needsWork: "Por fortalecer"
-    }[level],
-    strengths,
-    gaps,
-    summary:
-      level === "achieved"
-        ? "La integracion conecta hallazgos, hipotesis, limites y continuidad del proceso."
-        : "La integracion aun debe vincular mejor informe, hipotesis, etica y plan de continuidad."
-  };
+  return { title: "Integración del informe externo", ...reviewWrittenFields(normalizeExternalReportIntegration(integration), [
+    ["newInformation", "información nueva", "¿Qué hallazgo concreto del informe no estaba en la entrevista?"],
+    ["hypothesisImpact", "efecto en la hipótesis", "¿Qué dato confirma o contradice la hipótesis y qué alternativa permanece abierta?"],
+    ["interventionUse", "uso en la intervención", "¿Qué decisión cambiaría a partir de ese hallazgo y por qué?"],
+    ["ethicalRisks", "consideraciones éticas", "¿Qué límite de interpretación o consentimiento corresponde a este caso?"],
+    ["limitations", "limitaciones", "¿Qué no permite concluir este informe y qué necesitas contrastar?"]
+  ]) };
 }
 
 export function evaluateInterventionDesign(design = {}) {
-  const normalized = normalizeInterventionDesign(design);
-  const strengths = [];
-  const gaps = [];
-  const fields = [
-    ["caseUnderstanding", "comprension del caso", 35],
-    ["clinicalFormulation", "formulacion clinica", 35],
-    ["objectives", "objetivos de intervencion", 25],
-    ["treatmentPlan", "plan de tratamiento o intervencion", 30],
-    ["strategies", "estrategias clinicas", 25],
-    ["processEvaluation", "evaluacion del proceso", 25],
-    ["ethics", "consideraciones eticas", 20],
-    ["reflexivity", "reflexividad del estudiante", 20],
-    ["contextualIntegration", "integracion situada/contextual", 25],
-    ["continuityDecision", "continuidad, cierre o derivacion", 20]
-  ];
-
-  for (const [key, label, minLength] of fields) {
-    if (normalized[key].length >= minLength) strengths.push(`Incluiste ${label}.`);
-    else gaps.push(`Falta desarrollar ${label}.`);
-  }
-
-  const level = gaps.length <= 2 ? "achieved" : gaps.length <= 5 ? "partial" : "needsWork";
-  return {
-    title: "Diseno de intervencion aplicado al caso",
-    level,
-    levelLabel: {
-      achieved: "Consistente",
-      partial: "En desarrollo",
-      needsWork: "Insuficiente"
-    }[level],
-    strengths: strengths.slice(0, 5),
-    gaps: gaps.slice(0, 5),
-    summary:
-      level === "achieved"
-        ? "El diseno se sostiene en formulacion, objetivos, estrategias, etica y evaluacion del proceso."
-        : "El diseno requiere mas fundamentacion para funcionar como propuesta clinica aplicada al caso."
-  };
+  return { title: "Diseño de intervención aplicado al caso", ...reviewWrittenFields(normalizeInterventionDesign(design), [
+    ["caseUnderstanding", "comprensión del caso", "¿Qué citas del paciente sostienen tu descripción?"],
+    ["clinicalFormulation", "formulación clínica", "¿Qué mecanismo propones, qué evidencia lo apoya y qué lo refutaría?"],
+    ["objectives", "objetivos", "¿Qué cambio observable propone el paciente y cómo sabrían que ocurrió?"],
+    ["treatmentPlan", "plan de intervención", "¿Cómo se conecta cada paso con la formulación y las preferencias del paciente?"],
+    ["strategies", "estrategias", "¿Qué función cumple la técnica en el enfoque declarado y por qué es pertinente aquí?"],
+    ["processEvaluation", "evaluación del proceso", "¿Qué indicador revisarías, cuándo y qué harías si no cambia?"],
+    ["ethics", "consideraciones éticas", "¿Qué límites y decisiones de consentimiento dependen de este caso?"],
+    ["reflexivity", "reflexividad", "¿Qué supuesto propio revisaste a partir de la conversación?"],
+    ["contextualIntegration", "contexto", "¿Qué recurso o restricción del entorno modifica tu propuesta?"],
+    ["continuityDecision", "continuidad, cierre o derivación", "¿Qué evidencia sostiene la decisión y qué condición haría cambiarla?"]
+  ]) };
 }
 
 function buildRequestSummary(level, instrument) {
   if (!instrument) return "Selecciona una evaluacion complementaria y fundamenta su pertinencia.";
   if (level === "coherent") {
-    return `La solicitud de ${instrument.label} es formativamente coherente si se integra con entrevista y contexto.`;
+    return `La solicitud de ${instrument.label} tiene datos registrados para continuar el ejercicio. Esto no confirma la pertinencia clínica del instrumento.`;
   }
   return `La solicitud de ${instrument.label} requiere mejor justificacion antes de entregar un informe simulado.`;
 }

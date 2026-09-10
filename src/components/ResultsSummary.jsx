@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, GraduationCap, TrendingUp } from "lucide-react";
 import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 
 export function ResultsSummary({ report, caseItem, history, sessionNumber = 1 }) {
-  const achieved = report.criteria.filter((criterion) => criterion.level === "achieved").length;
+  const review = report.criteria.filter((criterion) => criterion.level === "needsWork").length;
   const partial = report.criteria.filter((criterion) => criterion.level === "partial").length;
   const interviewTurns = history.filter((entry) => !entry.isSessionPrelude);
   const isNotEvaluable = report.evaluationStatus === "not_evaluable";
@@ -62,13 +62,13 @@ export function ResultsSummary({ report, caseItem, history, sessionNumber = 1 })
         </div>
         <div>
           <CheckCircle2 aria-hidden="true" />
-          <strong>{achieved}</strong>
-          <span>logrados</span>
+          <strong>{review}</strong>
+          <span>requieren revisión</span>
         </div>
         <div>
           <TrendingUp aria-hidden="true" />
           <strong>{partial}</strong>
-          <span>parciales</span>
+          <span>criterios con indicios</span>
         </div>
         <div>
           <GraduationCap aria-hidden="true" />

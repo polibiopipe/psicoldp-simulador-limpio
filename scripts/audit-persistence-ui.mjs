@@ -156,6 +156,11 @@ try {
   const caseItem = s.cases.find((item) => item.id === 'claudio');
   const conversation = [{ id: 'turn-1', question: '¿Qué te trae por acá?', answer: 'Me cuesta decidir y termino postergando.', responseCategory: 'motivo_consulta' }];
   const report = s.buildEducationalReport(conversation, caseItem);
+  const prelude = { isSessionPrelude: true, answer: 'Prefiero no hablar de mi familia todavía.' };
+  const withPrelude = s.buildSessionHistoryRecord({ id: 'with-prelude', caseItem, history: [prelude, ...conversation], report, sessionNumber: 2 });
+  assert.deepEqual(s.restoreSessionConversation(withPrelude), [prelude, ...withPrelude.conversationHistory], 'recuperar conserva la apertura sin contarla como intervención');
+  assert.equal(withPrelude.conversationHistory.length, 1);
+  assert.equal(s.restoreSessionConversation({ ...withPrelude, conversationHistory: [prelude, ...withPrelude.conversationHistory] }).length, 2, 'no se duplica una apertura ya presente');
   let closureCalls = 0;
   let confirmed = false;
   let navigated = false;

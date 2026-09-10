@@ -2,6 +2,7 @@ import React from "react";
 import { ArrowRight } from "lucide-react";
 import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 import { EmailShare } from "./EmailShare.jsx";
+import { FeedbackMediation } from "./FeedbackMediation.jsx";
 
 export function FeedbackPanel({
   report,
@@ -10,7 +11,8 @@ export function FeedbackPanel({
   sessionNumber = 1,
   onBackToInterview,
   onReviewClosure,
-  onSelectCase
+  onSelectCase,
+  mediationProps = {}
 }) {
   const visibleHistory = history.filter((entry) => !entry.isSessionPrelude);
   const isNotEvaluable = report.evaluationStatus === "not_evaluable";
@@ -78,9 +80,7 @@ export function FeedbackPanel({
     selectedApproach: report.therapeuticApproach
   });
   const observedActions = sessionFeedback.observedActions || [];
-  const priorityActions = observedActions
-    .filter((item) => item.boundaryPressure || item.autonomyRespect || item.validation || item.followUp)
-    .slice(0, 4);
+  const priorityActions = sessionFeedback.priorityActions;
 
   return (
     <section className="feedback-panel">
@@ -99,14 +99,14 @@ export function FeedbackPanel({
         </div>
         <p>
           {isLimitedEvaluation
-            ? "Hubo poco material conversacional. La devolución orienta el próximo intento, sin entregar porcentajes robustos."
+            ? sessionFeedback.levelDescription
             : sessionFeedback.levelDescription}
         </p>
       </section>
 
       <div className="feedback-sections feedback-brief-grid">
         <section className="feedback-block">
-          <h2>Fortalezas observadas</h2>
+          <h2>Indicios para reconocer fortalezas</h2>
           <ul>
             {sessionFeedback.strengths.map((item) => (
               <li key={item}>{item}</li>
@@ -151,15 +151,18 @@ export function FeedbackPanel({
           <p>{sessionFeedback.evidenceNote}</p>
           {observedActions.length > 0 && (
             <ol className="feedback-observed-actions">
-              {observedActions.slice(0, 8).map((item) => (
+              {observedActions.map((item) => (
                 <li key={`${item.index}-${item.quote}`}>
                   <blockquote>{item.quote}</blockquote>
-                  <p><strong>Habilidad reconocida:</strong> {item.recognizedSkill}</p>
+                  {item.previousPatientResponse && <p><strong>Paciente antes de la intervención:</strong> “{item.previousPatientResponse}”</p>}
+                  <p><strong>Indicio identificado:</strong> {item.recognizedSkill}</p>
                   <p><strong>Lectura formativa:</strong> {item.formativeReading}</p>
-                  <p><strong>Efecto posible:</strong> {item.possibleEffect}</p>
+                  <p><strong>Respuesta y límites de interpretación:</strong> {item.possibleEffect}</p>
                   <p><strong>Sugerencia:</strong> {item.suggestion}</p>
                   <p><strong>Reformulación:</strong> {item.reformulation}</p>
                   <p><strong>Criterio:</strong> {item.criterion}</p>
+                  <p><strong>Para reflexionar:</strong> {item.reflectionQuestion}</p>
+                  <p><strong>Fundamento educativo:</strong> {item.sources.map((source, index) => <React.Fragment key={source.id}>{index > 0 && "; "}<a href={source.url} target="_blank" rel="noreferrer">{source.label}</a></React.Fragment>)}</p>
                 </li>
               ))}
             </ol>
@@ -177,10 +180,11 @@ export function FeedbackPanel({
           </section>
 
           <section className="feedback-block">
-            <h2>Referencias usadas</h2>
+            <h2>Fundamentos y alcance de las fuentes</h2>
+            <p>Estas fuentes orientan los criterios educativos. Cada interpretación de la conversación sigue siendo revisable con tu docente.</p>
             <ul>
-              {sessionFeedback.referencesUsed.map((item) => (
-                <li key={item}>{item}</li>
+              {sessionFeedback.academicReferences.map((item) => (
+                <li key={item.id}><a href={item.url} target="_blank" rel="noreferrer">{item.label}. {item.title}</a>. {item.type}. {item.scope}</li>
               ))}
             </ul>
           </section>
@@ -258,11 +262,13 @@ export function FeedbackPanel({
         )}
       </details>
 
+      <FeedbackMediation key={mediationProps.sessionRecordId || `${caseItem.id}-${sessionNumber}`} actions={observedActions} {...mediationProps} />
+
       <details className="history-details">
         <summary>Ver conversación completa ({visibleHistory.length})</summary>
         <ol>
-          {visibleHistory.map((entry) => (
-            <li key={entry.id}>
+          {visibleHistory.map((entry, index) => (
+            <li key={entry.id || `history-${index}`}>
               <strong>Estudiante:</strong> {entry.question}
               <br />
               <strong>{caseItem.name}:</strong> {entry.answer}
@@ -273,7 +279,7 @@ export function FeedbackPanel({
 
       <details className="history-details">
         <summary>Exportar o compartir la retroalimentación</summary>
-        <EmailShare report={report} caseItem={caseItem} history={visibleHistory} />
+        <EmailShare report={report} caseItem={caseItem} history={history} />
       </details>
 
       <div className="action-row">
