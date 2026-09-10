@@ -5013,3 +5013,11 @@ button.dashboard-metric-card:hover {
 .availability-block-row input { width: 100%; min-width: 0; padding: 8px; border: 1px solid #bdceca; border-radius: 8px; font: inherit; }
 
 .closure-editable-fields { display: contents; border: 0; padding: 0; margin: 0; min-width: 0; }
+.feedback-mediation { margin-block: 1.5rem; }
+.feedback-mediation fieldset { min-width: 0; margin: 0; padding: 0; border: 0; display: grid; gap: .8rem; }
+.feedback-mediation label { font-size: 1rem; font-weight: 650; }
+.feedback-mediation select, .feedback-mediation textarea { width: 100%; min-width: 0; font: inherit; font-size: 1rem; line-height: 1.5; }
+.feedback-mediation p { font-size: 1rem; line-height: 1.6; overflow-wrap: anywhere; }
+.mediation-exchange { border-left: 3px solid currentColor; padding-left: 1rem; }
+.mediation-result { margin-block: 1.5rem; padding-block: 1rem; border-block: 1px solid #b8c6ce; }
+.feedback-mediation > .secondary-action { margin-top: 1rem; }

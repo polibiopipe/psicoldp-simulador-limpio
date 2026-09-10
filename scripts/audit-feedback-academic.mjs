@@ -116,6 +116,10 @@ check("El incidente tardío aparece como prioridad y en la exportación", () => 
   const f = buildSessionFeedback({ conversation: history });
   assert.equal(f.priorityActions[0].index, 9);
   assert.ok(buildResultsText({ history, report, caseItem }).includes(history[8].question));
+  const exported = buildResultsText({ history: [{ isSessionPrelude: true, answer: "No quiero hablar de mi familia." }, ...history], report, caseItem });
+  assert.ok(exported.includes("Contexto anterior: No quiero hablar de mi familia."));
+  assert.ok(exported.includes("Para reflexionar: Turno 9:"));
+  assert.doesNotMatch(exported, /Estudiante: undefined/);
 });
 const temp = await mkdtemp(resolve(".audit-academic-"));
 try {

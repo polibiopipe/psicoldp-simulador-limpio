@@ -10,6 +10,7 @@ import {
 } from "./engine/sessionMemory.js";
 import {
   buildSessionHistoryRecord,
+  restoreSessionConversation,
   getLatestInProgressSessionForCase,
   getSessionHistoryForUser,
   saveSessionHistory,
@@ -131,6 +132,7 @@ export default function App() {
   const navigationSavingRef = useRef(false);
   const openingPracticeRef = useRef(false);
   const closureDraftRef = useRef(null);
+  const mediationDraftRef = useRef(null);
   const [interviewBusy, setInterviewBusy] = useState(false);
   const [navigationSaving, setNavigationSaving] = useState(false);
   const [openingPractice, setOpeningPractice] = useState(false);
@@ -140,6 +142,11 @@ export default function App() {
     setInterviewBusy(busy);
   }, [authSession?.user?.id]);
   const captureClosureDraft = useCallback((draft) => { closureDraftRef.current = draft; }, []);
+  const captureMediationDraft = useCallback((draft) => {
+    mediationDraftRef.current = { sessionRecordId: activeSessionRecordId, draft };
+    setClosureSaveState("open");
+    setSaveStatus(null);
+  }, [activeSessionRecordId]);
 
   const selectedCase = cases.find((caseItem) => caseItem.id === selectedCaseId) || cases[0];
   const report = useMemo(() => buildEducationalReport(history, selectedCase), [history, selectedCase]);
@@ -153,6 +160,7 @@ export default function App() {
   );
 
   function updateActiveSessionRecordId(nextId = "", record = null) {
+    if (activeSessionRecordIdRef.current !== nextId) mediationDraftRef.current = null;
     activeSessionRecordIdRef.current = nextId;
     setActiveSessionRecordId(nextId);
     setActiveSessionRecordSnapshot((current) => {
@@ -633,7 +641,7 @@ export default function App() {
     updateActiveAppointmentId(reusableAppointment?.id || "", reusableAppointment);
     setHistory(
       resumeRecord?.conversationHistory?.length
-        ? resumeRecord.conversationHistory
+        ? restoreSessionConversation(resumeRecord)
         : session > 1
           ? [createSessionPrelude(selectedCase, session, summary, sessionTotal)]
           : []
@@ -702,7 +710,7 @@ export default function App() {
     setSessionSummaries(summaries);
     setSessionSummary(previousSummary);
     setPreSessionPlan(nextPlan);
-    setHistory(resumeRecord.conversationHistory || []);
+    setHistory(restoreSessionConversation(resumeRecord));
     updateActiveSessionRecordId(resumeRecord.id, resumeRecord);
     updateActiveAppointmentId(
       resumeAppointment?.id ||
@@ -1108,6 +1116,8 @@ export default function App() {
         clinicalArtifacts,
         clinicalDecision,
         clinicalPlanEvaluation,
+        feedbackPractice: mediationDraftRef.current?.sessionRecordId === activeSessionRecordId
+          ? mediationDraftRef.current.draft : activeSessionRecordSnapshot?.feedback?.feedbackPractice || null,
         status
       });
       const saveResult = await saveSessionHistory(sessionRecord, { userId: authSession?.user?.id || "local" });
@@ -1518,7 +1528,14 @@ export default function App() {
             sessionNumber={sessionNumber}
             feedbackProps={{
               onBackToInterview: () => requestExitFromResults(screens.simulation),
-              onSelectCase: () => requestExitFromResults(screens.select)
+              onSelectCase: () => requestExitFromResults(screens.select),
+              mediationProps: {
+                authSession,
+                sessionRecordId: activeSessionRecordId,
+                initialPractice: activeSessionRecordSnapshot?.feedback?.feedbackPractice,
+                onDraftChange: captureMediationDraft,
+                onSavePractice: saveClosurePendingSession
+              }
             }}
             closureProps={{
               totalSessions: sessionTotal,
@@ -1622,7 +1639,7 @@ function resolveInitialHistoryForSession({
   resumeRecord
 }) {
   if (nextScreen === screens.simulation && resumeRecord?.conversationHistory?.length) {
-    return resumeRecord.conversationHistory;
+    return restoreSessionConversation(resumeRecord);
   }
   if (nextScreen === screens.simulation && safeSession > 1) {
     return [createSessionPrelude(nextCase, safeSession, previousSummary, processTotal)];

@@ -1,13 +1,24 @@
+import { analyzeConversationEvidence } from "../engine/sessionFeedback.js";
+
 export function buildResultsText({ report, caseItem, history }) {
   const date = new Date().toLocaleString("es-CL");
   const achieved = report.criteria
     .map((criterion) => `- ${criterion.title}: ${criterion.levelLabel}`)
     .join("\n");
   const improvements = report.improvements.map((item) => `- ${item}`).join("\n");
+  const opening = history.filter(entry => entry.isSessionPrelude).map(entry => `${caseItem.name}: ${entry.answer}`).join("\n");
   const conversation = history
-    .filter((entry) => !entry.isPendingResponse)
+    .filter((entry) => !entry.isPendingResponse && !entry.isSessionPrelude)
     .map((entry, index) => `${index + 1}. Estudiante: ${entry.question}\n   ${caseItem.name}: ${entry.answer}`)
     .join("\n");
+  const evidence = analyzeConversationEvidence(history).map(action => [
+    `Turno ${action.index}: ${action.quote}`,
+    `Contexto anterior: ${action.previousPatientResponse || "Sin respuesta previa registrada"}`,
+    `Criterio: ${action.criterion}`, `Lectura formativa: ${action.formativeReading}`,
+    `Respuesta y límites: ${action.possibleEffect}`, `Sugerencia: ${action.suggestion}`,
+    `Para reflexionar: ${action.reflectionQuestion}`,
+    `Fuentes: ${action.sources.map(source => `${source.label} ${source.url}`).join("; ")}`
+  ].join("\n")).join("\n\n");
 
   return `Escucha Viva · Entrevista Psicológica Formativa - ${caseItem.name}
 Fecha: ${date}
@@ -35,6 +46,12 @@ ${report.closingMoments.map((item) => `- ${item}`).join("\n")}
 Fundamentos educativos:
 ${(report.academicReferences || []).map(source => `- ${source.label}. ${source.title}. ${source.url}`).join("\n") || "- Sin fuentes asociadas a intervenciones."}
 Versión de criterios: ${report.basisVersion || "Registro anterior a la versión académica"}.
+
+Detalle de los intercambios:
+${evidence || "- Sin intervenciones para revisar."}
+
+Contexto de apertura:
+${opening || "- Sin apertura previa registrada."}
 
 Conversación registrada:
 ${conversation || "- No hay conversación registrada."}

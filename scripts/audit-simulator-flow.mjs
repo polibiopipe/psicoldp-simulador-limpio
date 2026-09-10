@@ -20,7 +20,7 @@ const auth = { user: { id: 'flow-student', email: 'student@example.test' } };
 const accessDocument = { ...JSON.parse(await readFile(new URL('../docs/access-consent-1.0.json', import.meta.url), 'utf8')), is_current: true };
 let practiceReads = 0;
 let accessWrites = 0;
-const tables = { simulation_access_documents: [accessDocument], simulation_access_consents: [], user_profiles: [{ ...auth.user, approved: true }], simulation_sessions: [], simulation_appointments: [] };
+const tables = { simulator_access: [{ user_id: auth.user.id, simulator_id: 'escucha-viva', enabled: true }], simulation_access_documents: [accessDocument], simulation_access_consents: [], user_profiles: [{ ...auth.user, approved: true }], simulation_sessions: [], simulation_appointments: [] };
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.window = {
   scrollY: 0, addEventListener() {}, removeEventListener() {}, scrollTo() {},
@@ -84,6 +84,7 @@ try {
     export { SimulationChat } from './src/components/SimulationChat.jsx';
     export { SessionClosure } from './src/components/SessionClosure.jsx';
     export { SessionResults } from './src/components/SessionResults.jsx';
+    export { FeedbackMediation } from './src/components/FeedbackMediation.jsx';
     export { cases } from './src/data/cases.js'; export { buildClinicalAgendaItem } from './src/engine/clinicalAgenda.js'; export { saveSessionSummary } from './src/engine/sessionMemory.js';`, resolveDir: process.cwd() },
     outfile, bundle: true, platform: 'node', format: 'esm', define: { 'import.meta.env': '{}' }, external: ['react', 'react-dom', 'lucide-react'],
     plugins: [{ name: 'remote-boundaries', setup(b) {
@@ -99,6 +100,7 @@ try {
   assert.equal(ui.root.findAllByType(s.AuthenticatedLayout).length, 0, 'the workspace stays unmounted until affirmative acceptance');
   assert.equal(practiceReads, 0, 'practice history must not load behind the gate');
   assert.equal(accessWrites, 0, 'login alone does not imply acceptance');
+  assert.equal(ui.root.findAllByType('input').length, 3, 'the assigned account reaches all three consent declarations');
   assert.ok(ui.root.findAllByType('input').every((n) => n.props.checked === false));
   const submitConsent = () => ui.root.findByType('form').props.onSubmit({ preventDefault() {} });
   await act(async () => { await submitConsent(); });
@@ -173,6 +175,8 @@ try {
   const rationale = 'Falta delimitar el motivo y conocer sus apoyos cotidianos.';
   await act(async () => { justification().props.onChange({ target: { value: rationale } }); });
   await act(async () => { button('2. Revisar retroalimentación').props.onClick(); });
+  const practice = { turnIndex: 1, quote: '¿Qué te trae por acá?', reflection: 'Buscaba conocer qué le preocupa. La respuesta menciona postergación.', rewrite: '¿En qué momento de esta semana te costó decidir?', result: null };
+  await act(async () => { ui.root.findByType(s.FeedbackMediation).props.onDraftChange(practice); });
   await act(async () => { button('1. Registrar cierre').props.onClick(); });
   assert.equal(justification().props.value, rationale, 'consultar feedback conserva el cierre sin remontarlo');
   await act(async () => { await ui.root.findByType(s.AuthenticatedLayout).props.onNavigate('home'); });
@@ -181,9 +185,13 @@ try {
   assert.equal(tables.simulation_sessions[0].status, 'closure_pending');
   assert.equal(tables.simulation_sessions[0].feedback.preSessionPlan.evaluationObjective, preparationObjective, 'retomar conserva la preparación original');
   assert.equal(tables.simulation_sessions[0].feedback.clinicalDecision.justification, rationale, 'salir pendiente incluye los campos actuales en la nube');
+  assert.deepEqual(tables.simulation_sessions[0].feedback.feedbackPractice, practice, 'la reflexión se guarda con el cierre, separada de la entrevista');
+  assert.equal(tables.simulation_sessions[0].score, null, 'la apertura del avatar no se guarda como nota del estudiante');
   cache.clear(); // simulate another device, with no local draft available
   await act(async () => { await home().props.onStartSession('claudio', 1); });
   assert.equal(justification().props.value, rationale, 'el cierre pendiente se recupera desde el registro remoto');
+  assert.deepEqual(ui.root.findByType(s.FeedbackMediation).props.initialPractice, practice, 'el ejercicio se recupera al cambiar de dispositivo');
+  assert.equal(ui.root.findByType(s.SessionResults).props.history.length, 1, 'la reflexión no agrega intervenciones al paciente');
   await act(async () => { await button('Registrar continuidad').props.onClick(); });
   assert.equal(tables.simulation_sessions[0].status, 'completed');
   assert.equal(tables.simulation_sessions[0].id, sessionId, 'se cierra la misma sesión que se inició');
@@ -205,8 +213,9 @@ try {
   assert.equal(ui.root.findAllByType(s.AuthenticatedLayout).length, 0, 'a new version requires a new explicit acceptance');
   assert.ok(ui.root.findAllByType('input').every((n) => n.props.checked === false));
   accessDocument.version = '1.0';
-  await act(async () => { ui.unmount(); auth.user = { id: 'second-student', email: 'second@example.invalid' }; tables.user_profiles.push({ ...auth.user, approved: true }); ui = TestRenderer.create(React.createElement(s.App)); await flush(); });
+  await act(async () => { ui.unmount(); auth.user = { id: 'second-student', email: 'second@example.invalid' }; tables.user_profiles.push({ ...auth.user, approved: true }); tables.simulator_access.push({ user_id: auth.user.id, simulator_id: 'escucha-viva', enabled: true }); ui = TestRenderer.create(React.createElement(s.App)); await flush(); });
   assert.equal(ui.root.findAllByType(s.AuthenticatedLayout).length, 0, 'one account cannot reuse another account acceptance');
+  assert.equal(ui.root.findAllByType('input').length, 3, 'la segunda cuenta también llega al consentimiento pendiente');
   console.log('PASS: mandatory gate, unchecked declarations, failed writes, double clicks, account/version isolation and flujo de preparación, envío, guardado fallido, salida, reanudación, cierre pendiente, cambio de dispositivo y cierre definitivo.');
 } finally {
   if (ui) await act(async () => { ui.unmount(); });

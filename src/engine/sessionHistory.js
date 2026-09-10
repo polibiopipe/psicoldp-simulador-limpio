@@ -7,6 +7,12 @@ import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 const HISTORY_STORAGE_KEY = "simuladorClinicoLdp.sessionHistory.v1";
 const LOCAL_STUDENT_ID = "local-browser-student";
 
+export function restoreSessionConversation(record) {
+  const conversation = record?.conversationHistory || [];
+  return conversation.some(entry => entry?.isSessionPrelude)
+    ? conversation : [...(record?.feedback?.sessionPrelude || []), ...conversation];
+}
+
 export function buildSessionHistoryRecord({
   id = "",
   caseItem,
@@ -18,6 +24,7 @@ export function buildSessionHistoryRecord({
   clinicalArtifacts = null,
   clinicalDecision = null,
   clinicalPlanEvaluation = null,
+  feedbackPractice = null,
   appointmentId = "",
   startedAt = "",
   endsAt = "",
@@ -110,6 +117,8 @@ export function buildSessionHistoryRecord({
       sessionMetrics
     },
     feedback: {
+      feedbackPractice,
+      sessionPrelude: history.filter(entry => entry?.isSessionPrelude).map(entry => ({ isSessionPrelude: true, answer: entry.answer || "" })),
       generalScore: report.generalScore,
       sessionFeedback,
       strengths: report.strengths,
@@ -275,7 +284,7 @@ function mapRecordToSupabasePayload(record, user) {
     appointment_id: record.appointmentId || null,
     conversation: record.conversationHistory,
     feedback: feedbackPayload,
-    score: Math.round(record.feedback?.generalScore ?? record.patientOpenness?.final ?? 0),
+    score: Number.isFinite(record.feedback?.generalScore) ? Math.round(record.feedback.generalScore) : null,
     status: record.status || "completed",
     started_at: record.startedAt || null,
     ends_at: record.endsAt || null,

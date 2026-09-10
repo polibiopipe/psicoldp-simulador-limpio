@@ -2,6 +2,7 @@ import React from "react";
 import { ArrowRight } from "lucide-react";
 import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 import { EmailShare } from "./EmailShare.jsx";
+import { FeedbackMediation } from "./FeedbackMediation.jsx";
 
 export function FeedbackPanel({
   report,
@@ -10,7 +11,8 @@ export function FeedbackPanel({
   sessionNumber = 1,
   onBackToInterview,
   onReviewClosure,
-  onSelectCase
+  onSelectCase,
+  mediationProps = {}
 }) {
   const visibleHistory = history.filter((entry) => !entry.isSessionPrelude);
   const isNotEvaluable = report.evaluationStatus === "not_evaluable";
@@ -260,6 +262,8 @@ export function FeedbackPanel({
         )}
       </details>
 
+      <FeedbackMediation key={mediationProps.sessionRecordId || `${caseItem.id}-${sessionNumber}`} actions={observedActions} {...mediationProps} />
+
       <details className="history-details">
         <summary>Ver conversación completa ({visibleHistory.length})</summary>
         <ol>
@@ -275,7 +279,7 @@ export function FeedbackPanel({
 
       <details className="history-details">
         <summary>Exportar o compartir la retroalimentación</summary>
-        <EmailShare report={report} caseItem={caseItem} history={visibleHistory} />
+        <EmailShare report={report} caseItem={caseItem} history={history} />
       </details>
 
       <div className="action-row">
