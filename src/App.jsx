@@ -23,9 +23,7 @@ import {
   findReusableAppointmentForSession,
   getSimulationAppointmentById,
   getSimulationAppointments,
-  isAppointmentExpired,
-  saveSimulationAppointment,
-  startAppointmentForPractice
+  isAppointmentExpired
 } from "./engine/simulationAppointments.js";
 import {
   SESSION_DURATION_MINUTES,
@@ -837,7 +835,7 @@ export default function App() {
     const createdAt = new Date().toISOString();
     const sessionRecordId = getOrCreateActiveSessionRecordId();
     const currentAuthSession = await getFreshAuthSessionForSimulation();
-    const appointment = await ensureActiveAppointmentForCurrentSession(currentAuthSession);
+    let appointment = await ensureActiveAppointmentForCurrentSession(currentAuthSession);
     let response = null;
     try {
       response = await createPatientResponse({
@@ -862,6 +860,13 @@ export default function App() {
         setConnectionNotice("Tu sesion de acceso expiro. Inicia sesion nuevamente para continuar esta practica.");
       }
       throw error;
+    }
+    if (response?.appointmentTiming?.id === appointment?.id) {
+      appointment = { ...appointment, ...response.appointmentTiming };
+      if (authIdentityRef.current === currentAuthSession?.user?.id) {
+        updateActiveAppointmentId(appointment.id, appointment);
+        setAppointmentRecords((current) => mergeAppointmentRecordList(current, appointment));
+      }
     }
     const responseText = String(response?.text || "").trim();
     if (!responseText) {
@@ -952,27 +957,12 @@ export default function App() {
   }
 
   async function activateAppointmentForPractice(appointment, currentAuthSession = authSession) {
-    const nextAppointment = startAppointmentForPractice(appointment);
-    if (!nextAppointment) return null;
-
-    const mustPersist =
-      appointment.status !== nextAppointment.status ||
-      appointment.startedAt !== nextAppointment.startedAt ||
-      appointment.endsAt !== nextAppointment.endsAt;
-
-    if (!mustPersist) {
-      updateActiveAppointmentId(nextAppointment.id, nextAppointment);
-      return nextAppointment;
-    }
-
-    const result = await saveSimulationAppointment(currentAuthSession, nextAppointment);
-    if (!result.cloudSaved || !result.data) {
-      throw new Error(result.error?.message || result.error || "No pudimos confirmar el inicio de la cita. Reintenta desde la agenda.");
-    }
-    const savedAppointment = result.data;
-    updateActiveAppointmentId(savedAppointment.id, savedAppointment);
-    setAppointmentRecords((current) => mergeAppointmentRecordList(current, savedAppointment));
-    return savedAppointment;
+    if (!appointment || !["scheduled", "in_progress"].includes(appointment.status) || isAppointmentExpired(appointment)) return null;
+    // The authenticated response API owns the clock. The browser only carries
+    // the confirmed reservation until a first response starts it on the server.
+    if (authIdentityRef.current !== currentAuthSession?.user?.id) return null;
+    updateActiveAppointmentId(appointment.id, appointment);
+    return appointment;
   }
 
   async function ensureActiveAppointmentForCurrentSession(currentAuthSession = authSession) {

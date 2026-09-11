@@ -96,6 +96,7 @@ export async function createPatientResponse({
       ...localMetadata,
       text: geminiResponse.text,
       directAnswer: geminiResponse.text,
+      appointmentTiming: geminiResponse.appointmentTiming || null,
       responseId: geminiResponse.source === "gemini"
         ? `gemini-${caseItem.id}-${Date.now()}`
         : localMetadata.responseId,

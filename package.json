@@ -32,7 +32,8 @@
     "audit:access-consent": "node scripts/audit-access-consent.mjs",
     "audit:feedback-academic": "node scripts/audit-feedback-academic.mjs",
     "audit:feedback-mediation": "node scripts/audit-feedback-mediation.mjs",
-    "prebuild": "node --test scripts/claudio-voice-pilot.test.mjs"
+    "prebuild": "node --test scripts/claudio-voice-pilot.test.mjs && npm run audit:appointment-server-start",
+    "audit:appointment-server-start": "node scripts/audit-appointment-server-start.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",

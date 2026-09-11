@@ -27,3 +27,35 @@ proyecto. `npm run audit:agenda` verifica persistencia y citas rechazadas.
 `npm run audit:simulator-flow` comprueba el recorrido y la continuidad.
 
 La prueba con micrófono y altavoces reales requiere el equipo del usuario.
+
+## Inicio de la sesión
+
+El navegador envía una reserva confirmada. La API autenticada valida usuario,
+aprobación, consentimiento, cita y sesión. Solo después de obtener una primera
+respuesta válida, el servidor fija `started_at` y `ends_at` mediante una
+actualización condicional. Los reintentos conservan la hora ya confirmada.
+El cliente recibe esos tiempos junto con la respuesta y los usa al guardar.
+
+`node scripts/audit-appointment-server-start.mjs` ejecuta la API con límites
+de autenticación y persistencia simulados: primera respuesta, fallos, permisos,
+propiedad, vencimiento y carreras. La prueba transaccional en la base real fue
+bloqueada por revisión automática y no se ejecutó. No se modificó su esquema.
+
+## Realismo pendiente
+
+La foto fija y SpeechSynthesis no satisfacen el objetivo de videollamada realista.
+No se ha conectado un motor de vídeo ni una voz neuronal nueva.
+
+Una alternativa para evaluar es MuseTalk 1.5 para animación desde foto/audio y
+Kokoro para voz española. MuseTalk declara inferencia de más de 30 fps en una
+NVIDIA Tesla V100; su ejemplo de una RTX 3050 Ti de 4 GB tarda unos cinco minutos
+en generar ocho segundos. No basta con comprobar que exista cualquier GPU.
+El propio proyecto advierte limitaciones de preservación de bigote y labios.
+Se necesita validar identidad, latencia y calidad con Claudio antes de integrar.
+
+- https://github.com/TMElyralab/MuseTalk
+- https://github.com/hexgrad/kokoro
+- https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md
+
+No se ha contratado infraestructura. El siguiente dato necesario es el modelo
+de GPU disponible, para evaluar una prueba local sin pagar un servidor externo.

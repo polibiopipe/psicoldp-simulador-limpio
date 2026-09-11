@@ -12,7 +12,8 @@ import {
   MAX_STUDENT_TURNS,
   countCompletedStudentTurns,
   getRemainingSessionTime,
-  getSimulationUsagePolicy
+  getSimulationUsagePolicy,
+  getZonedDateKey
 } from "../src/engine/simulationUsagePolicy.js";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
@@ -66,6 +67,7 @@ export default async function handler(req, res) {
       provider: "vercel",
       function: "gemini-patient-response",
       hasGeminiKey: Boolean(apiKey),
+      hasUsageConfiguration: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
       model
     });
     return;
@@ -161,7 +163,7 @@ export default async function handler(req, res) {
       );
       return;
     }
-    sendJson(res, 200, fallback);
+    sendJson(res, 200, { ...fallback, appointmentTiming: appointmentTiming(usageValidation.appointment) });
   };
 
   if (!apiKey) {
@@ -314,6 +316,7 @@ export default async function handler(req, res) {
         return;
       }
       sendJson(res, 200, {
+        appointmentTiming: appointmentTiming(usageValidation.appointment),
         text: retryResponseText,
         responseText: retryResponseText,
         source: "gemini",
@@ -348,6 +351,7 @@ export default async function handler(req, res) {
     return;
   }
   sendJson(res, 200, {
+    appointmentTiming: appointmentTiming(usageValidation.appointment),
     text: responseText,
     responseText,
     source: "gemini",
@@ -445,10 +449,13 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
   if (Number(appointment.session_number) !== sessionNumber) {
     return usageError("APPOINTMENT_SESSION_MISMATCH", "La cita no corresponde al numero de sesion actual.", 409);
   }
-  if (!["in_progress"].includes(appointment.status)) {
+  if (!["scheduled", "in_progress"].includes(appointment.status)) {
     return usageError("APPOINTMENT_NOT_ACTIVE", "La cita no esta activa para continuar la entrevista.", 409);
   }
-  if (!appointment.started_at) {
+  if (appointment.status === "scheduled" && appointment.scheduled_local_date !== getZonedDateKey(new Date()) && !getSimulationUsagePolicy({ role: profile.role }).hasBypass) {
+    return usageError("APPOINTMENT_NOT_TODAY", "Esta cita está programada para otro día. Revisa tu agenda.", 409);
+  }
+  if (appointment.status === "in_progress" && !appointment.started_at) {
     return usageError("APPOINTMENT_NOT_STARTED", "La cita guardada no tiene una hora de inicio valida.", 409);
   }
 
@@ -526,7 +533,43 @@ async function validateUsageBeforeGemini({ req, payload, caseId }) {
 }
 
 async function completeReservedIntervention(validation, responseText, responseSource = "gemini") {
+  if (!responseText?.trim()) return usageError("PATIENT_RESPONSE_UNAVAILABLE", "La respuesta llegó vacía. Reintenta tu intervención.", 502, true);
+  let appointment = validation.appointment;
+  if (appointment.status === "scheduled") {
+    // Only the server can set these fields. Conditional update makes the first
+    // successful answer idempotent, without restarting the clock in another tab.
+    const startedAt = new Date();
+    const endsAt = new Date(startedAt.getTime() + Number(appointment.duration_minutes) * 60000);
+    try {
+      const { data, error } = await validation.serviceClient.from("simulation_appointments")
+        .update({ status: "in_progress", started_at: startedAt.toISOString(), ends_at: endsAt.toISOString() })
+        .eq("id", appointment.id).eq("user_id", validation.user.id).eq("status", "scheduled")
+        .is("started_at", null).select("*").maybeSingle();
+      if (error) return usageError("APPOINTMENT_START_FAILED", "No pudimos confirmar el inicio de la sesión. Reintenta tu intervención.", 503, true);
+      if (data) appointment = data;
+      else {
+        const latest = await validation.serviceClient.from("simulation_appointments").select("*")
+          .eq("id", appointment.id).eq("user_id", validation.user.id).maybeSingle();
+        if (latest.error || !latest.data) return usageError("APPOINTMENT_START_FAILED", "No pudimos confirmar la cita. Reintenta desde la agenda.", 503, true);
+        appointment = latest.data;
+      }
+    } catch {
+      return usageError("APPOINTMENT_START_FAILED", "No pudimos confirmar el inicio de la sesión. Reintenta tu intervención.", 503, true);
+    }
+  }
+  if (appointment.status !== "in_progress" || !appointment.started_at) {
+    return usageError("APPOINTMENT_NOT_ACTIVE", "La cita cambió mientras se preparaba la respuesta. Revisa la agenda.", 409);
+  }
+  if (getRemainingSessionTime({ startedAt: appointment.started_at, durationMinutes: appointment.duration_minutes }) <= 0) {
+    return usageError("SESSION_TIME_EXPIRED", "El tiempo de entrevista ha finalizado. Continúa con el cierre.", 409);
+  }
+  validation.appointment = appointment;
   return { ok: true };
+}
+
+function appointmentTiming(appointment) {
+  return { id: appointment.id, status: appointment.status, startedAt: appointment.started_at,
+    endsAt: appointment.ends_at, durationMinutes: appointment.duration_minutes };
 }
 
 async function releaseReservedIntervention(validation) {

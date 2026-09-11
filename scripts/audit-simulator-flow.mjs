@@ -31,7 +31,18 @@ globalThis.window = {
 };
 globalThis.document = { documentElement: { scrollTop: 0 }, body: { scrollTop: 0 }, addEventListener() {}, removeEventListener() {} };
 globalThis.localStorage = { getItem: (key) => cache.get(key) || null, setItem: (key, value) => cache.set(key, value), removeItem: (key) => cache.delete(key) };
-globalThis.__flowResponse = () => { responseCalls++; return new Promise((resolve) => { responseResolve = resolve; }); };
+globalThis.__flowResponse = (request) => { responseCalls++; return new Promise((resolve) => {
+  responseResolve = (value) => {
+    const appointment = tables.simulation_appointments.find((row) => row.id === request.appointmentId);
+    if (appointment && appointment.status === 'scheduled') {
+      appointment.status = 'in_progress';
+      appointment.started_at = new Date().toISOString();
+      appointment.ends_at = new Date(Date.now() + 45 * 60000).toISOString();
+    }
+    resolve({ ...value, appointmentTiming: appointment && { id: appointment.id, status: appointment.status,
+      startedAt: appointment.started_at, endsAt: appointment.ends_at, durationMinutes: appointment.duration_minutes } });
+  };
+}); };
 globalThis.__flowSupabase = {
   auth: {
     getSession: async () => ({ data: { session: auth }, error: null }),
@@ -64,6 +75,10 @@ globalThis.__flowSupabase = {
         if (["simulation_sessions", "simulation_appointments"].includes(table) && !payload) practiceReads++;
         if (payload && (writeFailure || (appointmentFailure && table === 'simulation_appointments'))) {
           return Promise.resolve({ data: null, error: { message: 'offline' } }).then(yes, no);
+        }
+        if (payload && table === 'simulation_appointments') {
+          assert.equal(payload.status, 'scheduled', 'el navegador no activa citas');
+          assert.ok(!payload.started_at && !payload.ends_at, 'el navegador no escribe el reloj del servidor');
         }
         if (payload) tables[table] = [payload, ...(tables[table] || []).filter((r) => r.id !== payload.id)];
         const rows = payload ? [payload] : (tables[table] || []).filter((r) => filters.every((fn) => fn(r))).slice(0, max);
