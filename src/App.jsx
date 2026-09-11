@@ -1410,6 +1410,13 @@ export default function App() {
 
       {screen === screens.home && <ResearchInvitation key={userId || "local"} userId={userId} onOpen={openTrustCenter} />}
 
+      {screen === screens.home && new URLSearchParams(window.location.search).get("piloto") === "claudio" && (
+        <section className="connection-status-banner" aria-label="Acceso al piloto con Claudio">
+          <div><strong>Piloto con Claudio · Voz y avatar 3D</strong><p>Prepara la sesión de Claudio y activa su voz al entrar a la entrevista.</p></div>
+          <button className="secondary-action" type="button" onClick={() => openCaseFromAgenda("claudio", 1, screens.brief)} disabled={openingPractice || navigationSaving}>Preparar piloto con Claudio</button>
+        </section>
+      )}
+
       {screen === screens.home && (
         <ClinicalDashboard
           cases={cases}

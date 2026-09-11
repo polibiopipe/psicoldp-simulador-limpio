@@ -31,7 +31,8 @@
     "audit:research-consent": "node scripts/audit-research-consent.mjs",
     "audit:access-consent": "node scripts/audit-access-consent.mjs",
     "audit:feedback-academic": "node scripts/audit-feedback-academic.mjs",
-    "audit:feedback-mediation": "node scripts/audit-feedback-mediation.mjs"
+    "audit:feedback-mediation": "node scripts/audit-feedback-mediation.mjs",
+    "prebuild": "node --test scripts/claudio-voice-pilot.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",
@@ -39,7 +40,9 @@
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "@met4citizen/talkinghead": "1.7.0",
+    "three": "0.180.0"
   },
   "devDependencies": {
     "react-test-renderer": "19.2.6"

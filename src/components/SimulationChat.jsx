@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { MonitorPlay, Send, ShieldCheck, SquareCheckBig, TriangleAlert, Users } from "lucide-react";
 import { PatientCard } from "./PatientCard.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { SessionSelector } from "./SessionSelector.jsx";
 import { VoiceDictationButton } from "./VoiceDictationButton.jsx";
 import { AvatarSessionView } from "./AvatarSessionView.jsx";
+const ClaudioTalkingAvatar = lazy(() => import("./ClaudioTalkingAvatar.jsx"));
 import { PedagogicalGuide } from "./PedagogicalGuide.jsx";
 import {
   getStageSuggestions,
@@ -37,7 +38,8 @@ export function SimulationChat({
   const [question, setQuestion] = useState("");
   const [selectedInterventionType, setSelectedInterventionType] = useState("");
   const [showStageSuggestions, setShowStageSuggestions] = useState(false);
-  const [showVideoSession, setShowVideoSession] = useState(false);
+  const claudioPilot = caseItem.id === "claudio" && new URLSearchParams(window.location.search).get("piloto") === "claudio";
+  const [showVideoSession, setShowVideoSession] = useState(claudioPilot);
   const [avatarState, setAvatarState] = useState("idle");
   const [validationFeedback, setValidationFeedback] = useState("");
   const [canRetryLastMessage, setCanRetryLastMessage] = useState(false);
@@ -309,7 +311,7 @@ export function SimulationChat({
               onClick={() => setShowVideoSession((current) => !current)}
             >
               <MonitorPlay aria-hidden="true" />
-              {showVideoSession ? "Ocultar vista" : "Vista simulada"}
+              {showVideoSession ? "Ocultar vista" : claudioPilot ? "Piloto con Claudio" : "Vista simulada"}
             </button>
             <button className="secondary-action" type="button" onClick={onChangeCase} disabled={avatarState === "thinking" || avatarState === "closed"}>
               <Users aria-hidden="true" />
@@ -344,7 +346,18 @@ export function SimulationChat({
         />
 
         <div className={`interview-experience${showVideoSession ? " with-video" : " chat-only"}`}>
-          {showVideoSession && (
+          {showVideoSession && claudioPilot ? (
+            <Suspense fallback={<p role="status">Preparando el piloto con Claudio…</p>}>
+              <ClaudioTalkingAvatar
+                caseItem={caseItem}
+                history={visibleHistory}
+                avatarState={avatarState}
+                disabled={usageBlocked || avatarState === "thinking" || avatarState === "closed"}
+                onVoiceIntervention={(text) => { setQuestion(text); attemptSendQuestion(text); }}
+                onFinish={finishSimulation}
+              />
+            </Suspense>
+          ) : showVideoSession && (
             <AvatarSessionView
               avatarState={avatarState}
               caseItem={caseItem}
