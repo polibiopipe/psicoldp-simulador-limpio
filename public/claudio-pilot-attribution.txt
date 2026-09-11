@@ -1,22 +1,5 @@
-Escucha Viva — Piloto no comercial de voz y avatar con Claudio
+Piloto de conversación con Claudio
 
-La figura 3D provisional no es el retrato definitivo de Claudio.
-TalkingHead 1.7.0 — Mika Suominen — MIT License.
-https://github.com/met4citizen/TalkingHead
-Three.js 0.180.0 — Three.js authors — MIT License.
-https://github.com/mrdoob/three.js
-
-Figura de prueba: avatars/avatarsdk.glb, creada con AvatarSDK y publicada
-como ejemplo para uso no comercial en TalkingHead.
-Referencia fijada: eed58d198076a7e1e825f804802921c4d3804d46.
-Se carga desde el repositorio original; no se redistribuye en este repositorio.
-https://github.com/met4citizen/TalkingHead/tree/eed58d198076a7e1e825f804802921c4d3804d46
-https://avatarsdk.com
-
-El modelo de ejemplo debe sustituirse por una figura con derechos adecuados
-antes de una oferta comercial del avatar. La licencia MIT del código no
-reemplaza los términos específicos de los modelos 3D.
-
-Sincronización: aproximación fonética española, reajustada por eventos de
-palabra de la voz del navegador cuando están disponibles. No hay análisis
-del audio emitido. La calidad y las voces dependen del dispositivo.
+Esta revisión muestra únicamente el retrato original incluido en Escucha Viva.
+El modelo genérico AvatarSDK usado en la primera prueba fue retirado.
+La voz y el dictado utilizan las capacidades del navegador.

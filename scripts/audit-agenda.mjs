@@ -126,6 +126,14 @@ try {
   failure = { code: "NETWORK_ERROR", message: "offline" };
   assert.equal((await service.saveScheduledAppointment(auth, appointment)).cloudSaved, false);
   assert.equal(row, null, "una escritura rechazada no crea citas");
+  const sessionRequest = { authSession: auth, caseItem, sessionNumber: 2, scheduledDate: draft.date, scheduledTime: draft.time };
+  const rejectedDraft = await service.ensureAppointmentForSession(sessionRequest);
+  assert.equal(rejectedDraft.appointment, null, "una cita rechazada nunca se entrega para iniciar la entrevista");
+  assert.equal(rejectedDraft.created, false);
+  failure = { code: "23505", message: "duplicate key" };
+  const duplicate = await service.ensureAppointmentForSession(sessionRequest);
+  assert.equal(duplicate.appointment, null, "un conflicto no devuelve un borrador para volver a insertarlo");
+  assert.equal(duplicate.result.error.code, "23505");
   failure = null;
   assert.equal((await service.saveScheduledAppointment(auth, appointment)).cloudSaved, true);
   assert.equal(row.scheduled_for, "2026-09-09T13:00:00.000Z");

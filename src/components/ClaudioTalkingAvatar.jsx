@@ -1,18 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Mic, PhoneOff, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
-import { BrowserAvatarVoice, preferredSpanishVoice, VISEMES } from "../engine/browserAvatarVoice.js";
+import { BrowserAvatarVoice, preferredSpanishVoice } from "../engine/browserAvatarVoice.js";
 import "./claudio-pilot.css";
 
-const MODEL_URL = "https://raw.githubusercontent.com/met4citizen/TalkingHead/eed58d198076a7e1e825f804802921c4d3804d46/avatars/avatarsdk.glb";
-const LABELS = { loading: "Preparando avatar", idle: "Listo para conversar", listening: "Te escucho", thinking: "Preparando respuesta", speaking: "Claudio está hablando", closed: "Sesión finalizada" };
+const LABELS = { idle: "Listo para conversar", listening: "Te escucho", thinking: "Preparando respuesta", speaking: "Claudio está hablando", closed: "Sesión finalizada" };
 export default function ClaudioTalkingAvatar({ caseItem, history, avatarState, disabled, onVoiceIntervention, onFinish }) {
-  const stageRef = useRef(null), headRef = useRef(null), voiceRef = useRef(null);
+  const voiceRef = useRef(null);
   const propsRef = useRef({ onVoiceIntervention, disabled });
   propsRef.current = { onVoiceIntervention, disabled };
-  const [started, setStarted] = useState(false), [modelState, setModelState] = useState("idle");
+  const [started, setStarted] = useState(false);
   const [voiceState, setVoiceState] = useState("idle"), [error, setError] = useState(""), [interim, setInterim] = useState("");
   const [voices, setVoices] = useState([]), [voiceURI, setVoiceURI] = useState(""), [muted, setMuted] = useState(false);
-  const [loadAttempt, setLoadAttempt] = useState(0);
   const previousAnswerRef = useRef(history.at(-1)?.id);
   const lastAnswer = history.at(-1)?.answer || caseItem.openingLine;
   const currentVoice = voices.find((voice) => voice.voiceURI === voiceURI) || preferredSpanishVoice(voices);
@@ -38,54 +36,6 @@ export default function ClaudioTalkingAvatar({ caseItem, history, avatarState, d
   }, []);
 
   useEffect(() => {
-    if (!started) return undefined;
-    let cancelled = false, head, settled = false, disposed = false;
-    setModelState("loading");
-    const disposeHead = () => {
-      if (!head || disposed) return;
-      disposed = true; head.dispose();
-      void head.audioCtx?.close().catch(() => {});
-      if (headRef.current === head) headRef.current = null;
-    };
-    (async () => {
-      try {
-        const { TalkingHead } = await import("@met4citizen/talkinghead");
-        if (cancelled || !stageRef.current) return;
-        head = new TalkingHead(stageRef.current, {
-          ttsEndpoint: null, lipsyncModules: [], cameraView: "head",
-          cameraRotateEnable: false, cameraPanEnable: false, cameraZoomEnable: false,
-          modelFPS: 30, modelPixelRatio: Math.min(1, 1.5 / window.devicePixelRatio),
-          avatarMood: "neutral", avatarIdleHeadMove: 0.12, avatarSpeakingHeadMove: 0.22,
-          lightAmbientIntensity: 1.5, lightDirectIntensity: 12,
-          update: () => {
-            if (cancelled || !head?.mtAvatar) return;
-            const voice = voiceRef.current, frame = voice?.lipFrame() || { viseme: "sil", level: 0 };
-            head.isSpeaking = voice?.state === "speaking"; head.isListening = voice?.state === "listening";
-            for (const viseme of VISEMES) {
-              const morph = head.mtAvatar["viseme_" + viseme];
-              if (!morph) continue;
-              morph.realtime = viseme === frame.viseme ? frame.level : 0; morph.needsUpdate = true;
-            }
-          }
-        });
-        headRef.current = head;
-        await head.showAvatar({
-          url: MODEL_URL, body: "M", avatarMood: "neutral",
-          retarget: { Neck: { z: -0.01, rx: -0.15 }, Neck1: { z: -0.01, rx: -0.15 }, Neck2: { z: -0.01, rx: -0.15 },
-            LeftShoulder: { rz: -0.3 }, RightShoulder: { rz: 0.3 }, scaleToEyesLevel: 1, origin: { y: -0.1 } },
-          baseline: { headRotateX: -0.04, eyeBlinkLeft: 0.05, eyeBlinkRight: 0.05 }
-        });
-        if (cancelled) { disposeHead(); return; }
-        setModelState("ready");
-      } catch {
-        disposeHead(); if (cancelled) return;
-        setModelState("error"); setError("No se pudo cargar el avatar 3D. Puedes reintentar o seguir conversando con voz y texto.");
-      } finally { settled = true; if (cancelled) disposeHead(); }
-    })();
-    return () => { cancelled = true; if (settled) disposeHead(); else head?.stop(); };
-  }, [started, loadAttempt]);
-
-  useEffect(() => {
     if (avatarState === "thinking" || avatarState === "closed" || disabled) voiceRef.current?.stop();
   }, [avatarState, disabled]);
 
@@ -104,19 +54,17 @@ export default function ClaudioTalkingAvatar({ caseItem, history, avatarState, d
   }
   function toggleMuted() { voiceRef.current?.stop(); setMuted((value) => !value); }
   const status = avatarState === "thinking" || avatarState === "closed" ? avatarState
-    : voiceState !== "idle" ? voiceState : modelState === "loading" ? "loading" : "idle";
+    : voiceState !== "idle" ? voiceState : "idle";
 
   return (
     <section className="claudio-pilot" aria-label="Piloto de conversación con Claudio">
       <header className="claudio-pilot-header">
-        <span>Piloto · Voz y avatar 3D</span><span role="status">{started ? LABELS[status] : "Listo para probar"}</span>
+        <span>Conversación con Claudio</span><span role="status">{started ? LABELS[status] : "Listo para probar"}</span>
       </header>
       <div className="claudio-pilot-stage">
-        <div ref={stageRef} className="claudio-pilot-canvas" aria-label="Representación 3D de prueba" />
-        {modelState !== "ready" && <img className="claudio-pilot-portrait" src={caseItem.image} alt="Retrato de Claudio" />}
-        {!started && <div className="claudio-pilot-start"><button type="button" onClick={start} disabled={disabled}><Play aria-hidden="true" /> Activar voz y avatar</button></div>}
+        <img className="claudio-pilot-portrait" src={caseItem.image} alt="Claudio, el paciente de esta sesión" />
+        {!started && <div className="claudio-pilot-start"><button type="button" onClick={start} disabled={disabled}><Play aria-hidden="true" /> Activar conversación por voz</button></div>}
         <div className="claudio-pilot-caption"><strong>Claudio</strong><span>{caseItem.age} · Paciente ficticio</span></div>
-        {modelState === "loading" && <span className="claudio-pilot-loading">Cargando representación 3D…</span>}
       </div>
       {started && <>
         <div className="claudio-pilot-controls">
@@ -134,12 +82,11 @@ export default function ClaudioTalkingAvatar({ caseItem, history, avatarState, d
             <option value="">Selección automática</option>
             {voices.map((voice) => <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name} · {voice.lang}</option>)}
           </select></label>
-          <p>La figura 3D es provisional y no reproduce todavía el retrato de Claudio. El movimiento labial es aproximado y depende de la voz del navegador.</p>
+          <p>Esta versión conserva el retrato original de Claudio. Puedes conversar por voz; la imagen permanece fija.</p>
           <p>Tu cámara permanece apagada. El navegador puede procesar el dictado mediante su servicio de voz; este piloto no guarda archivos de audio.</p>
-          <a href="/claudio-pilot-attribution.txt" target="_blank" rel="noopener noreferrer">Créditos del modelo de prueba</a>
         </details>
       </>}
-      {error && <div className="claudio-pilot-error" role="alert"><p>{error}</p>{modelState === "error" && <button type="button" onClick={() => { setError(""); setLoadAttempt((value) => value + 1); }}>Reintentar avatar</button>}</div>}
+      {error && <div className="claudio-pilot-error" role="alert"><p>{error}</p></div>}
     </section>
   );
 }

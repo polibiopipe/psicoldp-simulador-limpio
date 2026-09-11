@@ -23,12 +23,13 @@ let accessWrites = 0;
 const tables = { simulator_access: [{ user_id: auth.user.id, simulator_id: 'escucha-viva', enabled: true }], simulation_access_documents: [accessDocument], simulation_access_consents: [], user_profiles: [{ ...auth.user, approved: true }], simulation_sessions: [], simulation_appointments: [] };
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.window = {
+  location: { search: '?piloto=claudio' },
   scrollY: 0, addEventListener() {}, removeEventListener() {}, scrollTo() {},
   requestAnimationFrame: (fn) => fn(),
   setTimeout(fn, ms) { const id = ++timerId; timers.set(id, { fn, ms }); return id; },
   clearTimeout(id) { timers.delete(id); }, setInterval() { return 0; }, clearInterval() {}
 };
-globalThis.document = { documentElement: { scrollTop: 0 }, body: { scrollTop: 0 } };
+globalThis.document = { documentElement: { scrollTop: 0 }, body: { scrollTop: 0 }, addEventListener() {}, removeEventListener() {} };
 globalThis.localStorage = { getItem: (key) => cache.get(key) || null, setItem: (key, value) => cache.set(key, value), removeItem: (key) => cache.delete(key) };
 globalThis.__flowResponse = () => { responseCalls++; return new Promise((resolve) => { responseResolve = resolve; }); };
 globalThis.__flowSupabase = {
@@ -131,7 +132,7 @@ try {
 
   // An appointment activation rejected by the server must never reach the patient service.
   appointmentFailure = true;
-  await act(async () => { await assert.rejects(chat().props.onAsk('¿Qué te trae por acá?'), /offline/); });
+  await act(async () => { await assert.rejects(chat().props.onAsk('¿Qué te trae por acá?'), /No se pudo preparar la cita/); });
   assert.equal(responseCalls, 0);
   appointmentFailure = false;
   // Drive the real composer, including its delayed request and double-click protection.
@@ -205,6 +206,22 @@ try {
   assert.equal(tables.simulation_sessions[0].status, 'completed', 'editar y salir no hace retroceder un cierre completado');
   assert.equal(tables.simulation_sessions[0].id, sessionId);
   const caseItem = s.cases.find((c) => c.id === 'claudio');
+  await act(async () => { await button('Preparar piloto con Claudio').props.onClick(); });
+  assert.equal(ui.root.findByType(s.CaseBrief).props.sessionNumber, 2, 'el piloto respeta el avance y no intenta repetir la sesión 1 completada');
+  assert.equal(tables.simulation_appointments.length, 1, 'preparar el piloto no duplica citas');
+  await act(async () => { await ui.root.findByType(s.CaseBrief).props.onBegin({}); await flush(); });
+  const portrait = () => ui.root.findByProps({ className: 'claudio-pilot-portrait' });
+  assert.equal(portrait().props.src, caseItem.image, 'el piloto muestra el retrato canónico de Claudio');
+  await act(async () => { button('Activar conversación por voz').props.onClick(); });
+  assert.equal(portrait().props.src, caseItem.image, 'activar voz no sustituye la identidad visual');
+  assert.equal(ui.root.findAllByType('canvas').length, 0, 'no se monta un modelo 3D ajeno');
+  await act(async () => { ui.unmount(); });
+  tables.simulation_sessions = [];
+  cache.clear();
+  await act(async () => { ui = TestRenderer.create(React.createElement(s.App)); await flush(); });
+  await act(async () => { await button('Preparar piloto con Claudio').props.onClick(); });
+  assert.equal(ui.root.findByType(s.CaseBrief).props.sessionNumber, 2, 'una cita completada sin resumen también impide repetir la sesión 1');
+  assert.equal(tables.simulation_appointments.length, 1, 'la recuperación no altera la cita histórica');
   s.saveSessionSummary({ caseId: 'claudio', sessionNumber: 1, simulatedDate: new Date().toISOString(), clinicalDecision: { action: 'close_or_refer', proposedSessions: 4 } }, auth.user.id);
   assert.equal(s.buildClinicalAgendaItem(caseItem).nextSessionNumber, null, 'cerrar antes de la cuarta sesión no propone otra entrevista');
   await act(async () => { ui.unmount(); });

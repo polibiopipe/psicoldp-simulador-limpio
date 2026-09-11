@@ -174,7 +174,11 @@ export async function ensureAppointmentForSession({
     status: "scheduled"
   });
   const result = await saveSimulationAppointment(authSession, appointment);
-  return { appointment: result.data || appointment, created: true, result };
+  // A rejected draft is not an appointment: never start it with another upsert.
+  if (!result.cloudSaved || !result.data) {
+    return { appointment: null, created: false, result };
+  }
+  return { appointment: result.data, created: true, result };
 }
 
 export function buildAppointmentRecord({

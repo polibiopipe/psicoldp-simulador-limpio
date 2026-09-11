@@ -546,6 +546,21 @@ export default function App() {
     const openingOwner = authIdentityRef.current;
     const summaries = getSessionSummariesForCase(caseId);
     const nextCase = cases.find((caseItem) => caseItem.id === caseId) || cases[0];
+    if (targetSession === "next") {
+      const verifiedAppointments = await refreshAppointments(authSession);
+      if (!verifiedAppointments || openingOwner !== authIdentityRef.current) return false;
+      const agendaItem = buildClinicalAgendaItem(nextCase);
+      const caseAppointments = verifiedAppointments.filter((item) => item.caseId === caseId && item.status !== "cancelled");
+      const pending = caseAppointments.filter((item) => item.status !== "completed")
+        .sort((a, b) => a.sessionNumber - b.sessionNumber)[0];
+      const resumable = findLatestResumableSessionRecord(sessionRecords, caseId);
+      const lastCompleted = Math.max(0, ...caseAppointments.filter((item) => item.status === "completed").map((item) => item.sessionNumber));
+      targetSession = resumable?.sessionNumber || pending?.sessionNumber || Math.max(agendaItem.nextSessionNumber || 1, lastCompleted + 1);
+      if (!resumable && !pending && (targetSession > agendaItem.plannedSessions || (agendaItem.completedSessions > 0 && !agendaItem.nextSessionNumber))) {
+        setConnectionNotice("El proceso de Claudio ya está cerrado. Puedes revisar sus sesiones desde el historial.");
+        return false;
+      }
+    }
     const safeSession = Math.max(1, Number(targetSession) || 1);
     const previousSummary = getPreviousSessionSummary({
       caseId,
@@ -1013,6 +1028,9 @@ export default function App() {
       if (activeAppointment) return activeAppointment;
     }
 
+    if (result?.result?.error?.code === "23505") {
+      throw new Error("Ya existe una cita para esta sesión o fecha. Vuelve al inicio y abre Claudio para retomar tu avance, o revisa la agenda.");
+    }
     throw new Error("No se pudo preparar la cita de esta sesion. Revisa la agenda antes de iniciar.");
   }
 
@@ -1412,8 +1430,8 @@ export default function App() {
 
       {screen === screens.home && new URLSearchParams(window.location.search).get("piloto") === "claudio" && (
         <section className="connection-status-banner" aria-label="Acceso al piloto con Claudio">
-          <div><strong>Piloto con Claudio · Voz y avatar 3D</strong><p>Prepara la sesión de Claudio y activa su voz al entrar a la entrevista.</p></div>
-          <button className="secondary-action" type="button" onClick={() => openCaseFromAgenda("claudio", 1, screens.brief)} disabled={openingPractice || navigationSaving}>Preparar piloto con Claudio</button>
+          <div><strong>Piloto con Claudio · Conversación por voz</strong><p>Prepara la sesión de Claudio y activa su voz al entrar a la entrevista.</p></div>
+          <button className="secondary-action" type="button" onClick={() => openCaseFromAgenda("claudio", "next", screens.brief)} disabled={openingPractice || navigationSaving}>Preparar piloto con Claudio</button>
         </section>
       )}
 

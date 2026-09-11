@@ -2,7 +2,6 @@
 .claudio-pilot-header{display:flex;justify-content:space-between;gap:12px;padding:14px 18px;font-size:.875rem;flex-wrap:wrap}
 .claudio-pilot-header span:first-child{color:#a7d8d2}
 .claudio-pilot-stage{height:390px;position:relative;isolation:isolate;overflow:hidden;background:radial-gradient(ellipse at 50% 30%,#4e6670,#1b303b 70%)}
-.claudio-pilot-canvas{position:absolute;inset:0}.claudio-pilot-canvas canvas{display:block;width:100%;height:100%}
 .claudio-pilot-portrait{position:absolute;inset:0;height:100%;width:100%;object-fit:cover;object-position:center 25%}
 .claudio-pilot-caption{position:absolute;bottom:0;left:0;right:0;padding:38px 20px 18px;background:linear-gradient(transparent,#07131cdc);display:flex;flex-direction:column;gap:3px;pointer-events:none}
 .claudio-pilot-caption strong{font-size:1.35rem}.claudio-pilot-caption span{font-size:.875rem}
@@ -16,7 +15,6 @@
 .claudio-pilot-controls button[aria-pressed=true]{background:#c2ede5;color:#102c35}
 .claudio-pilot-controls .claudio-pilot-finish{background:#672f3d;border-color:#935568}
 .claudio-pilot-hint{margin:8px 16px 14px;color:#ccd9dd;font-size:.875rem;line-height:1.5}
-.claudio-pilot-loading{position:absolute;top:14px;left:14px;padding:8px 12px;border-radius:8px;background:#11252de6;font-size:.875rem}
 .claudio-pilot-settings{border-top:1px solid #324951;padding:12px 16px;font-size:.875rem}
 .claudio-pilot-settings summary{cursor:pointer}.claudio-pilot-settings p{line-height:1.5;color:#ccd9dd}
 .claudio-pilot-settings label{display:grid;gap:8px;margin-top:15px}.claudio-pilot-settings select{min-width:0;width:100%;background:#243b46;color:#fff;padding:9px;font:inherit;border-radius:6px;border:1px solid #597078}
