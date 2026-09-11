@@ -1,0 +1,63 @@
+name: Escucha Viva verification
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, 'chore/ecc-safe-verification-20260911']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-safe-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-safe:
+    name: verify-safe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.19.0'
+          package-manager-cache: false
+
+      - name: Verify runner safeguards
+        run: python3 scripts/verification/test-runner.py
+
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run local audits and build with Internet sockets blocked
+        run: npm run verify:safe
+
+      - name: Add verification summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [ -f .audit-verification/report.md ]; then
+            cat .audit-verification/report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '%s\n' 'Verification did not complete. Check the failed setup step; there is no PASS report.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Save verification reports
+        if: ${{ always() && hashFiles('.audit-verification/report.json') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: escucha-viva-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .audit-verification/report.json
+            .audit-verification/report.md
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

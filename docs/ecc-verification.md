@@ -72,6 +72,24 @@ produce salida distinta de cero; no se convierten comprobaciones fallidas en apr
 Cada intento invalida el informe anterior; una ejecución interrumpida conserva INCOMPLETE.
 No hay publicación, migración SQL ni actualización automática de otros proyectos.
 
+## Ejecución automática en GitHub
+
+El workflow `.github/workflows/verify-safe.yml` ejecuta el comando en propuestas hacia `main`,
+en cambios integrados en `main` y, para comprobar la activación inicial, en la rama de esta
+implementación. También admite ejecución manual. Su control se llama `verify-safe`.
+Usa Ubuntu 24.04, Node 24.19.0 y acciones oficiales fijadas por SHA. La instalación desde el
+lockfile precede a las pruebas sin red; no utiliza secretos del repositorio ni deja credenciales
+de Git persistidas. No usa `pull_request_target`, permisos de escritura o publicación automática.
+
+Se ejecutan primero las pruebas negativas del propio ejecutor. Los reportes se adjuntan al
+resumen y como artefacto por 14 días, incluidos los fallos. No se suben los registros detallados.
+Una comprobación cancelada, pendiente, bloqueada o fallida no equivale a PASS.
+
+Para exigir esta comprobación antes de integrar un cambio, la protección administrativa de
+`main` debe requerir un pull request, el estado `verify-safe` satisfactorio y una rama actualizada
+con `main`. No habilitar bypass para administradores ni actores adicionales. La presencia del
+workflow por sí sola no activa esa protección; debe comprobarse por separado en GitHub.
+
 ## Interpretación y continuidad
 
 Un PASS indica que se cumplieron estas comprobaciones locales con datos ficticios. Quedan
