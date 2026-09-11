@@ -90,6 +90,23 @@ Para exigir esta comprobación antes de integrar un cambio, la protección admin
 con `main`. No habilitar bypass para administradores ni actores adicionales. La presencia del
 workflow por sí sola no activa esa protección; debe comprobarse por separado en GitHub.
 
+La regla importable está en `docs/escucha-viva-protection-ruleset.json`. El identificador
+15368 corresponde a GitHub Actions, comprobado en los controles reales de esta implementación.
+Exige un pull request y el control aprobado, sin exigir un segundo revisor humano. También
+impide borrar `main` o reemplazar su historia con un push forzado. No tiene excepciones de bypass.
+
+**Estado al preparar esta activación:** la conexión de GitHub permite integrar el workflow,
+pero no expone una operación para modificar reglas administrativas. Este archivo NO activa
+la protección por existir en el repositorio. Un administrador debe hacer lo siguiente:
+
+1. Descargar el JSON y abrir Settings → Rules → Rulesets en este repositorio.
+2. Elegir New ruleset → Import a ruleset y seleccionar el archivo.
+3. Comprobar que la aplicación está en Active, la rama es `main`, el control obligatorio es
+   `verify-safe` de GitHub Actions, se exige actualizar la rama y la lista de bypass está vacía.
+4. Pulsar Create y volver a abrir la regla para confirmar que quedó activa.
+
+Guía oficial: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/managing-rulesets-for-a-repository
+
 ## Interpretación y continuidad
 
 Un PASS indica que se cumplieron estas comprobaciones locales con datos ficticios. Quedan
@@ -103,5 +120,7 @@ revisar cualquier auditoría nueva antes de incorporarla a la lista y ejecutar e
 No reutilizar un PASS anterior como evidencia de otra versión. La prueba real con Gemini exige
 una cuenta de pruebas autorizada y un entorno de pruebas configurado por separado.
 
-Para retirar esta adaptación, revertir el commit que añade `verify:safe`, esta documentación
-y `scripts/verification/`. No hay cambios de base de datos ni de lógica del simulador que revertir.
+Para retirar esta adaptación, desactivar primero la regla administrativa si se importó y pausar
+la revisión programada si está activa; luego revertir el cambio que añade `verify:safe`, el
+workflow, esta documentación y `scripts/verification/`. No hay cambios de base de datos ni de
+lógica del simulador que revertir.
