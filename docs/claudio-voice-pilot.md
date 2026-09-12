@@ -4,9 +4,11 @@ Abrir `/?piloto=claudio`, ingresar con una cuenta aprobada, preparar la sesión
 de Claudio y elegir **Activar conversación por voz**. El acceso retoma el caso
 o prepara la siguiente sesión según el avance; no fuerza la sesión 1.
 
-Esta revisión conserva el retrato original de Claudio, de 40 años, antes y
-después de activar la voz. Retira el modelo genérico 3D: la imagen permanece
-fija. Animar los labios conservando su identidad requiere otro desarrollo.
+Esta revisión conserva el retrato original de Claudio, de 40 años. Incorpora
+una presentación animada de 7,25 segundos y una conexión opcional a un motor
+local de Kokoro + Wav2Lip/OpenVINO para convertir cada respuesta real en vídeo.
+El botón **Ver muestra animada** no inicia intervenciones ni llama a la IA.
+Sin conectar el motor local, las respuestas siguen usando Web Speech y foto fija.
 
 Usa el historial y la misma función `onAsk` de las sesiones habituales.
 No añade llamadas al motor clínico al reproducir una respuesta y mantiene
@@ -41,21 +43,39 @@ de autenticación y persistencia simulados: primera respuesta, fallos, permisos,
 propiedad, vencimiento y carreras. La prueba transaccional en la base real fue
 bloqueada por revisión automática y no se ejecutó. No se modificó su esquema.
 
-## Realismo pendiente
+## Motor local integrado — 12 de septiembre de 2026
 
-La foto fija y SpeechSynthesis no satisfacen el objetivo de videollamada realista.
-No se ha conectado un motor de vídeo ni una voz neuronal nueva.
+En **Animación y voz**, descargar y descomprimir **Claudio-motor-local.zip**.
+Con Python 3.12 instalado, abrir **Iniciar-Claudio.cmd** y esperar «Listo».
+Pulsar **Conectar motor local**, confirmar en la ventana local y volver al piloto.
+El navegador puede solicitar permiso de conexión al equipo. La muestra funciona
+sin instalar el motor; las respuestas animadas necesitan mantenerlo abierto.
 
-Una alternativa para evaluar es MuseTalk 1.5 para animación desde foto/audio y
-Kokoro para voz española. MuseTalk declara inferencia de más de 30 fps en una
-NVIDIA Tesla V100; su ejemplo de una RTX 3050 Ti de 4 GB tarda unos cinco minutos
-en generar ocho segundos. No basta con comprobar que exista cualquier GPU.
-El propio proyecto advierte limitaciones de preservación de bigote y labios.
-Se necesita validar identidad, latencia y calidad con Claudio antes de integrar.
+El motor recibe solo el texto de la respuesta actual, usa voz española
+`em_alex` y anima la boca del retrato canónico. No vuelve a llamar a Gemini.
+Requiere token temporal y origen permitido; solo escucha en 127.0.0.1:8765.
+El token no se persiste. Los archivos generados se eliminan al responder.
+No recibe credenciales de Supabase ni modifica citas o consentimientos.
 
-- https://github.com/TMElyralab/MuseTalk
-- https://github.com/hexgrad/kokoro
-- https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md
+Interrumpir, silenciar, ocultar la pestaña o salir cancela la reproducción y
+descarta vídeos tardíos. Si una generación sigue terminando en el motor,
+otra petición recibe una indicación de ocupado. No se sustituye una respuesta
+fallida por la presentación grabada. Un bloqueo de reproducción automática
+ofrece el botón **Reproducir vídeo**.
 
-No se ha contratado infraestructura. El siguiente dato necesario es el modelo
-de GPU disponible, para evaluar una prueba local sin pagar un servidor externo.
+Pruebas: 15 casos de voz/vídeo, `audit:claudio-video-flow` con el componente
+real, `audit:simulator-flow`, pruebas del reloj del servidor y cuatro pruebas
+HTTP aisladas del motor. Una petición al motor real produjo 123 fotogramas
+a 25 fps con una frase nueva en 16,74 segundos en CPU Linux. Se comprobaron
+los fotogramas y el MP4. Esto no mide el Intel Arc del usuario ni demuestra
+una videollamada de baja latencia. La revisión visual en el navegador remoto
+no pudo acceder a localhost (ERR_BLOCKED_BY_CLIENT). Windows, micrófono real
+y el permiso de conexión local en el navegador del usuario quedan por validar.
+
+La boca aún pierde detalle; no se animan cabeza ni ojos. Wav2Lip limita los
+modelos y resultados a investigación/uso académico o personal no comercial.
+No se ha contratado infraestructura adicional.
+
+- https://github.com/Rudrabha/Wav2Lip
+- https://github.com/openvinotoolkit/openvino_notebooks/tree/latest/notebooks/wav2lip
+- https://github.com/thewh1teagle/kokoro-onnx

@@ -24,3 +24,7 @@ vite-dev.err
 
 supabase/.temp/
 .audit-*/
+tools/claudio-local/models/
+tools/claudio-local/claudio.png
+tools/claudio-local/.venv/
+__pycache__/
