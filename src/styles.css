@@ -5021,31 +5021,3 @@ button.dashboard-metric-card:hover {
 .mediation-exchange { border-left: 3px solid currentColor; padding-left: 1rem; }
 .mediation-result { margin-block: 1.5rem; padding-block: 1rem; border-block: 1px solid #b8c6ce; }
 .feedback-mediation > .secondary-action { margin-top: 1rem; }
-.seminar-route-screen {
-  width: 100%;
-  min-height: calc(100vh - 8rem);
-}
-
-.seminar-route-frame {
-  display: block;
-  width: 100%;
-  min-height: calc(100vh - 8rem);
-  border: 0;
-  background: #fff;
-}
-
-.seminar-access-denied {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  max-width: 48rem;
-  margin: 3rem auto;
-  padding: 2rem;
-  border: 1px solid var(--line, #d4ded9);
-  background: #fff;
-}
-
-.seminar-access-denied svg {
-  color: #087b75;
-  flex: 0 0 auto;
-}
