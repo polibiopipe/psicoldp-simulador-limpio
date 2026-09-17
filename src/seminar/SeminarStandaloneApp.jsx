@@ -113,16 +113,29 @@ function SeminarLogin() {
   return (
     <main className="seminar-auth-page">
       <section className="seminar-auth-intro">
-        <div className="seminar-auth-mark">Ψ</div>
-        <span>PsicoLDP · Simuladores formativos</span>
-        <h1>Ruta de Seminario</h1>
-        <p>Un espacio privado para orientar el trabajo, documentar el proceso y conservar las evidencias del equipo.</p>
-        <div className="seminar-auth-security"><ShieldCheck aria-hidden="true" /> Acceso mediante la validación común de Supabase.</div>
+        <div className="seminar-cinema-glow" aria-hidden="true" />
+        <div className="seminar-cinema-grid" aria-hidden="true" />
+        <div className="seminar-auth-brand"><div className="seminar-auth-mark">Ψ</div><div><strong>PsicoLDP</strong><span>Conocimiento en construcción</span></div></div>
+        <div className="seminar-auth-story">
+          <span className="seminar-auth-kicker">Simulador formativo · Investigación aplicada</span>
+          <h1>Ruta de<br/><em>Seminario</em></h1>
+          <p>Del primer acuerdo del equipo al expediente final: una experiencia para comprender, ejecutar y dejar evidencia de cada decisión.</p>
+          <div className="seminar-auth-metrics">
+            <div><strong>26</strong><span>hitos conectados</span></div>
+            <div><strong>04</strong><span>unidades de trabajo</span></div>
+            <div><strong>01</strong><span>proceso trazable</span></div>
+          </div>
+        </div>
+        <div className="seminar-auth-foot">
+          <div className="seminar-auth-security"><ShieldCheck aria-hidden="true" /> Acceso privado del equipo</div>
+          <span>AGO 2026 — ENE 2027</span>
+        </div>
       </section>
       <section className="seminar-auth-card">
-        <span className="eyebrow">Acceso del equipo</span>
-        <h2>{mode === "reset" ? "Recuperar contraseña" : "Iniciar sesión"}</h2>
-        <p>Utiliza el mismo correo y contraseña registrados en los simuladores formativos.</p>
+        <div className="seminar-card-number">01</div>
+        <span className="eyebrow">Acceso reservado</span>
+        <h2>{mode === "reset" ? "Recuperar contraseña" : "Volver al proceso"}</h2>
+        <p>{mode === "reset" ? "Te enviaremos las instrucciones al correo registrado." : "Ingresa con las mismas credenciales de los simuladores formativos."}</p>
         <form onSubmit={submit}>
           <label>Correo<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
           {mode === "login" && <label>Contraseña<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>}
@@ -131,6 +144,7 @@ function SeminarLogin() {
           <button className="seminar-auth-submit" type="submit" disabled={busy}>{mode === "reset" ? <Mail aria-hidden="true" /> : <LogIn aria-hidden="true" />}{busy ? "Procesando…" : mode === "reset" ? "Enviar recuperación" : "Ingresar"}</button>
         </form>
         <button className="seminar-auth-reset" type="button" onClick={() => setMode(mode === "reset" ? "login" : "reset")}><KeyRound aria-hidden="true" />{mode === "reset" ? "Volver al ingreso" : "Olvidé mi contraseña"}</button>
+        <div className="seminar-card-note"><span>Ψ</span><p>Este espacio conserva el recorrido académico del equipo. El acceso está limitado a sus tres integrantes.</p></div>
       </section>
     </main>
   );
