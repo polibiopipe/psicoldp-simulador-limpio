@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/ruta-seminario", "destination": "/index.html" }
+  ]
+}
