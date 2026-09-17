@@ -274,7 +274,9 @@ export default function App() {
         clearSessionEndTracking();
         setSaveStatus(null);
         setClosureSaveState("idle");
-        setScreen(screens.home);
+        setScreen((currentScreen) =>
+          currentScreen === screens.seminarRoute ? currentScreen : screens.home
+        );
       }
       setAuthSession(nextSession);
       if (!nextSession?.user) {
