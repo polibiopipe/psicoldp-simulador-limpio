@@ -6,11 +6,13 @@ import {
   LayoutDashboard,
   LogOut,
   ShieldCheck,
+  Route,
   UsersRound
 } from "lucide-react";
 
 const navItems = [
   { id: "home", label: "Inicio", icon: LayoutDashboard },
+  { id: "seminarRoute", label: "Ruta de Seminario", icon: Route },
   { id: "select", label: "Pacientes", icon: UsersRound },
   { id: "clinicalAgenda", label: "Agenda", icon: CalendarClock },
   { id: "savedSessions", label: "Sesiones", icon: FileText },
@@ -25,6 +27,7 @@ export function AuthenticatedLayout({
   isLocalMode = false,
   hasEvaluation = false,
   navigationBusy = false,
+  showSeminarRoute = false,
   onNavigate,
   onSignOut
 }) {
@@ -39,7 +42,7 @@ export function AuthenticatedLayout({
         </div>
 
         <nav className="workspace-nav">
-          {navItems.map((item) => {
+          {navItems.filter((item) => item.id !== "seminarRoute" || showSeminarRoute).map((item) => {
             const Icon = item.icon;
             const isDisabled = navigationBusy || (item.id === "results" && !hasEvaluation);
             const isActive = currentScreen === item.id ||

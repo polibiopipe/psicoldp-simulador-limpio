@@ -64,6 +64,8 @@ import { TrustCenter } from "./components/TrustCenter.jsx";
 import { AppFooter } from "./components/AppFooter.jsx";
 import { ClinicalAgenda } from "./components/ClinicalAgenda.jsx";
 import { AuthenticatedLayout } from "./components/AuthenticatedLayout.jsx";
+import { SeminarRoute } from "./components/SeminarRoute.jsx";
+import { canAccessSeminarRoute } from "./lib/seminarAccess.js";
 import { ClinicalDashboard } from "./components/ClinicalDashboard.jsx";
 import { isAccessGateRequired, isSupabaseConfigured, supabase } from "./lib/supabaseClient.js";
 import { getOrCreateUserApproval } from "./lib/userApproval.js";
@@ -80,11 +82,18 @@ const screens = {
   results: "results",
   savedSessions: "savedSessions",
   clinicalAgenda: "clinicalAgenda",
-  trustCenter: "trustCenter"
+  trustCenter: "trustCenter",
+  seminarRoute: "seminarRoute"
 };
 
+function getInitialScreen() {
+  return globalThis.location?.pathname === "/ruta-seminario"
+    ? screens.seminarRoute
+    : screens.home;
+}
+
 export default function App() {
-  const [screen, setScreen] = useState(screens.home);
+  const [screen, setScreen] = useState(getInitialScreen);
   const [consentBusy, setConsentBusy] = useState(false);
   const consentBusyRef = useRef(false);
   const handleConsentBusy = useCallback((value) => { consentBusyRef.current = value; setConsentBusy(value); }, []);
@@ -1392,6 +1401,7 @@ export default function App() {
         onNavigate={navigateWorkspace}
         onSignOut={() => requestExitFromResults(screens.home, handleSignOut)}
         navigationBusy={consentBusy || interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
+        showSeminarRoute={canAccessSeminarRoute(userEmail)}
       >
 
       {(navigationSaving || openingPractice) && <div className="connection-status-banner" role="status">
@@ -1423,6 +1433,8 @@ export default function App() {
           onStartSession={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.simulation)}
         />
       )}
+
+      {screen === screens.seminarRoute && <SeminarRoute userEmail={userEmail} />}
 
       {screen === screens.trustCenter && (
         <TrustCenter key={userId || "local"} userId={userId} onBack={goHome} onBusyChange={handleConsentBusy} />
