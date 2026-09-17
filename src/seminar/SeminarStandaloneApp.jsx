@@ -115,6 +115,8 @@ function SeminarLogin() {
       <section className="seminar-auth-intro">
         <div className="seminar-cinema-glow" aria-hidden="true" />
         <div className="seminar-cinema-grid" aria-hidden="true" />
+        <div className="seminar-cinema-orbit" aria-hidden="true"><i/><i/><i/><span>01</span><span>13</span><span>26</span></div>
+        <div className="seminar-cinema-beam" aria-hidden="true" />
         <div className="seminar-auth-brand"><div className="seminar-auth-mark">Ψ</div><div><strong>PsicoLDP</strong><span>Conocimiento en construcción</span></div></div>
         <div className="seminar-auth-story">
           <span className="seminar-auth-kicker">Simulador formativo · Investigación aplicada</span>
@@ -132,6 +134,7 @@ function SeminarLogin() {
         </div>
       </section>
       <section className="seminar-auth-card">
+        <div className="seminar-card-aura" aria-hidden="true" />
         <div className="seminar-card-number">01</div>
         <span className="eyebrow">Acceso reservado</span>
         <h2>{mode === "reset" ? "Recuperar contraseña" : "Volver al proceso"}</h2>
@@ -146,6 +149,7 @@ function SeminarLogin() {
         <button className="seminar-auth-reset" type="button" onClick={() => setMode(mode === "reset" ? "login" : "reset")}><KeyRound aria-hidden="true" />{mode === "reset" ? "Volver al ingreso" : "Olvidé mi contraseña"}</button>
         <div className="seminar-card-note"><span>Ψ</span><p>Este espacio conserva el recorrido académico del equipo. El acceso está limitado a sus tres integrantes.</p></div>
       </section>
+      <div className="seminar-scene-caption" aria-hidden="true"><span>INVESTIGAR</span><i/><span>DOCUMENTAR</span><i/><span>COMPRENDER</span></div>
     </main>
   );
 }
