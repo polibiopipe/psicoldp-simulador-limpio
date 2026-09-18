@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { KeyRound, LogIn, LogOut, Mail, ShieldCheck } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 import { isAuthorizedSeminarEmail } from "./seminarAccess.js";
@@ -8,6 +8,7 @@ export function SeminarStandaloneApp() {
   const [session, setSession] = useState(null);
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
+  const frameRef = useRef(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -50,6 +51,26 @@ export function SeminarStandaloneApp() {
     };
   }, []);
 
+  useEffect(() => {
+    async function receiveCoachRequest(event) {
+      if (event.source !== frameRef.current?.contentWindow || event.data?.type !== "seminar-coach-request") return;
+      const requestId = event.data.requestId;
+      try {
+        const response = await fetch("/api/seminar-writing-coach", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` },
+          body: JSON.stringify(event.data.payload || {})
+        });
+        const data = await response.json().catch(() => null);
+        frameRef.current?.contentWindow?.postMessage({ type: "seminar-coach-response", requestId, ok: response.ok, data }, "*");
+      } catch {
+        frameRef.current?.contentWindow?.postMessage({ type: "seminar-coach-response", requestId, ok: false, data: { message: "No pudimos conectar con la mediación. El texto se conserva." } }, "*");
+      }
+    }
+    globalThis.addEventListener("message", receiveCoachRequest);
+    return () => globalThis.removeEventListener("message", receiveCoachRequest);
+  }, [session?.access_token]);
+
   async function signOut() {
     await supabase?.auth.signOut();
     setSession(null);
@@ -63,7 +84,7 @@ export function SeminarStandaloneApp() {
           <div><strong>Ruta de Seminario</strong><span>PsicoLDP · Investigación</span></div>
           <div><span>{session?.user?.email}</span><button type="button" onClick={signOut}><LogOut aria-hidden="true" /> Cerrar sesión</button></div>
         </header>
-        <iframe className="seminar-standalone-frame" srcDoc={seminarDocument} title="Ruta de Seminario · PsicoLDP" />
+        <iframe ref={frameRef} className="seminar-standalone-frame" srcDoc={seminarDocument} title="Ruta de Seminario · PsicoLDP" />
       </main>
     );
   }
