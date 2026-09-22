@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { KeyRound, LogIn, LogOut, Mail, ShieldCheck } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 import { isAuthorizedSeminarEmail } from "./seminarAccess.js";
-import seminarDocument from "./rutaSeminarioDocument.js";
+import seminarDocument from "./rutaSeminarioEnhancedDocument.js";
 
 export function SeminarStandaloneApp() {
   const [session, setSession] = useState(null);
