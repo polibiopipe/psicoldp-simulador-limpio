@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { KeyRound, LogIn, LogOut, Mail, ShieldCheck } from "lucide-react";
+import { KeyRound, LogIn, Mail, ShieldCheck } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 import { isAuthorizedSeminarEmail } from "./seminarAccess.js";
 import seminarDocument from "./rutaSeminarioEnhancedDocument.js";
+import { CollaborativeSeminarShell } from "./CollaborativeSeminarShell.jsx";
 
 export function SeminarStandaloneApp() {
   const [session, setSession] = useState(null);
@@ -78,15 +79,7 @@ export function SeminarStandaloneApp() {
   }
 
   if (status === "approved") {
-    return (
-      <main className="seminar-standalone-shell">
-        <header className="seminar-session-bar">
-          <div><strong>Ruta de Seminario</strong><span>PsicoLDP · Investigación</span></div>
-          <div><span>{session?.user?.email}</span><button type="button" onClick={signOut}><LogOut aria-hidden="true" /> Cerrar sesión</button></div>
-        </header>
-        <iframe ref={frameRef} className="seminar-standalone-frame" srcDoc={seminarDocument} title="Ruta de Seminario · PsicoLDP" />
-      </main>
-    );
+    return <CollaborativeSeminarShell key={session.user.id} session={session} onSignOut={signOut} frameRef={frameRef} seminarDocument={seminarDocument} />;
   }
   if (["loading", "checking"].includes(status)) {
     return <AccessState title="Verificando acceso" text="Estamos comprobando tu sesión y autorización." />;
