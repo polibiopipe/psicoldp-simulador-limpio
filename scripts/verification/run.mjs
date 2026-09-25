@@ -38,6 +38,7 @@ const suites = [
   ['feedback-academic', 'scripts/audit-feedback-academic.mjs'],
   ['feedback-mediation', 'scripts/audit-feedback-mediation.mjs'],
   ['simulator-enrollment', 'scripts/test-simulator-enrollment.mjs'],
+  ['seminar-team', 'scripts/audit-seminar-team.mjs'],
 ];
 const reviewed = new Set(suites.map(([, path]) => `node ${path}`));
 const unknown = Object.entries(pkg.scripts).filter(([name, command]) =>
