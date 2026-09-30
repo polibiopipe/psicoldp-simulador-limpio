@@ -123,7 +123,7 @@ export function SeminarTeamWorkspace({ session, importedDraft, onOpenGuide }) {
     initial.title = String(importedDraft.title || 'Aporte desde la ruta').slice(0, 180);
     initial.stage_key = String(importedDraft.stage || '').slice(0, 160);
     initial.evidence_url = safeEvidenceUrl(importedDraft.evidence);
-    initial.content = { development: String(importedDraft.development || '').slice(0, 60000), reason: '', learning: '', origin: 'Copia voluntaria de un borrador local de la guía. Su origen y sus afirmaciones deben revisarse antes del cierre.' };
+    initial.content = { development: String(importedDraft.development || '').slice(0, 60000), reason: '', learning: '', origin: 'Copia voluntaria de un desarrollo del aula o de la guía. Su origen y sus afirmaciones deben revisarse antes del cierre.' };
     // Keep any in-progress editor copy before opening the imported proposal.
     if (draft && dirty) {
       try { localStorage.setItem(`${localKey(userId, draft)}:backup:${Date.now()}`, JSON.stringify(draft)); }

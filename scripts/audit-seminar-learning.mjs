@@ -1,0 +1,88 @@
+// Local interaction tests. No credentials, external requests or real records.
+import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { build } from 'esbuild';
+import React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import { LESSONS, REFERENCES, buildBoolean, computeFlow, reviewSnapshot, isLessonReviewed, structuralFeedback } from '../src/seminar/learningContent.js';
+
+assert.equal(new Set(LESSONS.map(row => row.id)).size, 23);
+for (const row of LESSONS) {
+  assert.ok(row.definition && row.purpose && row.when && row.practice && row.model);
+  assert.ok(row.steps.length >= 3 && row.fields.length >= 3 && row.coherence.length >= 2);
+  for (const ref of row.refs) assert.ok(REFERENCES[ref]);
+}
+assert.equal(buildBoolean(['stress, stress; estrés','university students, estudiantes','']), '(stress OR estrés) AND ("university students" OR estudiantes)');
+assert.equal(buildBoolean(['','','']), '');
+assert.ok(computeFlow([],{}).error);
+const counts = { duplicates:'10',other:'0',screenedOut:'50',notRetrieved:'2',fullExcluded:'6',reasons:'6 informes fuera del contexto delimitado; registro documental de prueba.' };
+assert.deepEqual(computeFlow([{count:'80'}],counts),{total:80,screened:70,sought:20,assessed:18,included:12});
+assert.ok(computeFlow([{count:'80'}],{...counts,duplicates:'81'}).error);
+assert.ok(computeFlow([{count:'80'}],{...counts,notRetrieved:''}).error);
+assert.ok(computeFlow([{count:'80'}],{...counts,fullExcluded:'1.5'}).error);
+assert.ok(computeFlow([{count:'80'}],{...counts,reasons:''}).error);
+assert.deepEqual(computeFlow([{count:'0'}],{duplicates:0,other:0,screenedOut:0,notRetrieved:0,fullExcluded:0}),{total:0,screened:0,sought:0,assessed:0,included:0});
+const record = { fields:{theme:'Tema'},practice:'Práctica',reflection:'Reflexión',source:'Fuente' };
+record.review = {snapshot:reviewSnapshot(record)};
+assert.ok(isLessonReviewed(record));
+assert.ok(!isLessonReviewed({...record,fields:{theme:'Tema cambiado'}}));
+assert.ok(!isLessonReviewed({...record,source:'Otra fuente'}));
+assert.ok(structuralFeedback(LESSONS[0],{}).length >= 3);
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+const local = new Map();
+globalThis.localStorage = {getItem:key=>local.get(key)??null,setItem:(key,value)=>local.set(key,value)};
+globalThis.fetch = async()=>{throw new Error('No hay conexión de prueba.');};
+const output=resolve('.audit-verification/tmp/seminar-learning-ui.cjs');
+mkdirSync(resolve('.audit-verification/tmp'),{recursive:true});
+const bundled=await build({entryPoints:['src/seminar/ResearchLearningWorkspace.jsx'],outfile:output,bundle:true,platform:'node',format:'cjs',write:false,external:['react'],loader:{'.css':'empty'}});
+writeFileSync(output,bundled.outputFiles[0].contents);
+const module=await import(pathToFileURL(output).href);
+const Workspace=module.ResearchLearningWorkspace || module.default.ResearchLearningWorkspace;
+let renderer,shared;
+const text=node=>typeof node==='string'?node:(node?.children||[]).map(text).join(' ');
+const button=label=>renderer.root.findAllByType('button').find(node=>text(node).includes(label));
+async function click(label){const node=button(label);assert.ok(node,'Button: '+label);await act(async()=>node.props.onClick());}
+async function field(label,value){const node=renderer.root.findAllByType('label').find(node=>text(node).startsWith(label));assert.ok(node,'Label: '+label);const input=node.findAll(node=>node.type==='textarea'||node.type==='input')[0];await act(async()=>input.props.onChange({target:{value}}));}
+async function mount(id='student-a'){await act(async()=>{renderer=TestRenderer.create(React.createElement(Workspace,{session:{user:{id},access_token:'synthetic-token'},onShare:value=>{shared=value;}}));});}
+await mount();
+assert.ok(text(renderer.toJSON()).includes('Tema e intención'));
+await click('Practicar');
+assert.ok(button('Contrastar con').props.disabled);
+await field('Mi respuesta al ejercicio','Comprender una experiencia delimitada sin fijar la conclusión.');
+await click('Contrastar con');
+assert.ok(text(renderer.toJSON()).includes('Una vía de resolución'));
+await click('Aplicar a mi investigación');
+await field('Mi tema','Aprendizaje y regulación en una experiencia educativa.');
+await field('Qué quiero conocer','Cómo se revisan las decisiones durante la actividad.');
+await field('Protoobjetivo','Comprender el proceso de revisión de decisiones en estudiantes.');
+await field('Fuente y pasaje','Manual del equipo, sección 3. Lectura del apartado y contraste de conceptos.');
+await click('Recibir retroalimentación');
+await click('Solicitar retroalimentación');
+assert.ok(text(renderer.toJSON()).includes('No hay conexión de prueba.'));
+await field('Qué mantengo','Mantengo la pregunta abierta y debo precisar la población.');
+await click('Comprobar coherencia');
+await click('Registrar mi revisión');
+assert.ok(text(renderer.toJSON()).includes('marca las que efectivamente revisaste'));
+for(const checkbox of renderer.root.findAllByType('input').filter(node=>node.props.type==='checkbox')) await act(async()=>checkbox.props.onChange({target:{checked:true}}));
+await click('Registrar mi revisión');
+assert.ok(text(renderer.toJSON()).includes('Revisión personal vigente.'));
+await click('Llevar desarrollo');
+assert.ok(shared.development.includes('Aprendizaje y regulación'));
+assert.ok(shared.requestId && shared.stage.includes('tema'));
+await click('Aplicar a mi investigación');
+await field('Mi tema','Tema revisado con nueva delimitación.');
+await click('Comprobar coherencia');
+assert.ok(text(renderer.toJSON()).includes('pendiente o desactualizada'));
+await act(async()=>renderer.unmount());
+await mount();
+await click('Aplicar a mi investigación');
+assert.ok(renderer.root.findAllByType('textarea').some(node=>node.props.value==='Tema revisado con nueva delimitación.'));
+await act(async()=>renderer.unmount());
+await mount('student-b');
+await click('Aplicar a mi investigación');
+assert.ok(renderer.root.findAllByType('textarea').every(node=>node.props.value===''));
+await act(async()=>renderer.unmount());
+console.log('PASS seminar learning: content, boolean logic, real counts, review invalidation, persistence isolation, unavailable feedback and team handoff');
