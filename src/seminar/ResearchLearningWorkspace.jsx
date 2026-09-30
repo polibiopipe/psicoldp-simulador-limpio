@@ -4,7 +4,8 @@ import { MethodExplorer, ResearchReadingRoom, PairReviewLab } from './ResearchLa
 import { ArrowRight, BookOpen, Sprout } from 'lucide-react';
 import './researchLearning.css';
 import { ProjectGuide, ModuleGuide, PracticeStudio, TransferPractice, JourneyNavigation } from './ResearchGuide.jsx';
-import { JOURNEY_STAGES, stageFor, cleanGuide, cleanLearning, nextJourneyModule } from './learningJourney.js';
+import { ThesisDraft, thesisText } from './ThesisDraft.jsx';
+import { JOURNEY_STAGES, stageFor, cleanGuide, cleanLearning, nextJourneyModule, routeIds } from './learningJourney.js';
 
 const empty = () => ({ schema: 1, selected: LESSONS[0].id, records: {} });
 function loadNotebook(key) {
@@ -23,6 +24,9 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson, o
   const [notebook, setNotebook] = useState(initial.data);
   const [storageError, setStorageError] = useState(initial.error);
   const [step, setStep] = useState(0);
+  const [draftOpen, setDraftOpen] = useState(false);
+  const draftRef = useRef(null);
+  const guideRef = useRef(null);
   const [moduleQuery, setModuleQuery] = useState('');
   const [notice, setNotice] = useState('');
   const [checks, setChecks] = useState({});
@@ -35,7 +39,20 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson, o
   const lesson = LESSONS.find(row => row.id === notebook.selected) || LESSONS[0];
   const record = notebook.records[lesson.id] || {};
   const fingerprint = reviewSnapshot(record);
-  const reviewed = LESSONS.filter(row => isLessonReviewed(notebook.records[row.id])).length;
+  const route = routeIds(notebook.guide);
+  const reviewed = route.filter(id => isLessonReviewed(notebook.records[id])).length;
+  const started = Object.keys(notebook.records).length > 0;
+  function jumpTo(ref) {
+    globalThis.requestAnimationFrame?.(() => { ref.current?.focus({ preventScroll: true }); ref.current?.scrollIntoView({ block: 'start', behavior: 'auto' }); });
+  }
+  function downloadThesis() {
+    const text = thesisText(notebook.records);
+    if (!text) return;
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'Mi-tesis-en-construccion.txt'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setNotice('Borrador descargado con tus apartados y fuentes. Revisa los campos pendientes antes de integrarlo.');
+  }
 
   useEffect(() => {
     if (initial.error) return;
@@ -147,12 +164,12 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson, o
   }
 
   return <section className="research-learning" aria-label="Aula formativa de investigación">
-    <header className="rl-heading">
-      <div className="rl-hero-copy"><p className="rl-eyebrow"><Sprout aria-hidden="true"/> PSICOLDP · APRENDER A INVESTIGAR</p><h1>La curiosidad es<br/>un buen comienzo.</h1><p>Comprende cada decisión. Da forma a tu investigación con ejemplos, práctica y conversaciones que hacen avanzar.</p><button type="button" className="rl-primary" onClick={() => { navigate(step); contentRef.current?.scrollIntoView({behavior:'auto',block:'start'}); }}>Continuar mi módulo <ArrowRight aria-hidden="true"/></button></div>
-      <div className="rl-progress"><BookOpen aria-hidden="true"/><strong>{reviewed}<span> / {LESSONS.length}</span></strong><span>módulos con revisión personal vigente</span><progress value={reviewed} max={LESSONS.length} aria-label="Módulos con revisión personal vigente"/><small>Cada avance tiene su propio ritmo.</small></div>
+    <header className="rl-heading rl-construction-heading">
+      <div className="rl-hero-copy"><p className="rl-eyebrow"><Sprout aria-hidden="true"/> PSICOLDP · APRENDER INVESTIGANDO</p><h1>Construir mi tesis.</h1><p>Comprende cada apartado, ensaya con un ejemplo y escribe tu propia investigación. Revisa tus decisiones y conecta lo que vas construyendo.</p><button type="button" className="rl-primary" onClick={() => jumpTo(moduleRef)}>{started ? 'Continuar mi tesis' : 'Comenzar mi tesis'} <ArrowRight aria-hidden="true"/></button><small className="rl-current-work">{started ? 'Retoma' : 'Comienza con'}: {lesson.title}</small></div>
+      <div className="rl-progress"><BookOpen aria-hidden="true"/><strong>{reviewed}<span> / {route.length}</span></strong><span>módulos con revisión personal vigente en tu ruta</span><progress value={reviewed} max={route.length} aria-label="Módulos con revisión personal vigente en mi ruta"/><small>Tu ruta se ajusta al enfoque que eliges.</small></div>
     </header>
-    <ProjectGuide notebook={notebook} lesson={lesson} onOpen={select} onGuideChange={changeGuide} onTeam={onOpenTeam} onArchive={onOpenArchive}/>
-    <div className="rl-storage"><p>{storageError || 'Tu cuaderno se guarda en este navegador y esta cuenta. Comparte los aportes desde la mesa del equipo.'}</p><details><summary>Mi cuaderno y respaldos</summary><div className="rl-actions"><button type="button" onClick={exportNotebook}>Exportar cuaderno</button><button type="button" onClick={exportText}>Descargar desarrollo</button><label className="rl-file">Recuperar copia<input type="file" accept="application/json,.json" onChange={importNotebook}/></label></div></details></div>
+    <nav className="rl-project-tools" aria-label="Herramientas de mi tesis"><button type="button" onClick={() => { setDraftOpen(true); jumpTo(draftRef); }}>Ver mi tesis en construcción</button><button type="button" onClick={() => jumpTo(guideRef)}>Consultar mi ruta y decisiones</button></nav>
+    <div className="rl-storage"><p>{storageError || 'Tu cuaderno se guarda en este navegador y esta cuenta. Comparte los aportes desde la mesa del equipo.'}</p><details><summary>Mi cuaderno y respaldos</summary><div className="rl-actions"><button type="button" onClick={exportNotebook}>Exportar cuaderno</button><button type="button" onClick={exportText}>Descargar cuaderno de aprendizaje</button><label className="rl-file">Recuperar copia<input type="file" accept="application/json,.json" onChange={importNotebook}/></label></div></details></div>
     {notice && <p className="rl-notice" role="status">{notice}</p>}
     <div className="rl-layout">
       <nav className="rl-lessons" aria-label="Módulos de investigación"><div className="rl-sidebar-title"><span>Mi recorrido</span><small>Siete etapas · {LESSONS.length} módulos disponibles</small></div><label className="rl-module-search">Encontrar un módulo<input type="search" value={moduleQuery} onChange={event => setModuleQuery(event.target.value)} placeholder="Embudo, XP, instrumentos…"/></label><JourneyNavigation selected={lesson.id} records={notebook.records} query={moduleQuery} onOpen={select}/></nav>
@@ -180,6 +197,7 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson, o
           </>}
           {step === 4 && <>
             <h4>Primera revisión de estructura</h4><p className="rl-caption">Comprueba campos y expresiones que conviene revisar. No califica la calidad científica ni verifica el contenido de las fuentes.</p><ul>{structuralFeedback(lesson, record).map(note => <li key={note}>{note}</li>)}</ul>
+            {onOpenTeam && <div className="rl-peer-support"><p>También puedes contrastar este apartado con tu equipo y volver a editarlo.</p><button type="button" onClick={share}>Preparar este apartado para revisión en equipo</button></div>}
             <h4>Devolución sobre mi desarrollo</h4><p>La devolución formula una mejora prioritaria. Tú decides qué mantener o corregir y fundamentas esa decisión.</p>
             <button type="button" className="rl-primary" disabled={busy} onClick={() => askCoach('question')}>{busy ? 'Revisando el desarrollo…' : 'Solicitar retroalimentación'}</button>
             {coachError && <p className="rl-error" role="alert">{coachError}</p>}
@@ -199,6 +217,8 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson, o
         <footer className="rl-navigation"><button type="button" disabled={step === 0} onClick={() => navigate(step - 1)}>Paso anterior</button><span>{step + 1} de 6</span>{step < 5 ? <button type="button" onClick={() => navigate(step + 1)}>Siguiente paso</button> : <button type="button" disabled={!nextJourneyModule(lesson.id,notebook.guide)} onClick={() => select(nextJourneyModule(lesson.id,notebook.guide))}>Siguiente módulo</button>}</footer>
       </div>
     </div>
+    <div ref={draftRef} tabIndex={-1} className="rl-project-anchor"><ThesisDraft records={notebook.records} onEdit={select} open={draftOpen} onToggle={setDraftOpen} onDownload={downloadThesis}/></div>
+    <div ref={guideRef} tabIndex={-1} className="rl-project-anchor"><ProjectGuide notebook={notebook} lesson={lesson} onOpen={select} onGuideChange={changeGuide} onTeam={onOpenTeam} onArchive={onOpenArchive}/></div>
   </section>;
 }
 
