@@ -20,13 +20,13 @@ export function thesisText(records = {}) {
   ).join('\n\n────────────────────\n\n') + '\n';
 }
 
-export function ThesisDraft({records,onEdit,open,onToggle,onDownload}) {
+export function ThesisDraft({records,onEdit,open,onToggle,onDownload,onDownloadWord}) {
   const sections = thesisSections(records);
   return <details className="rl-thesis-draft" open={open} onToggle={event => onToggle(event.currentTarget.open)}>
     <summary><FileText aria-hidden="true"/> Mi tesis en construcción <span>{sections.length} {sections.length === 1 ? 'apartado con escritura propia' : 'apartados con escritura propia'}</span></summary>
     <p>Aquí se reúnen los apartados que escribes en «Aplicar a mi investigación» y sus fuentes. Lee cómo se conectan, vuelve a editarlos y descarga el borrador para integrarlo según las pautas de tu tesis.</p>
     {!sections.length ? <div className="rl-notice"><p>Tu primer apartado aparecerá aquí cuando escribas tu propuesta. La guía te acompaña desde el tema y la intención de conocimiento.</p><button type="button" onClick={() => onEdit('tema',0)}>Comenzar por mi tema</button></div> : <>
-      <button type="button" onClick={onDownload}>Descargar borrador de mi tesis</button>
+      <div className="rl-actions">{onDownloadWord && <button type="button" className="rl-primary" onClick={onDownloadWord}>Descargar mi tesis en Word</button>}<button type="button" onClick={onDownload}>Descargar borrador de mi tesis</button></div>
       <p className="rl-caption">Borrador de trabajo: los apartados con texto pueden tener campos pendientes. La revisión personal requiere contrastar fuentes y criterios.</p>
       {sections.map(({lesson,record}) => <article key={lesson.id} className="rl-thesis-section"><header><div><h3>{lesson.title}</h3><small>{isLessonReviewed(record) ? 'Revisión personal vigente' : 'Pendiente de revisión personal'}</small></div><button type="button" onClick={() => onEdit(lesson.id,3)}><PencilLine aria-hidden="true"/> Editar apartado</button></header><details><summary>Leer mi desarrollo</summary>{lesson.fields.map(field => <div key={field.key}><h4>{field.label}</h4><p>{record.fields?.[field.key]?.trim() || 'Pendiente de desarrollar'}</p></div>)}<h4>Fuente y respaldo</h4><p>{record.source?.trim() || 'Pendiente de registrar'}</p></details></article>)}
     </>}

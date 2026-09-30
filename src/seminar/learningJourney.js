@@ -69,7 +69,9 @@ export function cleanGuide(value = {}) {
 export function cleanLearning(value) {
   if (!value || typeof value !== 'object') return undefined;
   const result = {};
-  for (const key of ['goal','reason','alternative','difficulty','recall','recallReflection','transfer','transferReason']) result[key] = String(value[key] || '').slice(0,4000);
+  for (const key of ['goal','reason','alternative','difficulty','recall','recallReflection','transfer','transferReason','teachingReason','teachingRevision']) result[key] = String(value[key] || '').slice(0,4000);
+  result.teachingChoice = ['0','1','2'].includes(value.teachingChoice) ? value.teachingChoice : '';
+  result.teachingFeedbackFor = typeof value.teachingFeedbackFor === 'string' ? value.teachingFeedbackFor.slice(0,10000) : '';
   result.due = validDate(value.due) ? value.due : '';
   result.attempts = Array.isArray(value.attempts) ? value.attempts.slice(0,40).map(row => ({at:String(row?.at || '').slice(0,40),answer:String(row?.answer || '').slice(0,4000),reason:String(row?.reason || '').slice(0,4000),alternative:String(row?.alternative || '').slice(0,4000),support:SUPPORT_LEVELS.some(([id]) => id === row?.support) ? row.support : 'guided',help:row?.help === true})) : [];
   if (value.beforeHelp && typeof value.beforeHelp === 'object') result.beforeHelp = {answer:String(value.beforeHelp.answer || '').slice(0,4000),reason:String(value.beforeHelp.reason || '').slice(0,4000)};

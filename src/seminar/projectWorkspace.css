@@ -1,0 +1,88 @@
+.research-learning .ts-explanation { margin: 24px 0; }
+.research-learning .ts-distinction { display: flex; gap: 14px; padding: 22px; border: 1px solid #d9ded3; border-radius: 16px; background: #edf3ed; }
+.research-learning .ts-distinction > svg { flex: 0 0 24px; color: #49674e; }
+.research-learning .ts-distinction h5, .research-learning .ts-worked h5, .research-learning .ts-feedback h5 { margin: 0 0 12px; font-size: 1.13rem; line-height: 1.5; }
+.research-learning .ts-distinction p { margin: 0; }
+.research-learning .ts-studio { padding: 28px; margin: 26px 0; background: linear-gradient(125deg, #faf2e6, #f3edf6 68%, #edf3f2); border: 1px solid #e0d8d1; border-radius: 22px; }
+.research-learning .ts-studio h4 { margin-top: 10px; }
+.research-learning .ts-steps { display: flex; gap: 9px; flex-wrap: wrap; margin: 20px 0; }
+.research-learning .ts-steps button[aria-current="step"] { background: #475f50; color: white; border-color: #475f50; }
+.research-learning .ts-worked { background: #fffdf9; border-radius: 16px; padding: 24px; border: 1px solid #e6ddd5; min-height: 190px; }
+.research-learning .ts-challenge { margin: 28px 0; }
+.research-learning .ts-challenge fieldset { border: 0; padding: 0; margin: 20px 0; min-width: 0; }
+.research-learning .ts-challenge legend { font-size: 1rem; font-weight: 650; margin-bottom: 12px; }
+.research-learning .ts-challenge fieldset label { display: flex; align-items: flex-start; gap: 12px; background: #fffc; border: 1px solid #dfd9dc; border-radius: 12px; padding: 15px; margin-bottom: 9px; font-size: 1rem; line-height: 1.6; }
+.research-learning .ts-challenge input[type="radio"] { width: 18px; min-height: 18px; height: 18px; flex: 0 0 18px; margin: 4px 0 0; accent-color: #475f50; }
+.research-learning .ts-challenge > label, .research-learning .ts-feedback label { display: flex; flex-direction: column; gap: 9px; font-size: 1rem; margin: 18px 0; }
+.research-learning .ts-challenge > small { display: block; margin-top: 10px; font-size: .875rem; }
+.research-learning .ts-feedback { margin: 20px 0; border-left: 4px solid #789483; padding: 22px; border-radius: 0 14px 14px 0; background: #f7fbf5; }
+.research-learning .ts-foundation { margin-top: 25px; font-size: .9rem; line-height: 1.7; }
+.research-learning .pw-panel { padding: 28px; margin: 24px 0; border: 1px solid #dbded6; border-radius: 20px; background: #fffefa; scroll-margin-top: 20px; }
+.research-learning .pw-panel > summary { cursor: pointer; font-family: Georgia, serif; font-size: 1.55rem; color: #304b3c; line-height: 1.5; }
+.research-learning .pw-panel > summary > svg { width: 24px; height: 24px; margin-right: 8px; vertical-align: middle; }
+.research-learning .pw-panel > summary > span { display: block; font-family: inherit; font-size: .95rem; color: #586354; padding-left: 34px; }
+.research-learning .pw-panel p { line-height: 1.7; overflow-wrap: anywhere; }
+.research-learning .pw-guide { background: #f0f4ed; padding: 18px 22px; border-radius: 14px; margin: 20px 0; }
+.research-learning .pw-guide summary { cursor: pointer; font-weight: 650; }
+.research-learning .pw-guide li { margin-bottom: 9px; }
+.research-learning .pw-toolbar { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin: 24px 0 14px; }
+.research-learning .pw-toolbar label { flex: 1 1 190px; display: flex; flex-direction: column; gap: 8px; font-size: .9rem; }
+.research-learning .pw-metrics { display: flex; flex-wrap: wrap; gap: 12px 26px; padding: 12px 0; color: #455749; font-size: .95rem; }
+.research-learning .pw-metrics strong { margin-right: 5px; }
+.research-learning .pw-editor { margin: 22px 0; padding: 24px; border: 1px solid #ded5c3; border-radius: 16px; background: #fbf5e9; }
+.research-learning .pw-editor h3 { margin-top: 0; font-size: 1.3rem; }
+.research-learning .pw-editor .rl-field { margin-bottom: 16px; }
+.research-learning .pw-editor small { font-size: .875rem; }
+.research-learning .pw-columns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; margin-top: 20px; align-items: start; }
+.research-learning .pw-column { min-width: 0; border-radius: 15px; padding: 14px; background: #f1efe9; }
+.research-learning .pw-column > h3 { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 1.05rem; font-weight: 600; line-height: 1.5; margin: 2px 0 17px; }
+.research-learning .pw-column > h3 > span { font-size: .875rem; border-radius: 50%; background: #fff9; padding: 3px 9px; }
+.research-learning .pw-doing { background: #eaf2ef; }
+.research-learning .pw-review { background: #efebf4; }
+.research-learning .pw-done { background: #f5eedf; }
+.research-learning .pw-card { min-width: 0; padding: 17px; border: 1px solid #dbe0d7; border-radius: 13px; background: #fffefa; margin-bottom: 13px; box-shadow: 0 3px 14px #2b3e2910; overflow-wrap: anywhere; }
+.research-learning .pw-card h4 { font-size: 1.06rem; margin: 0 0 11px; line-height: 1.5; }
+.research-learning .pw-card > p { font-size: .95rem; margin: 13px 0; white-space: pre-wrap; }
+.research-learning .pw-card > small { display: block; font-size: .875rem; line-height: 1.6; }
+.research-learning .pw-card .pw-module-link { min-height: 0; padding: 0; background: transparent; border: 0; color: #496552; text-decoration: underline; text-align: left; font-size: .875rem; }
+.research-learning .pw-card details { font-size: .9rem; margin: 16px 0; }
+.research-learning .pw-card details summary { cursor: pointer; line-height: 1.6; }
+.research-learning .pw-check { display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; font-size: .9rem; margin: 14px 0; }
+.research-learning .pw-check input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; margin: 3px 0 0; accent-color: #496552; }
+.research-learning .pw-status { display: flex; flex-direction: column; gap: 8px; font-size: .875rem; }
+.research-learning .pw-status select { width: 100%; min-width: 0; }
+.research-learning .pw-card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 13px; }
+.research-learning .pw-card-actions button { padding: 8px 10px; font-size: .875rem; }
+.research-learning .pw-blocker { display: flex; gap: 8px; background: #f9eade; padding: 12px; border-radius: 10px; margin: 12px 0; }
+.research-learning .pw-blocker svg { flex: 0 0 18px; width: 18px; }
+.research-learning .pw-blocker p { margin: 0; font-size: .9rem; }
+.research-learning .pw-overdue { color: #8b4b2d; font-weight: 650; }
+.research-learning .pw-column-empty, .research-learning .pw-empty { color: #596254; font-size: .95rem; }
+.research-learning .pw-file-step { padding: 24px 0; border-bottom: 1px solid #e3e3d9; }
+.research-learning .pw-file-step h3 { margin: 9px 0 14px; font-size: 1.25rem; }
+.research-learning .pw-export-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 13px; margin: 18px 0; }
+.research-learning .pw-export-grid > button { display: flex; gap: 13px; align-items: flex-start; text-align: left; padding: 20px; background: #f4f5ed; border-radius: 14px; white-space: normal; }
+.research-learning .pw-export-grid > button > svg { flex: 0 0 23px; }
+.research-learning .pw-export-grid strong { display: block; font-size: 1rem; margin-bottom: 8px; }
+.research-learning .pw-export-grid small { display: block; font-size: .875rem; line-height: 1.6; font-weight: 400; }
+.research-learning .pw-file-list { padding: 0; list-style: none; margin: 20px 0 0; }
+.research-learning .pw-file-list > li { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 22px 0; border-top: 1px solid #e4e4d9; }
+.research-learning .pw-file-list > li > div { min-width: 0; }
+.research-learning .pw-file-list strong { overflow-wrap: anywhere; }
+.research-learning .pw-file-list small { display: block; margin-top: 8px; line-height: 1.6; font-size: .875rem; }
+.research-learning .pw-file-list p { margin: 9px 0 0; font-size: .875rem; }
+.research-learning .pw-file-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; flex: 0 1 360px; }
+.research-learning .pw-file-actions button { font-size: .875rem; }
+.research-learning .rl-project-tools { flex-wrap: wrap; }
+@media (max-width: 1150px) {
+  .research-learning .pw-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .research-learning .pw-file-list > li { flex-direction: column; align-items: flex-start; }
+  .research-learning .pw-file-actions { flex-basis: auto; }
+}
+@media (max-width: 720px) {
+  .research-learning .pw-panel, .research-learning .ts-studio { padding: 19px 16px; }
+  .research-learning .pw-columns, .research-learning .pw-export-grid { grid-template-columns: minmax(0, 1fr); }
+  .research-learning .pw-editor, .research-learning .ts-worked { padding: 18px; }
+  .research-learning .pw-panel > summary { font-size: 1.3rem; }
+  .research-learning .ts-distinction { padding: 17px; }
+}
