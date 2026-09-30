@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LESSONS, LEARNING_STEPS, REFERENCES, SEARCH_SOURCES, buildBoolean, computeFlow, reviewSnapshot, isLessonReviewed, draftText, structuralFeedback } from './learningContent.js';
-import { LearningEntrances, MethodExplorer, ResearchReadingRoom, PairReviewLab } from './ResearchLabs.jsx';
-import { ArrowRight, BookOpen, Check, Sprout } from 'lucide-react';
+import { MethodExplorer, ResearchReadingRoom, PairReviewLab } from './ResearchLabs.jsx';
+import { ArrowRight, BookOpen, Sprout } from 'lucide-react';
 import './researchLearning.css';
+import { ProjectGuide, ModuleGuide, PracticeStudio, TransferPractice, JourneyNavigation } from './ResearchGuide.jsx';
+import { JOURNEY_STAGES, stageFor, cleanGuide, cleanLearning, nextJourneyModule } from './learningJourney.js';
 
 const empty = () => ({ schema: 1, selected: LESSONS[0].id, records: {} });
 function loadNotebook(key) {
@@ -15,7 +17,7 @@ function loadNotebook(key) {
   } catch { return { data: empty(), error: 'No pudimos recuperar el cuaderno de este navegador. No se sobrescribirá el registro anterior. Exporta lo que escribas en esta sesión y conserva la página abierta.' }; }
 }
 
-export function ResearchLearningWorkspace({ session, onShare, requestedLesson }) {
+export function ResearchLearningWorkspace({ session, onShare, requestedLesson, onOpenTeam, onOpenArchive }) {
   const storageKey = 'seminar-learning-v1:' + session.user.id;
   const [initial] = useState(() => loadNotebook(storageKey));
   const [notebook, setNotebook] = useState(initial.data);
@@ -24,7 +26,6 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson })
   const [moduleQuery, setModuleQuery] = useState('');
   const [notice, setNotice] = useState('');
   const [checks, setChecks] = useState({});
-  const [showModel, setShowModel] = useState(false);
   const [busy, setBusy] = useState(false);
   const [coachError, setCoachError] = useState('');
   const [decision, setDecision] = useState('');
@@ -47,15 +48,16 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson })
   function update(patch) {
     setNotebook(previous => ({ ...previous, records: { ...previous.records, [lesson.id]: { ...previous.records[lesson.id], ...patch } } }));
   }
-  function select(id) {
+  function select(id, nextStep = 0) {
     request.current?.abort(); request.current = null; setBusy(false); setCoachError('');
-    setNotebook(previous => ({ ...previous, selected: id })); setStep(0); setShowModel(false); setNotice(''); setDecision('');
+    setNotebook(previous => ({ ...previous, selected: id })); setStep(nextStep); setNotice(''); setDecision('');
     globalThis.requestAnimationFrame?.(() => { moduleRef.current?.focus({ preventScroll: true }); moduleRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' }); });
   }
   useEffect(() => {
     if (requestedLesson && LESSONS.some(row => row.id === requestedLesson.id)) select(requestedLesson.id);
   }, [requestedLesson]);
   function navigate(next) { setStep(next); setNotice(''); contentRef.current?.focus(); }
+  function changeGuide(guide) { setNotebook(previous => ({ ...previous, guide })); }
   function exportNotebook() {
     const output = { ...notebook, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json;charset=utf-8' });
@@ -66,15 +68,15 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson })
   function exportText() {
     const text = LESSONS.filter(row => notebook.records[row.id]).map(row => {
       const value = notebook.records[row.id];
-      return row.title + '\n\n' + draftText(row, value) + '\n\nFuente y respaldo:\n' + (value.source || '(pendiente)') + '\n\nPráctica:\n' + (value.practice || '(pendiente)') + '\n\nReflexión:\n' + (value.reflection || '(pendiente)') + (value.tools ? '\n\nRegistro de herramientas:\n' + JSON.stringify(value.tools, null, 2) : '');
+      return row.title + '\n\n' + draftText(row, value) + '\n\nFuente y respaldo:\n' + (value.source || '(pendiente)') + '\n\nPráctica:\n' + (value.practice || '(pendiente)') + '\n\nReflexión:\n' + (value.reflection || '(pendiente)') + (value.tools ? '\n\nRegistro de herramientas:\n' + JSON.stringify(value.tools, null, 2) : '') + (value.learning ? '\n\nAprendizaje, intentos y repasos:\n' + JSON.stringify(value.learning, null, 2) : '');
     }).join('\n\n────────────────────\n\n');
-    const url = URL.createObjectURL(new Blob([text || 'Cuaderno sin desarrollos.', '\n'], { type: 'text/plain;charset=utf-8' }));
+    const url = URL.createObjectURL(new Blob(['MI RUTA Y DECISIONES\n' + JSON.stringify(notebook.guide || {}, null, 2) + '\n\n', text || 'Cuaderno sin desarrollos.', '\n'], { type: 'text/plain;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url; link.download = 'Mi-investigacion-desarrollo.txt'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async function importNotebook(event) {
     const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
     try {
-      if (file.size > 1500000) throw new Error('La copia es demasiado extensa.');
+      if (file.size > 32 * 1024 * 1024) throw new Error('Esta copia supera los 32 MB admitidos. Conserva el archivo y divide el respaldo antes de recuperarlo.');
       const incoming = JSON.parse(await file.text());
       if (incoming.schema !== 1 || !incoming.records || typeof incoming.records !== 'object') throw new Error('Esta copia no tiene el formato del cuaderno.');
       const records = {};
@@ -87,11 +89,12 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson })
           clean.tools = { searches: Array.isArray(value.tools?.searches) ? value.tools.searches.slice(0,100).map((row, n) => Object.fromEntries(['date','source','query','filters','count','note'].map(k => [k, String(row?.[k] ?? '').slice(0,2000)]).concat([['id','import-' + n]]))) : [], flow: {} };
           for (const key of ['duplicates','other','screenedOut','notRetrieved','fullExcluded','reasons','otherReason']) clean.tools.flow[key] = String(value.tools?.flow?.[key] ?? '').slice(0,4000);
         }
+        if (value.learning) clean.learning = cleanLearning(value.learning);
         records[module.id] = clean;
       }
-      if (!Object.keys(records).length) throw new Error('La copia no contiene módulos reconocibles.');
-      if (!globalThis.confirm('¿Reemplazar los módulos presentes en esta copia? Exporta primero tu cuaderno si necesitas conservar ambas versiones. Las revisiones deberán registrarse de nuevo.')) return;
-      setNotebook(previous => ({ ...previous, records: { ...previous.records, ...records } }));
+      if (!Object.keys(records).length && (!incoming.guide || typeof incoming.guide !== 'object' || Array.isArray(incoming.guide))) throw new Error('La copia no contiene módulos ni decisiones reconocibles.');
+      if (!globalThis.confirm('¿Recuperar los módulos y las decisiones presentes en esta copia? Reemplazarán esas partes del cuaderno. Exporta primero si necesitas conservar ambas versiones. Las revisiones deberán registrarse de nuevo.')) return;
+      setNotebook(previous => ({ ...previous, records: { ...previous.records, ...records }, ...(incoming.guide ? { guide: cleanGuide(incoming.guide) } : {}) }));
       setNotice('Copia recuperada. Los módulos importados requieren una nueva revisión.');
     } catch (error) { setNotice(error.message || 'No fue posible leer la copia. El cuaderno actual se conserva.'); }
   }
@@ -118,7 +121,7 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson })
       if (!response.ok) throw new Error(data?.message || 'No fue posible completar la devolución.');
       if (!data || typeof data.observation !== 'string' || typeof data.question !== 'string') throw new Error('La devolución no tuvo el formato esperado. Tu borrador se conserva.');
       if (request.current !== controller) return;
-      setNotebook(previous => ({ ...previous, records: { ...previous.records, [id]: { ...previous.records[id], coach: { ...data, snapshot, decision: phase === 'contrast' ? decision : '' } } } }));
+      setNotebook(previous => ({ ...previous, records: { ...previous.records, [id]: { ...previous.records[id], coach: { ...data, draft: reviewText, snapshot, decision: phase === 'contrast' ? decision : '' } } } }));
     } catch (error) {
       if (request.current === controller) setCoachError(error.name === 'AbortError' ? 'La revisión no terminó a tiempo. Tu texto se conserva; puedes reintentar.' : error.message);
     } finally { clearTimeout(timer); if (request.current === controller) { setBusy(false); request.current = null; } }
@@ -138,7 +141,7 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson })
   }
   function share() {
     if (!lesson.fields.some(field => record.fields?.[field.key]?.trim())) { setNotice('Escribe tu desarrollo antes de llevarlo a la mesa.'); return; }
-    const development = draftText(lesson, record) + '\n\nFUENTE Y RESPALDO\n' + (record.source || '(pendiente)') + '\n\nREFLEXIÓN\n' + (record.reflection || '(pendiente)') + (record.tools ? '\n\nREGISTROS\n' + JSON.stringify(record.tools, null, 2) : '');
+    const development = draftText(lesson, record) + '\n\nRUTA METODOLÓGICA PROVISIONAL\n' + (notebook.guide?.route || 'Por decidir') + '\nRazones: ' + (notebook.guide?.reason || '(pendiente)') + '\nAlternativa y pendientes: ' + (notebook.guide?.alternative || '(pendiente)') + '\n\nFUENTE Y RESPALDO\n' + (record.source || '(pendiente)') + '\n\nREFLEXIÓN\n' + (record.reflection || '(pendiente)') + (record.tools ? '\n\nREGISTROS\n' + JSON.stringify(record.tools, null, 2) : '');
     if (development.length > 58000) { setNotice('Este registro es muy extenso para un solo aporte. Exporta el cuaderno y comparte un enlace al documento desde la mesa.'); return; }
     onShare({ requestId: globalThis.crypto.randomUUID(), title: lesson.title + ' · desarrollo propio', stage: 'Aula formativa · ' + lesson.id, development, evidence: '' });
   }
@@ -148,17 +151,14 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson })
       <div className="rl-hero-copy"><p className="rl-eyebrow"><Sprout aria-hidden="true"/> PSICOLDP · APRENDER A INVESTIGAR</p><h1>La curiosidad es<br/>un buen comienzo.</h1><p>Comprende cada decisión. Da forma a tu investigación con ejemplos, práctica y conversaciones que hacen avanzar.</p><button type="button" className="rl-primary" onClick={() => { navigate(step); contentRef.current?.scrollIntoView({behavior:'auto',block:'start'}); }}>Continuar mi módulo <ArrowRight aria-hidden="true"/></button></div>
       <div className="rl-progress"><BookOpen aria-hidden="true"/><strong>{reviewed}<span> / {LESSONS.length}</span></strong><span>módulos con revisión personal vigente</span><progress value={reviewed} max={LESSONS.length} aria-label="Módulos con revisión personal vigente"/><small>Cada avance tiene su propio ritmo.</small></div>
     </header>
-    <LearningEntrances onOpen={select}/>
+    <ProjectGuide notebook={notebook} lesson={lesson} onOpen={select} onGuideChange={changeGuide} onTeam={onOpenTeam} onArchive={onOpenArchive}/>
     <div className="rl-storage"><p>{storageError || 'Tu cuaderno se guarda en este navegador y esta cuenta. Comparte los aportes desde la mesa del equipo.'}</p><details><summary>Mi cuaderno y respaldos</summary><div className="rl-actions"><button type="button" onClick={exportNotebook}>Exportar cuaderno</button><button type="button" onClick={exportText}>Descargar desarrollo</button><label className="rl-file">Recuperar copia<input type="file" accept="application/json,.json" onChange={importNotebook}/></label></div></details></div>
     {notice && <p className="rl-notice" role="status">{notice}</p>}
     <div className="rl-layout">
-      <nav className="rl-lessons" aria-label="Módulos de investigación"><div className="rl-sidebar-title"><span>Tu recorrido</span><small>{LESSONS.length} módulos · a tu ritmo</small></div><label className="rl-module-search">Encontrar un módulo<input type="search" value={moduleQuery} onChange={event => setModuleQuery(event.target.value)} placeholder="Embudo, XP, instrumentos…"/></label>{[...new Set(LESSONS.map(row => row.group))].map(group => {
-        const rows = LESSONS.filter(row => row.group === group && (row.title + ' ' + row.group).toLocaleLowerCase('es').includes(moduleQuery.toLocaleLowerCase('es')));
-        return rows.length ? <div key={group}><h2>{group}</h2>{rows.map(row => <button key={row.id} type="button" onClick={() => select(row.id)} aria-current={lesson.id === row.id ? 'step' : undefined}><span>{row.title}</span>{isLessonReviewed(notebook.records[row.id]) && <small><Check aria-hidden="true"/> Revisión registrada</small>}</button>)}</div> : null;
-      })}{!LESSONS.some(row => (row.title + ' ' + row.group).toLocaleLowerCase('es').includes(moduleQuery.toLocaleLowerCase('es'))) && <p className="rl-caption">No encontramos ese módulo. Prueba otra palabra.</p>}</nav>
-      <label className="rl-mobile-modules">Elige tu módulo<select value={lesson.id} onChange={event => select(event.target.value)}>{[...new Set(LESSONS.map(row => row.group))].map(group => <optgroup key={group} label={group}>{LESSONS.filter(row => row.group === group).map(row => <option key={row.id} value={row.id}>{row.title}</option>)}</optgroup>)}</select></label>
+      <nav className="rl-lessons" aria-label="Módulos de investigación"><div className="rl-sidebar-title"><span>Mi recorrido</span><small>Siete etapas · {LESSONS.length} módulos disponibles</small></div><label className="rl-module-search">Encontrar un módulo<input type="search" value={moduleQuery} onChange={event => setModuleQuery(event.target.value)} placeholder="Embudo, XP, instrumentos…"/></label><JourneyNavigation selected={lesson.id} records={notebook.records} query={moduleQuery} onOpen={select}/></nav>
+      <label className="rl-mobile-modules">Elige tu módulo<select value={lesson.id} onChange={event => select(event.target.value)}>{JOURNEY_STAGES.map(group => <optgroup key={group.id} label={group.title}>{group.ids.map(id => LESSONS.find(row=>row.id===id)).map(row => <option key={row.id} value={row.id}>{row.title}</option>)}</optgroup>)}</select></label>
       <div className="rl-main">
-        <div className="rl-module-title" ref={moduleRef} tabIndex={-1}><p className="rl-eyebrow">{lesson.group} · Módulo {LESSONS.indexOf(lesson) + 1}</p><h2>{lesson.title}</h2></div>
+        <div className="rl-module-title" ref={moduleRef} tabIndex={-1}><p className="rl-eyebrow">{stageFor(lesson.id).title} · Módulo de tu proyecto</p><h2>{lesson.title}</h2></div><ModuleGuide lesson={lesson} records={notebook.records} onOpen={select}/>
         <nav className="rl-steps" aria-label="Pasos de aprendizaje">{LEARNING_STEPS.map((label, n) => <button type="button" key={label} onClick={() => navigate(n)} aria-current={step === n ? 'step' : undefined}><span>{n + 1}</span>{label}</button>)}</nav>
         <section className="rl-content" ref={contentRef} tabIndex={-1} aria-label={LEARNING_STEPS[step]}>
           <div className="rl-step-heading"><span className="rl-step-number">0{step + 1}</span><div><p className="rl-eyebrow">APRENDE · ENSAYA · CONSTRUYE</p><h3>{LEARNING_STEPS[step]}</h3></div></div>
@@ -172,7 +172,7 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson })
             {lesson.id === 'xp' && <ResearchReadingRoom/>}
           </>}
           {step === 1 && <>{['xp','pares','iteracion'].includes(lesson.id) && <PairReviewLab/>}<p className="rl-caption">Ejemplos didácticos. No son datos, resultados ni decisiones aprobadas de tu investigación.</p><article className="rl-example"><h4>Una formulación que orienta</h4><p>{lesson.example}</p></article><article className="rl-example rl-example-revise"><h4>Una formulación que necesita revisión</h4><p>{lesson.weak}</p></article><h4>Por qué</h4><p>{lesson.explanation}</p><Sources refs={lesson.refs}/></>}
-          {step === 2 && <><p>{lesson.practice}</p><TextField label="Mi respuesta al ejercicio" value={record.practice || ''} onChange={value => update({ practice: value })}/><button type="button" disabled={!record.practice?.trim()} onClick={() => setShowModel(true)}>Contrastar con una orientación</button>{showModel && <div className="rl-notice"><h4>Una vía de resolución</h4><p>{lesson.model}</p><p>Compara las razones de tu respuesta, no solo las palabras. Puedes volver a editarla.</p></div>}</>}
+          {step === 2 && <PracticeStudio key={lesson.id} lesson={lesson} record={record} guide={notebook.guide || {}} onChange={update} onNavigate={navigate} onSupportChange={support=>changeGuide({...notebook.guide,support})}/>}
           {step === 3 && <><p>Construye este apartado con tus propias fuentes y decisiones. Si algo sigue pendiente, indícalo y explica cómo lo resolverás.</p>{lesson.fields.map(field => <TextField key={lesson.id + field.key} label={field.label} help={field.help} value={record.fields?.[field.key] || ''} onChange={value => update({ fields: { ...record.fields, [field.key]: value } })}/>)}<TextField label="Fuente y pasaje que sustentan este desarrollo" help="Autor, año, documento, página o sección y la afirmación que respalda. Distingue lectura completa, parcial y resumen consultado." value={record.source || ''} onChange={value => update({ source: value })}/>
             {lesson.id === 'booleanas' && <BooleanBuilder tools={record.tools || {}} onChange={tools => update({ tools })} onUse={value => update({ fields: { ...record.fields, strategy: value + '\nPlataforma y fecha de ejecución: pendientes.' } })}/>}
             {lesson.id === 'busqueda' && <><SearchDirectory/><button type="button" onClick={() => { select('flujo'); setStep(3); }}>Abrir mi bitácora y flujo</button></>}
@@ -183,19 +183,20 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson })
             <h4>Devolución sobre mi desarrollo</h4><p>La devolución formula una mejora prioritaria. Tú decides qué mantener o corregir y fundamentas esa decisión.</p>
             <button type="button" className="rl-primary" disabled={busy} onClick={() => askCoach('question')}>{busy ? 'Revisando el desarrollo…' : 'Solicitar retroalimentación'}</button>
             {coachError && <p className="rl-error" role="alert">{coachError}</p>}
-            {record.coach && <div className="rl-coach"><h4>{record.coach.snapshot === fingerprint ? 'Devolución de esta versión' : 'Devolución anterior: el desarrollo cambió'}</h4><p>{record.coach.observation}</p><p><strong>Prioridad: </strong>{record.coach.priorityImprovement}</p><p><strong>Pregunta: </strong>{record.coach.question}</p>{Array.isArray(record.coach.options) && <ul>{record.coach.options.map((option,n) => <li key={n}>{String(option)}</li>)}</ul>}<p>{record.coach.contrast}</p>{record.coach.suggestedRewrite && <details><summary>Propuesta de redacción para contrastar</summary><p>{record.coach.suggestedRewrite}</p><small>Revisa su fidelidad antes de incorporar cualquier frase a tu desarrollo.</small></details>}<p>{record.coach.nextAction}</p><p className="rl-caption">{record.coach.limitation}</p>
+            {record.coach && <div className="rl-coach"><h4>{record.coach.snapshot === fingerprint ? 'Devolución de esta versión' : 'Devolución anterior: el desarrollo cambió'}</h4><p>{record.coach.observation}</p>{record.coach.strengths?.length > 0 && <><h4>Aspectos que sostienen el desarrollo</h4><ul>{record.coach.strengths.map((text,n)=><li key={n}>{String(text)}</li>)}</ul></>}{record.coach.cautions?.length > 0 && <><h4>Qué conviene contrastar</h4><ul>{record.coach.cautions.map((text,n)=><li key={n}>{String(text)}</li>)}</ul></>}<p><strong>Prioridad: </strong>{record.coach.priorityImprovement}</p><p><strong>Pregunta: </strong>{record.coach.question}</p>{Array.isArray(record.coach.options) && <ul>{record.coach.options.map((option,n) => <li key={n}>{String(option)}</li>)}</ul>}<p>{record.coach.contrast}</p>{record.coach.suggestedRewrite && <details><summary>Propuesta de redacción para contrastar</summary><p>{record.coach.suggestedRewrite}</p><small>Revisa su fidelidad antes de incorporar cualquier frase a tu desarrollo.</small></details>}<p>{record.coach.nextAction}</p>{record.coach.draft && <details><summary>Versión que recibió esta devolución</summary><pre>{record.coach.draft}</pre></details>}<p className="rl-caption">{record.coach.limitation}</p>
               {record.coach.snapshot === fingerprint && <><TextField label="Mi decisión y sus razones" value={decision} onChange={setDecision}/><button type="button" disabled={busy || !decision.trim()} onClick={() => askCoach('contrast')}>Contrastar mi decisión</button></>}
             </div>}
             <TextField label="Qué mantengo, qué cambio y por qué" help="Registra tu reflexión después de revisar. Explica también qué fuente o pregunta necesitas contrastar." value={record.reflection || ''} onChange={value => update({ reflection: value })}/><Sources refs={['feedback','meta']}/>
           </>}
           {step === 5 && <>
             <p>Lee tu desarrollo junto a los demás componentes. Registra una revisión solo después de explicar las conexiones y resolver o declarar las tensiones.</p><div className="rl-checks">{lesson.coherence.map((text,n) => <label key={text}><input type="checkbox" checked={!!checks[n]} onChange={event => setChecks(previous => ({ ...previous, [n]: event.target.checked }))}/><span>{text}</span></label>)}</div>
-            <CoherenceMap records={notebook.records} onOpen={id => { select(id); setStep(3); }}/>
+            <TransferPractice key={lesson.id} lesson={lesson} record={record} onChange={update}/>
+            <CoherenceMap guide={notebook.guide} records={notebook.records} onOpen={id => { select(id); setStep(3); }}/>
             <div className="rl-actions"><button type="button" className="rl-primary" onClick={closeReview}>Registrar mi revisión</button><button type="button" onClick={share}>Llevar desarrollo a la mesa del equipo</button></div>
             <p className="rl-caption">{isLessonReviewed(record) ? 'Revisión personal vigente. ' : 'Revisión personal pendiente o desactualizada. '}La mesa permite preparar un aporte y guardarlo para revisión en pares. La validación académica requiere contrastar fuentes y criterios.</p>
           </>}
         </section>
-        <footer className="rl-navigation"><button type="button" disabled={step === 0} onClick={() => navigate(step - 1)}>Paso anterior</button><span>{step + 1} de 6</span>{step < 5 ? <button type="button" onClick={() => navigate(step + 1)}>Siguiente paso</button> : <button type="button" disabled={LESSONS.indexOf(lesson) === LESSONS.length - 1} onClick={() => select(LESSONS[LESSONS.indexOf(lesson)+1].id)}>Siguiente módulo</button>}</footer>
+        <footer className="rl-navigation"><button type="button" disabled={step === 0} onClick={() => navigate(step - 1)}>Paso anterior</button><span>{step + 1} de 6</span>{step < 5 ? <button type="button" onClick={() => navigate(step + 1)}>Siguiente paso</button> : <button type="button" disabled={!nextJourneyModule(lesson.id,notebook.guide)} onClick={() => select(nextJourneyModule(lesson.id,notebook.guide))}>Siguiente módulo</button>}</footer>
       </div>
     </div>
   </section>;
@@ -236,7 +237,7 @@ function SearchFlow({ tools, onChange }) {
   </section>;
 }
 
-function CoherenceMap({ records, onOpen }) {
+function CoherenceMap({ records, onOpen, guide }) {
   const rows = [['delimitacion','phenomenon','Fenómeno'],['delimitacion','population','Población'],['delimitacion','context','Contexto'],['concepto','lens','Lente teórico'],['vacio','gap','Vacío'],['vacio','problem','Problema'],['pregunta','question','Pregunta'],['objetivos','general','Objetivo general'],['objetivos','specifics','Objetivos específicos'],['diseno','design','Diseño'],['analisis','plan','Análisis'],...([['cuantitativo','question','Pregunta cuantitativa'],['cualitativo','question','Pregunta cualitativa'],['mixto','reason','Razón de integración'],['mixto','connection','Punto de integración'],['iteracion','increment','Próximo incremento del equipo']].filter(([id,key]) => records[id]?.fields?.[key]?.trim()))];
-  return <details className="rl-map" open><summary>Mi investigación: comprobar la conexión entre apartados</summary><p>Compara palabras y alcance. ¿Aparece un concepto nuevo sin fundamento? ¿Cambian participantes o contexto? ¿Cada objetivo tiene evidencia y análisis previstos?</p><div className="rl-table-wrap"><table><thead><tr><th>Componente</th><th>Mi formulación actual</th><th>Revisar</th></tr></thead><tbody>{rows.map(([id,key,title]) => <tr key={id+key}><th scope="row">{title}</th><td>{records[id]?.fields?.[key] || 'Pendiente de desarrollar'}</td><td><button type="button" onClick={() => onOpen(id)}>Abrir {title.toLowerCase()}</button></td></tr>)}</tbody></table></div></details>;
+  return <details className="rl-map" open><summary>Mi investigación: comprobar la conexión entre apartados</summary>{guide?.route && <p><strong>Ruta metodológica provisional: </strong>{guide.route === 'undecided' ? 'En exploración' : guide.route}. <strong>Razones registradas: </strong>{guide.reason || 'Pendientes de desarrollar'}. Contrasta esta elección con el enfoque y el diseño escritos abajo.</p>}<p>Compara palabras y alcance. ¿Aparece un concepto nuevo sin fundamento? ¿Cambian participantes o contexto? ¿Cada objetivo tiene evidencia y análisis previstos?</p><div className="rl-table-wrap"><table><thead><tr><th>Componente</th><th>Mi formulación actual</th><th>Revisar</th></tr></thead><tbody>{rows.map(([id,key,title]) => <tr key={id+key}><th scope="row">{title}</th><td>{records[id]?.fields?.[key] || 'Pendiente de desarrollar'}</td><td><button type="button" onClick={() => onOpen(id)}>Abrir {title.toLowerCase()}</button></td></tr>)}</tbody></table></div></details>;
 }
