@@ -222,7 +222,7 @@ export function SeminarTeamWorkspace({ session, importedDraft, onOpenGuide, onOp
   return <section className="seminar-team" aria-label="Espacio colaborativo del equipo XP">
     <header className="st-intro">
       <div><p className="st-kicker">RUTA DE SEMINARIO · EQUIPO XP</p><h1>Investigar es un trabajo compartido.</h1><p>Proponer, contrastar y reconstruir. Cada aporte conserva su versión, quién lo registró y qué revisó otra persona.</p></div>
-      <button type="button" className="st-secondary" onClick={onOpenGuide}>Consultar la ruta y preparar un borrador →</button>
+      <button type="button" className="st-secondary" onClick={onOpenGuide}>Volver a construir mi tesis →</button>
     </header>
     {onOpenLearning && <nav className="st-learning-links" aria-label="Talleres para el trabajo del equipo"><span>Antes de construir, explora:</span><button type="button" onClick={() => onOpenLearning('xp')}>Fundamentos de XP y XR</button><button type="button" onClick={() => onOpenLearning('iteracion')}>Planificar una iteración</button><button type="button" onClick={() => onOpenLearning('pares')}>Practicar revisión en pares</button></nav>}
     <div className="st-connection" role="status"><span>{connection}</span><button type="button" onClick={() => { setError(''); void refresh(); }}>Actualizar</button></div>

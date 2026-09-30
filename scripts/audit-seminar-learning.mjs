@@ -202,4 +202,57 @@ assert.equal(restored.guide.decisions.length,1);
 assert.equal(restored.records.tema.learning.attempts.length,2);
 assert.ok(restored.records.tema.learning.beforeHelp.answer.includes('primer intento'));
 await act(async()=>renderer.unmount());
-console.log('PASS seminar learning: content, boolean logic, real counts, review invalidation, persistence isolation, unavailable feedback, method exploration, XP workshops and team handoff');
+
+
+// The unified entry keeps real thesis writing separate from exercise answers.
+const draftOutput=resolve('.audit-verification/tmp/thesis-draft.cjs');
+const draftBundle=await build({entryPoints:['src/seminar/ThesisDraft.jsx'],outfile:draftOutput,bundle:true,platform:'node',format:'cjs',write:false,external:['react'],loader:{'.css':'empty'}});
+writeFileSync(draftOutput,draftBundle.outputFiles[0].contents);
+const draftModule=await import(pathToFileURL(draftOutput).href);
+const draftExports=draftModule.default || draftModule;
+const fixtureRecords={tema:{fields:{theme:'Mi propuesta propia'},source:'Fuente leída y contrastada',practice:'EXERCISE_ONLY',coach:{suggestedRewrite:'SUGGESTION_ONLY'}},xp:{fields:{purpose:'TEAM_PLAN_ONLY'}}};
+const thesis=draftExports.thesisText(fixtureRecords);
+assert.ok(thesis.includes('Mi propuesta propia') && thesis.includes('Fuente leída y contrastada'));
+assert.ok(thesis.includes('[Pendiente de desarrollar]'));
+for(const excluded of ['EXERCISE_ONLY','SUGGESTION_ONLY','TEAM_PLAN_ONLY']) assert.ok(!thesis.includes(excluded));
+assert.equal(draftExports.thesisText({}),'');
+assert.equal(draftExports.thesisSections(fixtureRecords).length,1);
+
+// Supports return to the same writing session; neither workspace is remounted.
+const shellOutput=resolve('.audit-verification/tmp/seminar-shell.cjs');
+const shellBundle=await build({entryPoints:['src/seminar/CollaborativeSeminarShell.jsx'],outfile:shellOutput,bundle:true,platform:'node',format:'cjs',write:false,external:['react'],loader:{'.css':'empty'},plugins:[{name:'local-team-fixture',setup(build){
+  build.onResolve({filter:/SeminarTeamWorkspace\.jsx$/},()=>({path:'team',namespace:'fixture'}));
+  build.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`import React,{useState} from 'react'; export function SeminarTeamWorkspace(){const [draft,setDraft]=useState('');return React.createElement('textarea',{'aria-label':'Team fixture draft',value:draft,onChange:e=>setDraft(e.target.value)});}`,resolveDir:process.cwd()}));
+}}]});
+writeFileSync(shellOutput,shellBundle.outputFiles[0].contents);
+const shellModule=await import(pathToFileURL(shellOutput).href);
+const Shell=shellModule.CollaborativeSeminarShell || shellModule.default.CollaborativeSeminarShell;
+local.set('seminar-learning-v1:student-d',JSON.stringify({schema:1,selected:'tema',records:fixtureRecords}));
+await act(async()=>{renderer=TestRenderer.create(React.createElement(Shell,{session:{user:{id:'student-d'}},onSignOut(){},seminarDocument:'<p>Archived fixture</p>'}));});
+const panel=id=>renderer.root.findByProps({id:'seminar-'+id+'-panel'});
+assert.equal(renderer.root.findAll(node=>node.props.role==='tablist').length,0);
+assert.equal(panel('learn').props.hidden,false);
+assert.equal(panel('team').props.hidden,true);
+await click('Aplicar a mi investigación');
+await field('Mi tema','Mi escritura antes de consultar un apoyo.');
+await click('Ver mi tesis en construcción');
+assert.equal(renderer.root.findByProps({className:'rl-thesis-draft'}).props.open,true);
+assert.ok(text(renderer.root.findByProps({className:'rl-thesis-draft'})).includes('Mi escritura antes de consultar un apoyo.'));
+await click('Revisar con mi equipo');
+assert.equal(panel('team').props.hidden,false);
+assert.equal(panel('learn').props.hidden,true);
+await act(async()=>renderer.root.findByProps({'aria-label':'Team fixture draft'}).props.onChange({target:{value:'Borrador del equipo sin cerrar'}}));
+await click('Volver a construir mi tesis');
+assert.equal(panel('learn').props.hidden,false);
+assert.ok(panel('learn').findAllByType('textarea').some(node=>node.props.value==='Mi escritura antes de consultar un apoyo.'));
+await click('Consultar calendario y archivo');
+assert.equal(panel('guide').props.hidden,false);
+await click('Volver a construir mi tesis');
+await click('Revisar con mi equipo');
+assert.equal(renderer.root.findByProps({'aria-label':'Team fixture draft'}).props.value,'Borrador del equipo sin cerrar');
+await click('Volver a construir mi tesis');
+await click('Editar apartado');
+assert.equal(renderer.root.findByProps({className:'rl-content'}).props['aria-label'],'Aplicar a mi investigación');
+assert.ok(panel('learn').findAllByType('textarea').some(node=>node.props.value==='Mi escritura antes de consultar un apoyo.'));
+await act(async()=>renderer.unmount());
+console.log('PASS seminar learning: unified writing entry, thesis draft isolation, support round trips, content, boolean logic, real counts, review invalidation, persistence isolation, feedback, methods and XP');

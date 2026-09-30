@@ -43,3 +43,24 @@
 @media(prefers-reduced-motion:reduce){.research-learning *{transition:none!important;scroll-behavior:auto!important}}
 
 .rl-module-title{scroll-margin-top:20px}.rl-module-title:focus{outline:none}
+
+/* The learner enters one construction workspace; other views support that work. */
+.rl-construction-heading{min-height:245px;padding:28px 34px;margin-bottom:12px}
+.rl-construction-heading .rl-hero-copy h1{font-size:clamp(32px,3.4vw,47px);margin:12px 0}
+.rl-construction-heading .rl-hero-copy>p:not(.rl-eyebrow){font-size:15px;max-width:600px;line-height:1.6;margin-bottom:18px}
+.rl-current-work{display:block;color:#365952;font-size:12px;margin-top:10px}
+.rl-project-tools{display:flex;flex-wrap:wrap;gap:8px 20px;margin:0 0 12px;padding:0 3px}
+.research-learning .rl-project-tools button{background:transparent;border:0;border-radius:4px;padding:7px 0;font-size:13px;text-decoration:underline;text-underline-offset:4px}
+.rl-project-anchor{scroll-margin-top:20px;max-width:1500px;margin:24px auto 0}
+.rl-project-anchor:focus,.seminar-mode-panel:focus{outline:none}
+.rl-thesis-draft{padding:24px 28px;background:#fffdf7;border:1px solid #d4ded3;border-radius:18px}
+.rl-thesis-draft>summary{font-size:20px;font-family:Georgia,serif;font-weight:400;margin:0}
+.rl-thesis-draft>summary span{display:block;font:400 12px/1.5 Inter,system-ui,sans-serif;color:var(--rl-muted);margin:8px 0 0 24px}
+.rl-thesis-draft[open]>summary{margin-bottom:20px}.rl-thesis-draft>p{font-size:14px;max-width:900px}
+.rl-thesis-section{padding:20px 0;border-top:1px solid #dce3d9;margin-top:20px}
+.rl-thesis-section>header{display:flex;justify-content:space-between;gap:16px;align-items:center}
+.rl-thesis-section h3{font-size:18px;margin:0 0 6px}.rl-thesis-section small{font-size:12px;color:var(--rl-muted)}
+.rl-thesis-section button{font-size:12px}.rl-thesis-section details{margin-top:16px}.rl-thesis-section details>summary{font-size:13px}
+.rl-thesis-section h4{font-size:14px;margin:20px 0 8px}.rl-thesis-section p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px}
+.rl-peer-support{background:#f0edf6;border:1px solid #dbd3e8;border-radius:12px;padding:17px;margin:24px 0}.rl-peer-support p{font-size:13px}.rl-peer-support button{font-size:13px}
+@media(max-width:720px){.rl-construction-heading{padding:22px 20px;min-height:260px}.rl-construction-heading .rl-hero-copy h1{font-size:34px}.rl-construction-heading .rl-hero-copy>p:not(.rl-eyebrow){font-size:13px}.rl-current-work{font-size:11px}.rl-project-tools{gap:2px 16px}.research-learning .rl-project-tools button{font-size:12px}.rl-thesis-draft{padding:20px 16px}.rl-thesis-draft>summary{font-size:22px}.rl-thesis-section>header{align-items:flex-start;flex-direction:column}.rl-thesis-section h3{font-size:17px}.rl-project-anchor{margin-top:20px}}

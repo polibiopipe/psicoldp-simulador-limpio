@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { LogOut } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { ArrowLeft, LogOut } from 'lucide-react';
 import { SeminarTeamWorkspace } from './SeminarTeamWorkspace.jsx';
 import { ResearchLearningWorkspace } from './ResearchLearningWorkspace.jsx';
 
@@ -7,23 +7,29 @@ export function CollaborativeSeminarShell({ session, onSignOut, frameRef, semina
   const [view, setView] = useState('learn');
   const [importedDraft, setImportedDraft] = useState(null);
   const [requestedLesson, setRequestedLesson] = useState(null);
+  const panels = useRef({});
+  const learningPosition = useRef(0);
+  function openSupport(next) {
+    if (view === 'learn') learningPosition.current = globalThis.scrollY || 0;
+    setView(next);
+    globalThis.requestAnimationFrame?.(() => {
+      panels.current[next]?.focus({ preventScroll: true });
+      globalThis.scrollTo?.({ top: next === 'learn' ? learningPosition.current : 0, behavior: 'instant' });
+    });
+  }
   return <main className="seminar-standalone-shell">
     <header className="seminar-session-bar">
-      <div><strong>Ruta de Seminario</strong><span>PsicoLDP · Investigación colaborativa</span></div>
+      <div><strong>Simulador de tesis</strong><span>PsicoLDP · Aprender investigando</span></div>
       <div><span>{session.user.email}</span><button type="button" onClick={onSignOut}><LogOut aria-hidden="true"/> Cerrar sesión</button></div>
     </header>
-    <nav className="seminar-mode-tabs" role="tablist" aria-label="Espacios del seminario">
-      <button id="seminar-learn-tab" type="button" role="tab" aria-controls="seminar-learn-panel" aria-selected={view === 'learn'} onClick={() => setView('learn')}>Mi proyecto · Guía y práctica</button>
-      <button id="seminar-team-tab" type="button" role="tab" aria-controls="seminar-team-panel" aria-selected={view === 'team'} onClick={() => setView('team')}>Mi equipo · Revisión y XP</button>
-      <button id="seminar-guide-tab" type="button" role="tab" aria-controls="seminar-guide-panel" aria-selected={view === 'guide'} onClick={() => setView('guide')}>Calendario y archivo</button>
-    </nav>
-    <div id="seminar-learn-panel" className="seminar-mode-panel" role="tabpanel" aria-labelledby="seminar-learn-tab" hidden={view !== 'learn'}>
-      <ResearchLearningWorkspace key={session.user.id} session={session} requestedLesson={requestedLesson} onOpenTeam={() => setView('team')} onOpenArchive={() => setView('guide')} onShare={draft => { setImportedDraft(draft); setView('team'); }}/>
+    {view !== 'learn' && <div className="seminar-support-return"><button type="button" onClick={() => openSupport('learn')}><ArrowLeft aria-hidden="true"/> Volver a construir mi tesis</button><p>{view === 'team' ? 'Revisa tu desarrollo con el equipo y vuelve al apartado para incorporar lo aprendido.' : 'Consulta tus fechas y registros anteriores; continúa la construcción desde tu tesis.'}</p></div>}
+    <div ref={node => { panels.current.learn = node; }} tabIndex={-1} id="seminar-learn-panel" className="seminar-mode-panel" role="region" aria-label="Construir mi tesis" hidden={view !== 'learn'}>
+      <ResearchLearningWorkspace key={session.user.id} session={session} requestedLesson={requestedLesson} onOpenTeam={() => openSupport('team')} onOpenArchive={() => openSupport('guide')} onShare={draft => { setImportedDraft(draft); openSupport('team'); }}/>
     </div>
-    <div id="seminar-team-panel" className="seminar-mode-panel" role="tabpanel" aria-labelledby="seminar-team-tab" hidden={view !== 'team'}>
-      <SeminarTeamWorkspace key={session.user.id} session={session} importedDraft={importedDraft} onOpenLearning={id => { setRequestedLesson({ id, requestId: globalThis.crypto.randomUUID() }); setView('learn'); }} onOpenGuide={() => setView('guide')}/>
+    <div ref={node => { panels.current.team = node; }} tabIndex={-1} id="seminar-team-panel" className="seminar-mode-panel" role="region" aria-label="Revisión de mi tesis con el equipo" hidden={view !== 'team'}>
+      <SeminarTeamWorkspace key={session.user.id} session={session} importedDraft={importedDraft} onOpenLearning={id => { setRequestedLesson({ id, requestId: globalThis.crypto.randomUUID() }); setView('learn'); }} onOpenGuide={() => openSupport('learn')}/>
     </div>
-    <div id="seminar-guide-panel" className="seminar-mode-panel" role="tabpanel" aria-labelledby="seminar-guide-tab" hidden={view !== 'guide'}>
+    <div ref={node => { panels.current.guide = node; }} tabIndex={-1} id="seminar-guide-panel" className="seminar-mode-panel" role="region" aria-label="Consulta de calendario y archivo" hidden={view !== 'guide'}>
       <p className="seminar-team-local-caption">Este archivo acompaña la ruta única del proyecto y conserva sus actividades y los borradores de este navegador. Estos registros anteriores no se publican ni se atribuyen automáticamente a una persona. Para compartir un desarrollo, copia el contenido pertinente en un nuevo aporte de la mesa del equipo y enlaza su evidencia.</p>
       <iframe ref={frameRef} className="seminar-standalone-frame" srcDoc={seminarDocument} title="Ruta de Seminario · Guía y borradores anteriores"/>
     </div>
