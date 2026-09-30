@@ -10,6 +10,7 @@ import { ResearchKanban } from './ResearchKanban.jsx';
 import { ProjectFiles } from './ProjectFiles.jsx';
 import { cleanProject, boardCsv } from './projectWorkspaceModel.js';
 import { createThesisDocx } from './thesisDocx.js';
+import { ResearchProjectDashboard, DecisionLog } from './ResearchProjectDashboard.jsx';
 import './projectWorkspace.css';
 import { JOURNEY_STAGES, stageFor, cleanGuide, cleanLearning, nextJourneyModule, routeIds } from './learningJourney.js';
 
@@ -50,6 +51,7 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson, o
   const lesson = LESSONS.find(row => row.id === notebook.selected) || LESSONS[0];
   const record = notebook.records[lesson.id] || {};
   const project = notebook.project || { folder: '', folderName: '', files: [], board: { wipLimit: 3, cards: [] } };
+  const decisions = Array.isArray(notebook.decisions) ? notebook.decisions : [];
   const fingerprint = reviewSnapshot(record);
   const route = routeIds(notebook.guide);
   const reviewed = route.filter(id => isLessonReviewed(notebook.records[id])).length;
@@ -207,6 +209,7 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson, o
       <div className="rl-hero-copy"><p className="rl-eyebrow"><Sprout aria-hidden="true"/> PSICOLDP · APRENDER INVESTIGANDO</p><h1>Construir mi tesis.</h1><p>Comprende cada apartado, ensaya con un ejemplo y escribe tu propia investigación. Revisa tus decisiones y conecta lo que vas construyendo.</p><button type="button" className="rl-primary" onClick={() => jumpTo(moduleRef)}>{started ? 'Continuar mi tesis' : 'Comenzar mi tesis'} <ArrowRight aria-hidden="true"/></button><small className="rl-current-work">{started ? 'Retoma' : 'Comienza con'}: {lesson.title}</small></div>
       <div className="rl-progress"><BookOpen aria-hidden="true"/><strong>{reviewed}<span> / {route.length}</span></strong><span>módulos con revisión personal vigente en tu ruta</span><progress value={reviewed} max={route.length} aria-label="Módulos con revisión personal vigente en mi ruta"/><small>Tu ruta se ajusta al enfoque que eliges.</small></div>
     </header>
+    <ResearchProjectDashboard records={notebook.records} guide={notebook.guide || {}} project={project} decisions={decisions} onOpenLesson={select}/>
     <nav className="rl-project-tools" aria-label="Herramientas de mi tesis"><button type="button" onClick={() => { setDraftOpen(true); jumpTo(draftRef); }}>Ver mi tesis en construcción</button><button type="button" onClick={() => jumpTo(guideRef)}>Consultar mi ruta y decisiones</button><button type="button" onClick={() => { setBoardOpen(true); jumpTo(boardRef); }}>Mi tablero Kanban</button><button type="button" onClick={() => { setFilesOpen(true); jumpTo(filesRef); }}>Mis archivos y Drive</button></nav>
     <div className="rl-storage"><p>{storageError || 'Tu cuaderno se guarda en este navegador y esta cuenta. Comparte los aportes desde la mesa del equipo.'}</p><details><summary>Mi cuaderno y respaldos</summary><div className="rl-actions"><button type="button" onClick={exportNotebook}>Exportar cuaderno</button><button type="button" onClick={exportText}>Descargar cuaderno de aprendizaje</button><label className="rl-file">Recuperar copia<input type="file" accept="application/json,.json" onChange={importNotebook}/></label></div></details></div>
     {notice && <p className="rl-notice" role="status">{notice}</p>}
@@ -256,6 +259,7 @@ export function ResearchLearningWorkspace({ session, onShare, requestedLesson, o
         <footer className="rl-navigation"><button type="button" disabled={step === 0} onClick={() => navigate(step - 1)}>Paso anterior</button><span>{step + 1} de 6</span>{step < 5 ? <button type="button" onClick={() => navigate(step + 1)}>Siguiente paso</button> : <button type="button" disabled={!nextJourneyModule(lesson.id,notebook.guide)} onClick={() => select(nextJourneyModule(lesson.id,notebook.guide))}>Siguiente módulo</button>}</footer>
       </div>
     </div>
+    <DecisionLog decisions={decisions} lesson={lesson} onChange={value => setNotebook(previous => ({ ...previous, decisions: value }))}/>
     <div ref={draftRef} tabIndex={-1} className="rl-project-anchor"><ThesisDraft records={notebook.records} onEdit={select} open={draftOpen} onToggle={setDraftOpen} onDownload={downloadThesis} onDownloadWord={() => generateFile('thesis-docx')}/></div>
     <div ref={boardRef} tabIndex={-1} className="rl-project-anchor"><ResearchKanban board={project.board} onChange={board => updateProject({ board })} onOpenLesson={select} requestedPlan={requestedPlan} open={boardOpen} onToggle={setBoardOpen} onExport={() => generateFile('board')}/></div>
     <div ref={filesRef} tabIndex={-1} className="rl-project-anchor"><ProjectFiles project={project} onChange={updateProject} onGenerate={generateFile} lesson={lesson} open={filesOpen} onToggle={setFilesOpen} hasThesis={thesisSections(notebook.records).length > 0} hasSection={lesson.fields.some(field => record.fields?.[field.key]?.trim())}/></div>
