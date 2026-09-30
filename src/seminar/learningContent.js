@@ -287,7 +287,7 @@ export function computeFlow(searches = [], flow = {}) {
 }
 
 export function reviewSnapshot(record = {}) {
-  return JSON.stringify({ fields: record.fields || {}, practice: record.practice || '', reflection: record.reflection || '', source: record.source || '', tools: record.tools || {}, ...(record.learning?.reason || record.learning?.alternative ? { practiceRationale: { reason: record.learning.reason || '', alternative: record.learning.alternative || '' } } : {}), ...(record.learning?.transfer || record.learning?.transferReason ? { transfer: { answer:record.learning.transfer || '', reason:record.learning.transferReason || '' } } : {}) });
+  return JSON.stringify({ fields: record.fields || {}, practice: record.practice || '', reflection: record.reflection || '', source: record.source || '', tools: record.tools || {}, ...(record.learning?.reason || record.learning?.alternative ? { practiceRationale: { reason: record.learning.reason || '', alternative: record.learning.alternative || '' } } : {}), ...(record.learning?.teachingReason || record.learning?.teachingRevision ? { guidedDecision: { choice:record.learning.teachingChoice || '', reason:record.learning.teachingReason || '', revision:record.learning.teachingRevision || '' } } : {}), ...(record.learning?.transfer || record.learning?.transferReason ? { transfer: { answer:record.learning.transfer || '', reason:record.learning.transferReason || '' } } : {}) });
 }
 export function isLessonReviewed(record = {}) {
   return !!record.review && record.review.snapshot === reviewSnapshot(record);

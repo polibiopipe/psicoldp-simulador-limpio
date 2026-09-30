@@ -256,3 +256,144 @@ assert.equal(renderer.root.findByProps({className:'rl-content'}).props['aria-lab
 assert.ok(panel('learn').findAllByType('textarea').some(node=>node.props.value==='Mi escritura antes de consultar un apoyo.'));
 await act(async()=>renderer.unmount());
 console.log('PASS seminar learning: unified writing entry, thesis draft isolation, support round trips, content, boolean logic, real counts, review invalidation, persistence isolation, feedback, methods and XP');
+
+
+// Learning, document production and personal workflow form one recoverable project.
+const { DEEP_TEACHING, GUIDED_CASES } = await import('../src/seminar/deepTeachingContent.js');
+const { cleanProject, driveFolder, driveFile, activeWork, transitionCard, boardCsv } = await import('../src/seminar/projectWorkspaceModel.js');
+const { createThesisDocx } = await import('../src/seminar/thesisDocx.js');
+const { spawnSync } = await import('node:child_process');
+assert.deepEqual(Object.keys(DEEP_TEACHING).sort(),LESSONS.map(row=>row.id).sort());
+for(const lesson of LESSONS) {
+  const teaching=DEEP_TEACHING[lesson.id];
+  assert.ok(teaching.explanation.length>100 && teaching.distinction.length>80);
+  assert.equal(teaching.walkthrough.length,3);
+  assert.ok(teaching.walkthrough.every(row=>row.action && row.reason));
+}
+for(const stage of JOURNEY_STAGES) {
+  const task=GUIDED_CASES[stage.id];
+  assert.equal(task.options.length,3);
+  assert.ok(Number.isInteger(task.answer) && task.answer>=0 && task.answer<3 && task.feedback);
+}
+assert.equal(driveFolder('https://drive.google.com/drive/u/0/folders/demo_123?resourcekey=key_1&usp=sharing'),'https://drive.google.com/drive/folders/demo_123?resourcekey=key_1');
+for(const bad of ['http://drive.google.com/drive/folders/a','https://drive.google.com.evil.test/drive/folders/a','https://person@drive.google.com/drive/folders/a','https://drive.google.com/file/d/a/view']) assert.equal(driveFolder(bad),'');
+assert.ok(driveFile('https://docs.google.com/document/d/demo/edit'));
+assert.ok(driveFile('https://drive.google.com/file/d/demo/view'));
+for(const bad of ['javascript:alert(1)','https://drive.google.com/drive/folders/a','https://evil.test/file/d/a']) assert.equal(driveFile(bad),'');
+const cleanBoard=cleanProject({folder:'javascript:bad',files:[{url:'javascript:bad'}],board:{wipLimit:2,cards:[{id:'one',title:'Primera',status:'doing',product:'Matriz',checks:[{text:'Fuentes verificadas',done:true}],due:'2026-02-30',evidence:'javascript:bad'},{id:'two',title:'Segunda',status:'review',product:'Pregunta',checks:[]},{id:'three',title:'Tercera',status:'todo',product:'Objetivos',checks:[]}]}}).board;
+assert.equal(activeWork(cleanBoard.cards).length,2);
+assert.equal(cleanBoard.cards[0].due,'');
+assert.equal(cleanBoard.cards[0].evidence,'');
+assert.ok(transitionCard(cleanBoard,'three','doing').error.includes('límite'));
+assert.ok(transitionCard(cleanBoard,'one','done').error.includes('revisión de cierre'));
+const readyBoard={...cleanBoard,cards:cleanBoard.cards.map(c=>c.id==='one'?{...c,reviewNote:'Contrasté la matriz con las fuentes.'}:c)};
+assert.ok(transitionCard({...readyBoard,cards:readyBoard.cards.map(c=>({...c,blocked:true}))},'one','done').error);
+const completedBoard=transitionCard(readyBoard,'one','done','2026-09-30T10:00:00.000Z').board;
+assert.equal(completedBoard.cards[0].finishedAt,'2026-09-30T10:00:00.000Z');
+assert.equal(transitionCard(completedBoard,'one','review').board.cards[0].finishedAt,'');
+assert.ok(boardCsv({cards:[{...readyBoard.cards[0],title:'=SUM(A1:A2)'}]}).includes('"\'=SUM(A1:A2)"'));
+const sanitized=cleanProject({board:{cards:[{id:'duplicate'},{id:'duplicate'}]}});
+assert.equal(new Set(sanitized.board.cards.map(c=>c.id)).size,2);
+
+// Validate the actual DOCX zip and XML, including unicode and escaped student text.
+const wordBytes=createThesisDocx([{lesson:LESSONS[0],record:{fields:{theme:'Psicología & decisión <abierta> ñ'},source:'Fuente propia',practice:'EXERCISE_ONLY',coach:{suggestedRewrite:'SUGGESTION_ONLY'}}}]);
+const docxPath=resolve('.audit-verification/tmp/thesis-export.docx');
+writeFileSync(docxPath,wordBytes);
+const docxCheck=spawnSync('python3',['-c',[
+'import sys,zipfile,xml.etree.ElementTree as ET',
+'with zipfile.ZipFile(sys.argv[1]) as z:',
+' assert z.testzip() is None',
+' assert {"[Content_Types].xml","_rels/.rels","word/document.xml","word/styles.xml","word/_rels/document.xml.rels"}.issubset(z.namelist())',
+' for name in z.namelist(): ET.fromstring(z.read(name))',
+' root=ET.fromstring(z.read("word/document.xml"))',
+' text=" ".join(root.itertext())',
+' assert "Psicología & decisión <abierta> ñ" in text',
+' assert "Fuente propia" in text',
+' assert "EXERCISE_ONLY" not in text and "SUGGESTION_ONLY" not in text',
+' assert "[Pendiente de desarrollar]" in text'
+].join('\n'),docxPath],{encoding:'utf8'});
+assert.equal(docxCheck.status,0,docxCheck.stderr || docxCheck.error?.message);
+
+await mount('student-e');
+await click('Ver ejemplos');
+assert.ok(button('Contrastar esta decisión').props.disabled);
+await act(async()=>renderer.root.findAllByType('input').find(n=>n.props.name==='teaching-tema'&&n.props.value==='0').props.onChange({target:{value:'0'}}));
+await field('Mis razones antes de contrastar','Debo explicitar la intención antes de elegir una técnica.');
+await click('Contrastar esta decisión');
+assert.ok(text(renderer.toJSON()).includes('Examina esta alternativa'));
+await field('Qué ajusto después de comparar','Reformularé la intención sin anticipar un resultado.');
+await field('Mis razones antes de contrastar','Reviso mi razón después de considerar una intención abierta.');
+assert.ok(!text(renderer.toJSON()).includes('Examina esta alternativa'));
+assert.ok(text(renderer.toJSON()).includes('Cambiaste tu respuesta'));
+await click('Contrastar esta decisión');
+await click('Llevar este aprendizaje a mi apartado');
+await field('Mi tema','Investigación propia con respaldo y decisiones explícitas.');
+await click('Organizar este apartado en Kanban');
+assert.equal(renderer.root.findByProps({className:'pw-panel pw-kanban'}).props.open,true);
+await field('Título de la tarea','Comparar antecedentes para mi tema');
+await field('Producto verificable','Una matriz que compara pregunta, método y aporte.');
+await field('Criterios de terminado','Contrasté la matriz con los artículos.');
+await field('Responsable','Autora');
+await field('Revisor o par','Par de investigación');
+await field('Revisión de cierre','Revisé los pasajes y corregí una diferencia de alcance.');
+await click('Guardar tarea');
+let projectSaved=JSON.parse(local.get('seminar-learning-v1:student-e'));
+assert.equal(projectSaved.project.board.cards.length,1);
+const taskState=()=>renderer.root.findByProps({'aria-label':'Estado de Comparar antecedentes para mi tema'});
+await act(async()=>taskState().props.onChange({target:{value:'doing'}}));
+await act(async()=>taskState().props.onChange({target:{value:'done'}}));
+assert.ok(text(renderer.toJSON()).includes('comprueba todos los criterios'));
+const criterion=renderer.root.findByProps({className:'pw-card'}).findByType('input');
+await act(async()=>criterion.props.onChange({target:{checked:true}}));
+await act(async()=>taskState().props.onChange({target:{value:'review'}}));
+await act(async()=>taskState().props.onChange({target:{value:'done'}}));
+assert.equal(JSON.parse(local.get('seminar-learning-v1:student-e')).project.board.cards[0].status,'done');
+await click('Editar tarea');
+await field('Producto verificable','Cambio posterior al cierre.');
+await click('Guardar tarea');
+assert.ok(text(renderer.toJSON()).includes('Reabre la tarjeta'));
+await act(async()=>taskState().props.onChange({target:{value:'review'}}));
+await click('Guardar tarea');
+assert.equal(JSON.parse(local.get('seminar-learning-v1:student-e')).project.board.cards[0].product,'Cambio posterior al cierre.');
+await click('Mis archivos y Drive');
+await field('Enlace de mi carpeta en Drive','https://drive.google.com/drive/folders/my-thesis');
+await field('Nombre de mi carpeta','Tesis personal');
+await click('Vincular carpeta');
+assert.equal(JSON.parse(local.get('seminar-learning-v1:student-e')).project.folder,'https://drive.google.com/drive/folders/my-thesis');
+const oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL,oldDocument=globalThis.document;
+const blobs=new Map(),downloads=[];
+URL.createObjectURL=blob=>{const id='blob:fixture-'+blobs.size;blobs.set(id,blob);return id;};
+URL.revokeObjectURL=()=>{};
+globalThis.document={createElement:()=>({click(){downloads.push({name:this.download,url:this.href});}})};
+await click('Este apartado en Word');
+assert.ok(downloads.at(-1).name.endsWith('.docx'));
+assert.equal(blobs.get(downloads.at(-1).url).type,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+assert.ok(text(renderer.toJSON()).includes('enlace en Drive pendiente'));
+await click('Asociar o cambiar enlace');
+await field('Enlace al archivo en Drive','https://docs.google.com/document/d/my-first-version/edit');
+await click('Guardar enlace de esta versión');
+assert.equal(JSON.parse(local.get('seminar-learning-v1:student-e')).project.files[0].url,'https://docs.google.com/document/d/my-first-version/edit');
+await click('Respaldo completo');
+const projectBackup=await blobs.get(downloads.at(-1).url).text();
+const exportedProject=JSON.parse(projectBackup);
+assert.equal(exportedProject.project.board.cards[0].status,'review');
+assert.equal(exportedProject.project.files[0].url,'https://docs.google.com/document/d/my-first-version/edit');
+assert.ok(exportedProject.records.tema.learning.teachingRevision.includes('Reformularé'));
+URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke;globalThis.document=oldDocument;
+await act(async()=>renderer.unmount());
+await mount('student-e');
+assert.equal(JSON.parse(local.get('seminar-learning-v1:student-e')).project.board.cards.length,1);
+await click('Ver ejemplos');
+assert.ok(renderer.root.findAllByType('textarea').some(node=>node.props.value.includes('Reformularé')));
+const projectUpload=renderer.root.findAllByType('input').find(node=>node.props.type==='file');
+await act(async()=>projectUpload.props.onChange({target:{value:'',files:[{size:projectBackup.length,text:async()=>projectBackup}]}}));
+projectSaved=JSON.parse(local.get('seminar-learning-v1:student-e'));
+assert.equal(projectSaved.project.board.cards[0].status,'review');
+assert.equal(projectSaved.project.files[0].url,'https://docs.google.com/document/d/my-first-version/edit');
+assert.ok(projectSaved.records.tema.learning.teachingRevision.includes('Reformularé'));
+await act(async()=>renderer.unmount());
+await mount('student-f');
+assert.equal(renderer.root.findAllByProps({className:'pw-card'}).length,0);
+assert.ok(!text(renderer.toJSON()).includes('Tesis personal'));
+await act(async()=>renderer.unmount());
+console.log('PASS project learning: 29 worked modules, reasoned feedback, Kanban criteria/WIP, Drive link validation, DOCX zip/XML, backup restoration and account isolation');
