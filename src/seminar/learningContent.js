@@ -1,6 +1,8 @@
+import { ADVANCED_REFERENCES, methodologyLessons, collaborationLessons } from './advancedLearningContent.js';
 // Stable identifiers keep student work attached to its original learning unit.
 export const LEARNING_STEPS = ['Comprender', 'Ver ejemplos', 'Practicar', 'Aplicar a mi investigación', 'Recibir retroalimentación', 'Comprobar coherencia'];
 export const REFERENCES = {
+  ...ADVANCED_REFERENCES,
   manual: { label: 'Manual de estudio del equipo (2026)', text: 'Llanos Muñoz, L., Toledo Hein, C. D., & Solís Celedón, P. F. (2026). Manual completo de estudio y dominio de tesis [Documento de estudio interno, versión del 29 de septiembre].', note: 'Base didáctica de los módulos de planteamiento. Sus decisiones metodológicas pendientes no se presentan como acuerdos definitivos.' },
   spider: { label: 'Cooke, Smith y Booth (2012)', text: 'Cooke, A., Smith, D., & Booth, A. (2012). Beyond PICO: The SPIDER tool for qualitative evidence synthesis. Qualitative Health Research, 22(10), 1435–1443.', url: 'https://doi.org/10.1177/1049732312452938' },
   pico: { label: 'Richardson et al. (1995)', text: 'Richardson, W. S., Wilson, M. C., Nishikawa, J., & Hayward, R. S. A. (1995). The well-built clinical question: A key to evidence-based decisions. ACP Journal Club, 123(3), A12–A13.', url: 'https://doi.org/10.7326/ACPJC-1995-123-3-A12' },
@@ -168,7 +170,8 @@ export const LESSONS = [
     'Un estudiante puntúa alto pero describe dificultades. ¿Qué puede aportar integrar ambas evidencias?',
     'Permite examinar la discrepancia y su contexto, sin asumir que una evidencia anula la otra. Define cuándo y con qué unidad de análisis las compararías.',
     [['approach','Enfoque y razón','Qué necesitas conocer y qué evidencia lo hace posible.'],['design','Diseño y secuencia','Decisiones propuestas y alternativas consideradas.'],['integration','Integración o justificación de no aplicabilidad','Cómo se relacionan componentes si el estudio es mixto.']],
-    ['¿El diseño permite responder mis objetivos?', '¿Diferencio propuesta metodológica y decisión ya aprobada?'], ['manual','qual','quant']),
+    ['¿El diseño permite responder mis objetivos?', '¿Diferencio propuesta metodológica y decisión ya aprobada?'], ['manual','qual','quant','mixed']),
+  ...methodologyLessons(lesson),
   lesson('muestra', 'Participantes y muestreo', 'Diseñar',
     'El muestreo establece cómo se seleccionarán participantes o casos de una población delimitada. Su justificación depende de la pregunta, el enfoque y la viabilidad.',
     'Explicitar a quién representa o a qué contextos puede transferirse el conocimiento producido.', 'Al planificar acceso, reclutamiento y alcance.',
@@ -208,7 +211,7 @@ export const LESSONS = [
     'Si una fuente contradice a otra, ¿por qué no conviene eliminarla para que el resultado sea uniforme?',
     'La discrepancia puede aportar conocimiento. Revisa calidad, contexto y alcance de ambas antes de interpretar.',
     [['plan','Objetivos y procedimientos de análisis','Indica datos, unidad y procedimiento por objetivo.'],['integration','Comparación e integración','Cómo tratarás convergencias y discrepancias.'],['limits','Supuestos y decisiones pendientes','Qué requiere justificación o asesoría metodológica.']],
-    ['¿Cada objetivo tiene una estrategia de análisis?', '¿Evito presentar asociaciones como causas?'], ['manual','qual','quant']),
+    ['¿Cada objetivo tiene una estrategia de análisis?', '¿Evito presentar asociaciones como causas?'], ['manual','qual','quant','mixed']),
   lesson('resultados', 'Resultados y evidencia', 'Comunicar',
     'Los resultados presentan lo encontrado mediante el análisis realizado. Una expectativa o una ilustración no es un hallazgo.',
     'Responder objetivos con evidencia trazable.', 'Después de recoger y analizar datos; antes solo se planifica la presentación.',
@@ -228,7 +231,7 @@ export const LESSONS = [
     'Escribe una limitación para un estudio en una sola institución y explica su consecuencia.',
     'Las condiciones de esa institución pueden influir en los hallazgos. Deben describirse y limitar la extensión de las conclusiones.',
     [['interpretation','Interpretación o plan de discusión','Relaciona hallazgos con teoría; declara si todavía es un plan.'],['limitations','Limitaciones y alternativas','Qué explicación rival o condición restringe la interpretación.'],['conclusions','Conclusiones o preguntas pendientes','Responde dentro del alcance; no anticipes resultados.']],
-    ['¿Las conclusiones responden la pregunta sin exceder el diseño?', '¿La discusión retoma los antecedentes construidos?'], ['manual','qual','quant']),
+    ['¿Las conclusiones responden la pregunta sin exceder el diseño?', '¿La discusión retoma los antecedentes construidos?'], ['manual','qual','quant','mixed']),
   lesson('referencias', 'Citas y referencias APA 7', 'Comunicar',
     'La cita identifica la fuente de una afirmación; la referencia permite localizarla. La paráfrasis conserva el sentido y también requiere atribución.',
     'Hacer rastreable el argumento y reconocer el trabajo previo.', 'Durante la escritura, no solo al final.',
@@ -248,7 +251,8 @@ export const LESSONS = [
     'Responde: «¿Qué cambiaría en tu estudio si no aparece la relación esperada?».',
     'Un resultado nulo o discrepante sigue siendo informativo. La interpretación se ajusta a la evidencia y no se fuerza para confirmar expectativas.',
     [['account','Mi explicación del proyecto','Problema, pregunta, objetivo y propuesta metodológica.'],['objection','Objeción y respuesta','Razones, fuentes y límites.'],['next','Qué debemos revisar','Decisiones pendientes y apartados afectados.']],
-    ['¿Puedo explicar la continuidad problema–pregunta–objetivos–método?', '¿Reconozco qué sigue abierto?'], ['manual','feedback'])
+    ['¿Puedo explicar la continuidad problema–pregunta–objetivos–método?', '¿Reconozco qué sigue abierto?'], ['manual','feedback']),
+  ...collaborationLessons(lesson)
 ];
 
 export const SEARCH_SOURCES = [

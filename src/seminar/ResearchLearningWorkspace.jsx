@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LESSONS, LEARNING_STEPS, REFERENCES, SEARCH_SOURCES, buildBoolean, computeFlow, reviewSnapshot, isLessonReviewed, draftText, structuralFeedback } from './learningContent.js';
+import { LearningEntrances, MethodExplorer, ResearchReadingRoom, PairReviewLab } from './ResearchLabs.jsx';
+import { ArrowRight, BookOpen, Check, Sprout } from 'lucide-react';
 import './researchLearning.css';
 
 const empty = () => ({ schema: 1, selected: LESSONS[0].id, records: {} });
@@ -13,12 +15,13 @@ function loadNotebook(key) {
   } catch { return { data: empty(), error: 'No pudimos recuperar el cuaderno de este navegador. No se sobrescribirá el registro anterior. Exporta lo que escribas en esta sesión y conserva la página abierta.' }; }
 }
 
-export function ResearchLearningWorkspace({ session, onShare }) {
+export function ResearchLearningWorkspace({ session, onShare, requestedLesson }) {
   const storageKey = 'seminar-learning-v1:' + session.user.id;
   const [initial] = useState(() => loadNotebook(storageKey));
   const [notebook, setNotebook] = useState(initial.data);
   const [storageError, setStorageError] = useState(initial.error);
   const [step, setStep] = useState(0);
+  const [moduleQuery, setModuleQuery] = useState('');
   const [notice, setNotice] = useState('');
   const [checks, setChecks] = useState({});
   const [showModel, setShowModel] = useState(false);
@@ -27,6 +30,7 @@ export function ResearchLearningWorkspace({ session, onShare }) {
   const [decision, setDecision] = useState('');
   const request = useRef(null);
   const contentRef = useRef(null);
+  const moduleRef = useRef(null);
   const lesson = LESSONS.find(row => row.id === notebook.selected) || LESSONS[0];
   const record = notebook.records[lesson.id] || {};
   const fingerprint = reviewSnapshot(record);
@@ -46,7 +50,11 @@ export function ResearchLearningWorkspace({ session, onShare }) {
   function select(id) {
     request.current?.abort(); request.current = null; setBusy(false); setCoachError('');
     setNotebook(previous => ({ ...previous, selected: id })); setStep(0); setShowModel(false); setNotice(''); setDecision('');
+    globalThis.requestAnimationFrame?.(() => { moduleRef.current?.focus({ preventScroll: true }); moduleRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' }); });
   }
+  useEffect(() => {
+    if (requestedLesson && LESSONS.some(row => row.id === requestedLesson.id)) select(requestedLesson.id);
+  }, [requestedLesson]);
   function navigate(next) { setStep(next); setNotice(''); contentRef.current?.focus(); }
   function exportNotebook() {
     const output = { ...notebook, exportedAt: new Date().toISOString() };
@@ -136,23 +144,34 @@ export function ResearchLearningWorkspace({ session, onShare }) {
   }
 
   return <section className="research-learning" aria-label="Aula formativa de investigación">
-    <header className="rl-heading"><div><p className="rl-eyebrow">PSICOLDP · APRENDER A INVESTIGAR</p><h1>Comprende cada decisión.<br/>Construye tu investigación.</h1><p>Un concepto a la vez, con ejemplos, práctica y revisión de tu propio proyecto.</p></div><div className="rl-progress"><strong>{reviewed}<span> / {LESSONS.length}</span></strong><span>módulos con revisión personal vigente</span></div></header>
-    <div className="rl-storage"><p>{storageError || 'Tu cuaderno se guarda en este navegador y esta cuenta. Para compartir y guardar un aporte con el equipo, llévalo a la mesa.'}</p><div className="rl-actions"><button type="button" onClick={exportNotebook}>Exportar cuaderno</button><button type="button" onClick={exportText}>Descargar desarrollo</button><label className="rl-file">Recuperar copia<input type="file" accept="application/json,.json" onChange={importNotebook}/></label></div></div>
+    <header className="rl-heading">
+      <div className="rl-hero-copy"><p className="rl-eyebrow"><Sprout aria-hidden="true"/> PSICOLDP · APRENDER A INVESTIGAR</p><h1>La curiosidad es<br/>un buen comienzo.</h1><p>Comprende cada decisión. Da forma a tu investigación con ejemplos, práctica y conversaciones que hacen avanzar.</p><button type="button" className="rl-primary" onClick={() => { navigate(step); contentRef.current?.scrollIntoView({behavior:'auto',block:'start'}); }}>Continuar mi módulo <ArrowRight aria-hidden="true"/></button></div>
+      <div className="rl-progress"><BookOpen aria-hidden="true"/><strong>{reviewed}<span> / {LESSONS.length}</span></strong><span>módulos con revisión personal vigente</span><progress value={reviewed} max={LESSONS.length} aria-label="Módulos con revisión personal vigente"/><small>Cada avance tiene su propio ritmo.</small></div>
+    </header>
+    <LearningEntrances onOpen={select}/>
+    <div className="rl-storage"><p>{storageError || 'Tu cuaderno se guarda en este navegador y esta cuenta. Comparte los aportes desde la mesa del equipo.'}</p><details><summary>Mi cuaderno y respaldos</summary><div className="rl-actions"><button type="button" onClick={exportNotebook}>Exportar cuaderno</button><button type="button" onClick={exportText}>Descargar desarrollo</button><label className="rl-file">Recuperar copia<input type="file" accept="application/json,.json" onChange={importNotebook}/></label></div></details></div>
     {notice && <p className="rl-notice" role="status">{notice}</p>}
     <div className="rl-layout">
-      <nav className="rl-lessons" aria-label="Módulos de investigación">{[...new Set(LESSONS.map(row => row.group))].map(group => <div key={group}><h2>{group}</h2>{LESSONS.filter(row => row.group === group).map(row => <button key={row.id} type="button" onClick={() => select(row.id)} aria-current={lesson.id === row.id ? 'step' : undefined}><span>{row.title}</span>{isLessonReviewed(notebook.records[row.id]) && <small>Revisión registrada</small>}</button>)}</div>)}</nav>
-      <main className="rl-main">
-        <div className="rl-module-title"><p className="rl-eyebrow">{lesson.group} · Módulo {LESSONS.indexOf(lesson) + 1}</p><h2>{lesson.title}</h2></div>
+      <nav className="rl-lessons" aria-label="Módulos de investigación"><div className="rl-sidebar-title"><span>Tu recorrido</span><small>{LESSONS.length} módulos · a tu ritmo</small></div><label className="rl-module-search">Encontrar un módulo<input type="search" value={moduleQuery} onChange={event => setModuleQuery(event.target.value)} placeholder="Embudo, XP, instrumentos…"/></label>{[...new Set(LESSONS.map(row => row.group))].map(group => {
+        const rows = LESSONS.filter(row => row.group === group && (row.title + ' ' + row.group).toLocaleLowerCase('es').includes(moduleQuery.toLocaleLowerCase('es')));
+        return rows.length ? <div key={group}><h2>{group}</h2>{rows.map(row => <button key={row.id} type="button" onClick={() => select(row.id)} aria-current={lesson.id === row.id ? 'step' : undefined}><span>{row.title}</span>{isLessonReviewed(notebook.records[row.id]) && <small><Check aria-hidden="true"/> Revisión registrada</small>}</button>)}</div> : null;
+      })}{!LESSONS.some(row => (row.title + ' ' + row.group).toLocaleLowerCase('es').includes(moduleQuery.toLocaleLowerCase('es'))) && <p className="rl-caption">No encontramos ese módulo. Prueba otra palabra.</p>}</nav>
+      <label className="rl-mobile-modules">Elige tu módulo<select value={lesson.id} onChange={event => select(event.target.value)}>{[...new Set(LESSONS.map(row => row.group))].map(group => <optgroup key={group} label={group}>{LESSONS.filter(row => row.group === group).map(row => <option key={row.id} value={row.id}>{row.title}</option>)}</optgroup>)}</select></label>
+      <div className="rl-main">
+        <div className="rl-module-title" ref={moduleRef} tabIndex={-1}><p className="rl-eyebrow">{lesson.group} · Módulo {LESSONS.indexOf(lesson) + 1}</p><h2>{lesson.title}</h2></div>
         <nav className="rl-steps" aria-label="Pasos de aprendizaje">{LEARNING_STEPS.map((label, n) => <button type="button" key={label} onClick={() => navigate(n)} aria-current={step === n ? 'step' : undefined}><span>{n + 1}</span>{label}</button>)}</nav>
         <section className="rl-content" ref={contentRef} tabIndex={-1} aria-label={LEARNING_STEPS[step]}>
-          <h3>{LEARNING_STEPS[step]}</h3>
+          <div className="rl-step-heading"><span className="rl-step-number">0{step + 1}</span><div><p className="rl-eyebrow">APRENDE · ENSAYA · CONSTRUYE</p><h3>{LEARNING_STEPS[step]}</h3></div></div>
           {step === 0 && <>
+            <div className="rl-outcome"><BookOpen aria-hidden="true"/><p><strong>Tu próximo producto</strong><span>{lesson.fields.map(field => field.label).join(' · ')}</span></p></div>
+            {lesson.id === 'diseno' && <MethodExplorer onOpen={select}/>}
             <h4>Qué es</h4><p>{lesson.definition}</p><div className="rl-pair"><div><h4>Para qué sirve</h4><p>{lesson.purpose}</p></div><div><h4>Cuándo se utiliza</h4><p>{lesson.when}</p></div></div>
             <h4>Cómo se construye</h4><ol className="rl-process">{lesson.steps.map(item => <li key={item}>{item}</li>)}</ol>
             <Sources refs={lesson.refs}/>
             {lesson.id === 'busqueda' && <SearchDirectory/>}
+            {lesson.id === 'xp' && <ResearchReadingRoom/>}
           </>}
-          {step === 1 && <><p className="rl-caption">Ejemplos didácticos. No son datos, resultados ni decisiones aprobadas de tu investigación.</p><article className="rl-example"><h4>Una formulación que orienta</h4><p>{lesson.example}</p></article><article className="rl-example rl-example-revise"><h4>Una formulación que necesita revisión</h4><p>{lesson.weak}</p></article><h4>Por qué</h4><p>{lesson.explanation}</p><Sources refs={lesson.refs}/></>}
+          {step === 1 && <>{['xp','pares','iteracion'].includes(lesson.id) && <PairReviewLab/>}<p className="rl-caption">Ejemplos didácticos. No son datos, resultados ni decisiones aprobadas de tu investigación.</p><article className="rl-example"><h4>Una formulación que orienta</h4><p>{lesson.example}</p></article><article className="rl-example rl-example-revise"><h4>Una formulación que necesita revisión</h4><p>{lesson.weak}</p></article><h4>Por qué</h4><p>{lesson.explanation}</p><Sources refs={lesson.refs}/></>}
           {step === 2 && <><p>{lesson.practice}</p><TextField label="Mi respuesta al ejercicio" value={record.practice || ''} onChange={value => update({ practice: value })}/><button type="button" disabled={!record.practice?.trim()} onClick={() => setShowModel(true)}>Contrastar con una orientación</button>{showModel && <div className="rl-notice"><h4>Una vía de resolución</h4><p>{lesson.model}</p><p>Compara las razones de tu respuesta, no solo las palabras. Puedes volver a editarla.</p></div>}</>}
           {step === 3 && <><p>Construye este apartado con tus propias fuentes y decisiones. Si algo sigue pendiente, indícalo y explica cómo lo resolverás.</p>{lesson.fields.map(field => <TextField key={lesson.id + field.key} label={field.label} help={field.help} value={record.fields?.[field.key] || ''} onChange={value => update({ fields: { ...record.fields, [field.key]: value } })}/>)}<TextField label="Fuente y pasaje que sustentan este desarrollo" help="Autor, año, documento, página o sección y la afirmación que respalda. Distingue lectura completa, parcial y resumen consultado." value={record.source || ''} onChange={value => update({ source: value })}/>
             {lesson.id === 'booleanas' && <BooleanBuilder tools={record.tools || {}} onChange={tools => update({ tools })} onUse={value => update({ fields: { ...record.fields, strategy: value + '\nPlataforma y fecha de ejecución: pendientes.' } })}/>}
@@ -177,7 +196,7 @@ export function ResearchLearningWorkspace({ session, onShare }) {
           </>}
         </section>
         <footer className="rl-navigation"><button type="button" disabled={step === 0} onClick={() => navigate(step - 1)}>Paso anterior</button><span>{step + 1} de 6</span>{step < 5 ? <button type="button" onClick={() => navigate(step + 1)}>Siguiente paso</button> : <button type="button" disabled={LESSONS.indexOf(lesson) === LESSONS.length - 1} onClick={() => select(LESSONS[LESSONS.indexOf(lesson)+1].id)}>Siguiente módulo</button>}</footer>
-      </main>
+      </div>
     </div>
   </section>;
 }
@@ -218,6 +237,6 @@ function SearchFlow({ tools, onChange }) {
 }
 
 function CoherenceMap({ records, onOpen }) {
-  const rows = [['delimitacion','phenomenon','Fenómeno'],['delimitacion','population','Población'],['delimitacion','context','Contexto'],['concepto','lens','Lente teórico'],['vacio','gap','Vacío'],['vacio','problem','Problema'],['pregunta','question','Pregunta'],['objetivos','general','Objetivo general'],['objetivos','specifics','Objetivos específicos'],['diseno','design','Diseño'],['analisis','plan','Análisis']];
+  const rows = [['delimitacion','phenomenon','Fenómeno'],['delimitacion','population','Población'],['delimitacion','context','Contexto'],['concepto','lens','Lente teórico'],['vacio','gap','Vacío'],['vacio','problem','Problema'],['pregunta','question','Pregunta'],['objetivos','general','Objetivo general'],['objetivos','specifics','Objetivos específicos'],['diseno','design','Diseño'],['analisis','plan','Análisis'],...([['cuantitativo','question','Pregunta cuantitativa'],['cualitativo','question','Pregunta cualitativa'],['mixto','reason','Razón de integración'],['mixto','connection','Punto de integración'],['iteracion','increment','Próximo incremento del equipo']].filter(([id,key]) => records[id]?.fields?.[key]?.trim()))];
   return <details className="rl-map" open><summary>Mi investigación: comprobar la conexión entre apartados</summary><p>Compara palabras y alcance. ¿Aparece un concepto nuevo sin fundamento? ¿Cambian participantes o contexto? ¿Cada objetivo tiene evidencia y análisis previstos?</p><div className="rl-table-wrap"><table><thead><tr><th>Componente</th><th>Mi formulación actual</th><th>Revisar</th></tr></thead><tbody>{rows.map(([id,key,title]) => <tr key={id+key}><th scope="row">{title}</th><td>{records[id]?.fields?.[key] || 'Pendiente de desarrollar'}</td><td><button type="button" onClick={() => onOpen(id)}>Abrir {title.toLowerCase()}</button></td></tr>)}</tbody></table></div></details>;
 }

@@ -21,7 +21,7 @@ function readDraft(key) {
 function timestamp(value) { return value ? new Date(value).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }) : ''; }
 const EVENT_NAMES = { revision: 'Guardó una versión', comment: 'Aportó al contraste', review_approved: 'Registró revisión favorable', review_changes: 'Solicitó ajustes', agree: 'Confirmó su acuerdo', object: 'Dejó una objeción' };
 
-export function SeminarTeamWorkspace({ session, importedDraft, onOpenGuide }) {
+export function SeminarTeamWorkspace({ session, importedDraft, onOpenGuide, onOpenLearning }) {
   const userId = session.user.id;
   const [members, setMembers] = useState([]);
   const [items, setItems] = useState([]);
@@ -224,6 +224,7 @@ export function SeminarTeamWorkspace({ session, importedDraft, onOpenGuide }) {
       <div><p className="st-kicker">RUTA DE SEMINARIO · EQUIPO XP</p><h1>Investigar es un trabajo compartido.</h1><p>Proponer, contrastar y reconstruir. Cada aporte conserva su versión, quién lo registró y qué revisó otra persona.</p></div>
       <button type="button" className="st-secondary" onClick={onOpenGuide}>Consultar la ruta y preparar un borrador →</button>
     </header>
+    {onOpenLearning && <nav className="st-learning-links" aria-label="Talleres para el trabajo del equipo"><span>Antes de construir, explora:</span><button type="button" onClick={() => onOpenLearning('xp')}>Fundamentos de XP y XR</button><button type="button" onClick={() => onOpenLearning('iteracion')}>Planificar una iteración</button><button type="button" onClick={() => onOpenLearning('pares')}>Practicar revisión en pares</button></nav>}
     <div className="st-connection" role="status"><span>{connection}</span><button type="button" onClick={() => { setError(''); void refresh(); }}>Actualizar</button></div>
     {error && <div className="st-error" role="alert">{error}</div>}
     {notice && <div className="st-notice" role="status">{notice}</div>}

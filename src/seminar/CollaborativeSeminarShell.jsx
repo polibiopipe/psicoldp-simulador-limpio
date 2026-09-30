@@ -6,6 +6,7 @@ import { ResearchLearningWorkspace } from './ResearchLearningWorkspace.jsx';
 export function CollaborativeSeminarShell({ session, onSignOut, frameRef, seminarDocument }) {
   const [view, setView] = useState('learn');
   const [importedDraft, setImportedDraft] = useState(null);
+  const [requestedLesson, setRequestedLesson] = useState(null);
   return <main className="seminar-standalone-shell">
     <header className="seminar-session-bar">
       <div><strong>Ruta de Seminario</strong><span>PsicoLDP · Investigación colaborativa</span></div>
@@ -17,10 +18,10 @@ export function CollaborativeSeminarShell({ session, onSignOut, frameRef, semina
       <button id="seminar-guide-tab" type="button" role="tab" aria-controls="seminar-guide-panel" aria-selected={view === 'guide'} onClick={() => setView('guide')}>Guía y borradores anteriores</button>
     </nav>
     <div id="seminar-learn-panel" className="seminar-mode-panel" role="tabpanel" aria-labelledby="seminar-learn-tab" hidden={view !== 'learn'}>
-      <ResearchLearningWorkspace key={session.user.id} session={session} onShare={draft => { setImportedDraft(draft); setView('team'); }}/>
+      <ResearchLearningWorkspace key={session.user.id} session={session} requestedLesson={requestedLesson} onShare={draft => { setImportedDraft(draft); setView('team'); }}/>
     </div>
     <div id="seminar-team-panel" className="seminar-mode-panel" role="tabpanel" aria-labelledby="seminar-team-tab" hidden={view !== 'team'}>
-      <SeminarTeamWorkspace key={session.user.id} session={session} importedDraft={importedDraft} onOpenGuide={() => setView('guide')}/>
+      <SeminarTeamWorkspace key={session.user.id} session={session} importedDraft={importedDraft} onOpenLearning={id => { setRequestedLesson({ id, requestId: globalThis.crypto.randomUUID() }); setView('learn'); }} onOpenGuide={() => setView('guide')}/>
     </div>
     <div id="seminar-guide-panel" className="seminar-mode-panel" role="tabpanel" aria-labelledby="seminar-guide-tab" hidden={view !== 'guide'}>
       <p className="seminar-team-local-caption">La guía conserva sus actividades y los borradores de este navegador. Estos registros anteriores no se publican ni se atribuyen automáticamente a una persona. Para compartir un desarrollo, copia el contenido pertinente en un nuevo aporte de la mesa del equipo y enlaza su evidencia.</p>
