@@ -8,7 +8,8 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { LESSONS, REFERENCES, buildBoolean, computeFlow, reviewSnapshot, isLessonReviewed, structuralFeedback } from '../src/seminar/learningContent.js';
 
-assert.equal(new Set(LESSONS.map(row => row.id)).size, 23);
+assert.equal(new Set(LESSONS.map(row => row.id)).size, 29);
+for (const id of ['tema','embudo','positivo','negativo','booleanas','flujo','defensa','cuantitativo','cualitativo','mixto','xp','iteracion','pares']) assert.ok(LESSONS.some(row => row.id === id));
 for (const row of LESSONS) {
   assert.ok(row.definition && row.purpose && row.when && row.practice && row.model);
   assert.ok(row.steps.length >= 3 && row.fields.length >= 3 && row.coherence.length >= 2);
@@ -43,7 +44,7 @@ const module=await import(pathToFileURL(output).href);
 const Workspace=module.ResearchLearningWorkspace || module.default.ResearchLearningWorkspace;
 let renderer,shared;
 const text=node=>typeof node==='string'?node:(node?.children||[]).map(text).join(' ');
-const button=label=>renderer.root.findAllByType('button').find(node=>text(node).includes(label));
+const button=label=>renderer.root.findAllByType('button').find(node=>text(node).replace(/\s+/g, ' ').includes(label));
 async function click(label){const node=button(label);assert.ok(node,'Button: '+label);await act(async()=>node.props.onClick());}
 async function field(label,value){const node=renderer.root.findAllByType('label').find(node=>text(node).startsWith(label));assert.ok(node,'Label: '+label);const input=node.findAll(node=>node.type==='textarea'||node.type==='input')[0];await act(async()=>input.props.onChange({target:{value}}));}
 async function mount(id='student-a'){await act(async()=>{renderer=TestRenderer.create(React.createElement(Workspace,{session:{user:{id},access_token:'synthetic-token'},onShare:value=>{shared=value;}}));});}
@@ -80,9 +81,43 @@ await act(async()=>renderer.unmount());
 await mount();
 await click('Aplicar a mi investigación');
 assert.ok(renderer.root.findAllByType('textarea').some(node=>node.props.value==='Tema revisado con nueva delimitación.'));
+// Explore without silently changing a student's chosen design or copying fictitious findings.
+await click('Explorar metodología');
+await click('Mixta');
+assert.ok(text(renderer.toJSON()).includes('Aplicar encuesta y entrevista no basta'));
+await click('Trabajar la ruta mixta');
+await click('Aplicar a mi investigación');
+assert.ok(renderer.root.findAllByType('textarea').every(node=>node.props.value===''));
+await field('Por qué necesito integrar','Necesito comprender la relación entre actuación y explicaciones sin asumir causalidad.');
+await click('Comprobar coherencia');
+await click('Llevar desarrollo');
+assert.ok(shared.stage.includes('mixto') && shared.development.includes('sin asumir causalidad'));
+await click('Investigar en equipo');
+assert.ok(text(renderer.toJSON()).includes('Lecturas que se convierten en práctica'));
+await click('Ver ejemplos');
+await click('Pregunta del par');
+assert.ok(text(renderer.toJSON()).includes('¿Se midió razonamiento o satisfacción?'));
+await click('Integración razonada');
+assert.ok(text(renderer.toJSON()).includes('Aún no contamos con evidencia sobre cambios en el razonamiento'));
+await click('Taller: una iteración');
+await click('Aplicar a mi investigación');
+await field('Incremento de esta iteración','Comparar dos definiciones con pasajes verificables.');
+await click('Comprobar coherencia');
+await click('Llevar desarrollo');
+assert.ok(shared.stage.includes('iteracion') && shared.development.includes('dos definiciones'));
+await act(async()=>renderer.unmount());
+await mount();
+await click('Aplicar a mi investigación');
+assert.ok(renderer.root.findAllByType('textarea').some(node=>node.props.value.includes('dos definiciones')));
+// Team-to-aula navigation selects a workshop without replacing existing work.
+await act(async()=>renderer.update(React.createElement(Workspace,{session:{user:{id:'student-a'}},onShare:value=>{shared=value;},requestedLesson:{id:'pares',requestId:'synthetic'}})));
+assert.ok(text(renderer.toJSON()).includes('Taller: revisar, integrar y aprender'));
+await click('Tema e intención');
+await click('Aplicar a mi investigación');
+assert.ok(renderer.root.findAllByType('textarea').some(node=>node.props.value==='Tema revisado con nueva delimitación.'));
 await act(async()=>renderer.unmount());
 await mount('student-b');
 await click('Aplicar a mi investigación');
 assert.ok(renderer.root.findAllByType('textarea').every(node=>node.props.value===''));
 await act(async()=>renderer.unmount());
-console.log('PASS seminar learning: content, boolean logic, real counts, review invalidation, persistence isolation, unavailable feedback and team handoff');
+console.log('PASS seminar learning: content, boolean logic, real counts, review invalidation, persistence isolation, unavailable feedback, method exploration, XP workshops and team handoff');
