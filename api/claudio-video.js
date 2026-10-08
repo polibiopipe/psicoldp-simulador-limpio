@@ -6,8 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 const send = (res, status, json) => res.status(status).json(json);
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  if (req.method !== "POST") return send(res, 405, { error: "Método no permitido" });
-  if (req.headers["content-type"]?.split(";")[0] !== "application/json") return send(res, 415, { error: "Formato no permitido" });
+  if (!["GET", "POST"].includes(req.method)) return send(res, 405, { error: "Método no permitido" });
+  if (req.method === "POST" && req.headers["content-type"]?.split(";")[0] !== "application/json") return send(res, 415, { error: "Formato no permitido" });
   const token = /^Bearer (.+)$/.exec(req.headers.authorization || "")?.[1];
   if (!token) return send(res, 401, { error: "Debes iniciar sesión" });
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -24,6 +24,25 @@ export default async function handler(req, res) {
     return send(res, 403, { error: "La cuenta debe estar aprobada y contar con consentimiento vigente" });
   }
   if (!process.env.TAVUS_API_KEY || !process.env.TAVUS_CLAUDIO_PERSONA_ID) return send(res, 503, { error: "El servicio de avatar de Claudio aún no está configurado" });
+  if (req.method === "GET") {
+    const personaId = process.env.TAVUS_CLAUDIO_PERSONA_ID.trim();
+    if (!/^p[a-zA-Z0-9_-]{5,}$/.test(personaId)) {
+      return send(res, 422, { error: "El identificador guardado no tiene formato de Persona ID de Tavus (debe comenzar por p)." });
+    }
+    try {
+      const verification = await fetch("https://tavusapi.com/v2/personas/" + encodeURIComponent(personaId), {
+        method: "GET",
+        headers: { "x-api-key": process.env.TAVUS_API_KEY },
+        signal: AbortSignal.timeout(12000)
+      });
+      if (!verification.ok) {
+        const description = { 400:"Identificador de persona inválido.", 401:"La clave API de Tavus no es válida.", 403:"La clave API no tiene permiso para esta persona.", 404:"La persona no existe en la cuenta de Tavus.", 429:"Tavus limitó temporalmente las solicitudes." };
+        return send(res, 502, { error: description[verification.status] || "No fue posible verificar la persona.", providerStatus: verification.status });
+      }
+      const persona = await verification.json();
+      return send(res, 200, { ready: true, message: "Tavus reconoce la persona y la clave API. Esta verificación no crea ninguna videollamada.", personaName: typeof persona.persona_name === "string" ? persona.persona_name.slice(0, 100) : null });
+    } catch { return send(res, 502, { error:"No fue posible verificar la conexión con Tavus." }); }
+  }
   // A dedicated Tavus persona must be configured in its dashboard using the canonical Claudio biography.
   try {
     const upstream = await fetch("https://tavusapi.com/v2/conversations", {
