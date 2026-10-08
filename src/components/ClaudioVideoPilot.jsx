@@ -16,6 +16,18 @@ export function ClaudioVideoPilot({ onClose }) {
   const [pending, setPending] = useState(false);
   const [conversationUrl, setConversationUrl] = useState("");
   const [externalConsent, setExternalConsent] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(240);
+  const callStartRef = useRef(null);
+  useEffect(() => {
+    if (!conversationUrl) return undefined;
+    const timer = window.setInterval(() => {
+      const elapsed = Math.floor((Date.now() - callStartRef.current) / 1000);
+      const next = Math.max(0, 240 - elapsed);
+      setRemainingSeconds(next);
+      if (next === 0) { setConversationUrl(""); setError("La prueba de 4 minutos finalizó."); }
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [conversationUrl]);
 
   async function startLiveCall() {
     if (!externalConsent) { setError("Debes aceptar la transmisión audiovisual externa para continuar."); return; }
@@ -34,6 +46,8 @@ export function ClaudioVideoPilot({ onClose }) {
       if (!response.ok) throw new Error(payload.error || "No se pudo conectar el avatar.");
       const address = new URL(payload.conversationUrl);
       if (address.protocol !== "https:") throw new Error("Dirección de videollamada no segura.");
+      callStartRef.current = Date.now();
+      setRemainingSeconds(240);
       setConversationUrl(address.href);
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -125,7 +139,7 @@ export function ClaudioVideoPilot({ onClose }) {
             {!camera && <span style={{ color:"#c1d0d5" }}>Tu cámara apagada</span>}
           </div>}
         </div>
-        {!conversationUrl && <p role="status" style={{ margin:"12px 0 2px", padding:"8px 12px", borderRadius:8, background:"#17363c" }}>Estado: vista previa. Para hablar con Claudio se requiere una persona audiovisual y credenciales Tavus configuradas en el servidor.</p>}
+        {!conversationUrl && <p role="status" style={{ margin:"12px 0 2px", padding:"8px 12px", borderRadius:8, background:"#17363c" }}>Prueba limitada a 4 minutos por llamada (240 segundos). Para hablar con Claudio se requiere una persona audiovisual y credenciales Tavus configuradas en el servidor.</p>}
         {!conversationUrl && <label style={{ display:"flex", alignItems:"start", gap:10, marginTop:14, color:"#e0e8ea" }}><input type="checkbox" checked={externalConsent} onChange={(e) => setExternalConsent(e.target.checked)} /> Acepto que al iniciar la videollamada mi voz, imagen y conversación podrán transmitirse al proveedor externo Tavus. Esta prueba no sustituye el simulador clínico evaluable.</label>}
         <div style={{ display:"flex", justifyContent:"center", flexWrap:"wrap", gap:12, paddingTop:18 }}>
           {!conversationUrl && <button type="button" disabled={pending} onClick={toggleCamera} aria-pressed={camera} style={{ padding:"12px 18px", borderRadius:12 }}>{camera ? <VideoOff aria-hidden="true" /> : <Video aria-hidden="true" />} {camera ? "Apagar cámara":"Probar cámara"}</button>}
@@ -133,6 +147,7 @@ export function ClaudioVideoPilot({ onClose }) {
           {!conversationUrl && <button type="button" disabled={pending} onClick={startLiveCall} style={{ padding:"12px 18px", borderRadius:12, background:"#317868", color:"#fff" }}>Iniciar avatar en vivo</button>}
           <button type="button" onClick={finish} style={{ padding:"12px 18px", borderRadius:12, background:"#c84046", color:"#fff" }}><PhoneOff aria-hidden="true" /> Terminar</button>
         </div>
+        {conversationUrl && <p role="timer" style={{ textAlign:"center", fontWeight:700 }}>Tiempo restante: {String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:{String(remainingSeconds % 60).padStart(2, "0")} · máximo 4 minutos</p>}
         {error && <p role="alert" style={{ color:"#ffc4c4" }}>{error}</p>}
         <p style={{ fontSize:13, color:"#bdcdd1", marginBottom:0 }}>El avatar en vivo utiliza un proveedor externo solo cuando pulsas Iniciar. Debes contar con autorización y aceptar la transmisión audiovisual al proveedor. El piloto todavía no conserva la memoria ni la evaluación automática de Escucha Viva; la simulación clínica habitual se mantiene por separado.</p>
       </section>
