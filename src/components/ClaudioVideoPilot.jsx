@@ -15,8 +15,10 @@ export function ClaudioVideoPilot({ onClose }) {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [conversationUrl, setConversationUrl] = useState("");
+  const [externalConsent, setExternalConsent] = useState(false);
 
   async function startLiveCall() {
+    if (!externalConsent) { setError("Debes aceptar la transmisión audiovisual externa para continuar."); return; }
     if (!supabase) { setError("Inicia sesión para acceder a la videollamada experimental."); return; }
     setPending(true);
     setError("");
@@ -123,6 +125,7 @@ export function ClaudioVideoPilot({ onClose }) {
             {!camera && <span style={{ color:"#c1d0d5" }}>Tu cámara apagada</span>}
           </div>}
         </div>
+        {!conversationUrl && <label style={{ display:"flex", alignItems:"start", gap:10, marginTop:14, color:"#e0e8ea" }}><input type="checkbox" checked={externalConsent} onChange={(e) => setExternalConsent(e.target.checked)} /> Acepto que al iniciar la videollamada mi voz, imagen y conversación podrán transmitirse al proveedor externo Tavus. Esta prueba no sustituye el simulador clínico evaluable.</label>}
         <div style={{ display:"flex", justifyContent:"center", flexWrap:"wrap", gap:12, paddingTop:18 }}>
           {!conversationUrl && <button type="button" disabled={pending} onClick={toggleCamera} aria-pressed={camera} style={{ padding:"12px 18px", borderRadius:12 }}>{camera ? <VideoOff aria-hidden="true" /> : <Video aria-hidden="true" />} {camera ? "Apagar cámara":"Probar cámara"}</button>}
           {!conversationUrl && <button type="button" disabled={pending} onClick={toggleMicrophone} aria-pressed={microphone} style={{ padding:"12px 18px", borderRadius:12 }}>{microphone ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />} {microphone ? "Apagar micrófono":"Probar micrófono"}</button>}
