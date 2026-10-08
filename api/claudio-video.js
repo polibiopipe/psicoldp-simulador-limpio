@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       return send(res, 422, { error: "El identificador tiene caracteres no admitidos. Copia el Persona ID exacto desde Tavus." });
     }
     try {
-      const verification = await fetch("https://tavusapi.com/v2/personas/" + encodeURIComponent(personaId), {
+      const verification = await fetch("https://tavusapi.com/v2/pals/" + encodeURIComponent(personaId), {
         method: "GET",
         headers: { "x-api-key": process.env.TAVUS_API_KEY },
         signal: AbortSignal.timeout(12000)
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       method: "POST",
       headers: { "x-api-key": process.env.TAVUS_API_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({
-        persona_id: process.env.TAVUS_CLAUDIO_PERSONA_ID,
+        pal_id: process.env.TAVUS_CLAUDIO_PERSONA_ID.trim(),
         conversation_name: "Escucha Viva - Claudio - Piloto máximo 4 minutos",
         properties: { max_call_duration: 240, enable_recording: false }
       }),
