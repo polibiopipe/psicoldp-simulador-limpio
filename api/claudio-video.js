@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       }),
       signal: AbortSignal.timeout(15000)
     });
-    if (!upstream.ok) return send(res, 502, { error: "No se pudo crear la sesión de videollamada" });
+    if (!upstream.ok) {\n      const safeMessages = { 400: "Tavus rechazó la configuración de la conversación o sus parámetros.", 401: "Tavus rechazó la clave API: verifica que corresponda a esta cuenta.", 403: "La cuenta Tavus no tiene permiso para crear esta conversación.", 404: "La persona audiovisual indicada no existe o no está disponible.", 422: "La persona o el avatar no cumplen los requisitos de Tavus.", 429: "Tavus aplicó un límite de uso o solicitudes." };\n      return send(res, 502, { error: safeMessages[upstream.status] || "El proveedor de video rechazó la solicitud.", providerStatus: upstream.status });\n    }
     const data = await upstream.json();
     if (!/^https:\/\//.test(data.conversation_url || "") || !data.conversation_url.startsWith("https://")) {
       return send(res, 502, { error: "Respuesta de sesión inválida" });
