@@ -26,8 +26,8 @@ export default async function handler(req, res) {
   if (!process.env.TAVUS_API_KEY || !process.env.TAVUS_CLAUDIO_PERSONA_ID) return send(res, 503, { error: "El servicio de avatar de Claudio aún no está configurado" });
   if (req.method === "GET") {
     const personaId = process.env.TAVUS_CLAUDIO_PERSONA_ID.trim();
-    if (!/^p[a-zA-Z0-9_-]{5,}$/.test(personaId)) {
-      return send(res, 422, { error: "El identificador guardado no tiene formato de Persona ID de Tavus (debe comenzar por p)." });
+    if (!/^[a-zA-Z0-9_-]{5,128}$/.test(personaId)) {
+      return send(res, 422, { error: "El identificador tiene caracteres no admitidos. Copia el Persona ID exacto desde Tavus." });
     }
     try {
       const verification = await fetch("https://tavusapi.com/v2/personas/" + encodeURIComponent(personaId), {
