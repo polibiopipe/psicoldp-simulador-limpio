@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { ClaudioVideoPilot } from "./ClaudioVideoPilot.jsx";
 import { ArrowRight, Check, Gauge, Sparkles, Users } from "lucide-react";
 
 const levelLearningFocus = {
@@ -15,6 +16,7 @@ export function CaseSelector({
   onDifficultyChange,
   onSelectCase
 }) {
+  const [showClaudioPilot, setShowClaudioPilot] = useState(false);
   const selectedLevel = difficultyOptions.find((option) => option.id === difficulty);
 
   return (
@@ -88,6 +90,11 @@ export function CaseSelector({
             <strong>{caseItem.shortTitle}</strong>
             <span className="case-focus-badge">{caseItem.mainTheme || caseItem.shortTitle}</span>
             <p>{caseItem.motive}</p>
+            {caseItem.id === "claudio" && (
+              <button type="button" onClick={() => setShowClaudioPilot(true)} aria-label="Abrir ensayo audiovisual de Claudio">
+                Ensayar videollamada (experimental)
+              </button>
+            )}
             <button type="button" aria-label={`Seleccionar caso de ${caseItem.name}`} onClick={() => onSelectCase(caseItem.id)}>
               Seleccionar caso
               <ArrowRight aria-hidden="true" />
@@ -95,6 +102,7 @@ export function CaseSelector({
           </article>
         ))}
       </div>
+      {showClaudioPilot && <ClaudioVideoPilot onClose={() => setShowClaudioPilot(false)} />}
     </section>
   );
 }
