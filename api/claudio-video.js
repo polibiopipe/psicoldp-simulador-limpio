@@ -31,8 +31,8 @@ export default async function handler(req, res) {
       headers: { "x-api-key": process.env.TAVUS_API_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({
         persona_id: process.env.TAVUS_CLAUDIO_PERSONA_ID,
-        conversation_name: "Escucha Viva - Claudio - Piloto",
-        properties: { max_call_duration: 600, enable_recording: false }
+        conversation_name: "Escucha Viva - Claudio - Piloto máximo 4 minutos",
+        properties: { max_call_duration: 240, enable_recording: false }
       }),
       signal: AbortSignal.timeout(15000)
     });
