@@ -13,6 +13,7 @@ export function ClaudioVideoPilot({ onClose }) {
   const [camera, setCamera] = useState(false);
   const [microphone, setMicrophone] = useState(false);
   const [error, setError] = useState("");
+  const [verification, setVerification] = useState("");
   const [pending, setPending] = useState(false);
   const [conversationUrl, setConversationUrl] = useState("");
   const [externalConsent, setExternalConsent] = useState(false);
@@ -29,6 +30,23 @@ export function ClaudioVideoPilot({ onClose }) {
     return () => window.clearInterval(timer);
   }, [conversationUrl]);
 
+  async function verifyProvider() {
+    setPending(true);
+    setError("");
+    setVerification("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Debes iniciar sesión.");
+      const response = await fetch("/api/claudio-video", { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
+      const raw = await response.text();
+      let result;
+      try { result = JSON.parse(raw); } catch { throw new Error("El servidor no devolvió una respuesta válida. Revisa el despliegue."); }
+      if (!response.ok) throw new Error(result.error || "No se pudo verificar Tavus.");
+      setVerification(result.message + (result.personaName ? " Persona: " + result.personaName : ""));
+    } catch (err) { setError(err.message || "No fue posible verificar Tavus."); }
+    finally { setPending(false); }
+  }
+
   async function startLiveCall() {
     if (!externalConsent) { setError("Debes aceptar la transmisión audiovisual externa para continuar."); return; }
     if (!supabase) { setError("Inicia sesión para acceder a la videollamada experimental."); return; }
@@ -42,7 +60,9 @@ export function ClaudioVideoPilot({ onClose }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ caseId: "claudio" })
       });
-      const payload = await response.json();
+      const raw = await response.text();
+      let payload;
+      try { payload = JSON.parse(raw); } catch { throw new Error("El servidor no devolvió una respuesta válida. Revisa el despliegue."); }
       if (!response.ok) throw new Error(payload.error || "No se pudo conectar el avatar.");
       const address = new URL(payload.conversationUrl);
       if (address.protocol !== "https:") throw new Error("Dirección de videollamada no segura.");
@@ -144,10 +164,12 @@ export function ClaudioVideoPilot({ onClose }) {
         <div style={{ display:"flex", justifyContent:"center", flexWrap:"wrap", gap:12, paddingTop:18 }}>
           {!conversationUrl && <button type="button" disabled={pending} onClick={toggleCamera} aria-pressed={camera} style={{ padding:"12px 18px", borderRadius:12 }}>{camera ? <VideoOff aria-hidden="true" /> : <Video aria-hidden="true" />} {camera ? "Apagar cámara":"Probar cámara"}</button>}
           {!conversationUrl && <button type="button" disabled={pending} onClick={toggleMicrophone} aria-pressed={microphone} style={{ padding:"12px 18px", borderRadius:12 }}>{microphone ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />} {microphone ? "Apagar micrófono":"Probar micrófono"}</button>}
+          {!conversationUrl && <button type="button" disabled={pending} onClick={verifyProvider} style={{ padding:"12px 18px", borderRadius:12 }}>Verificar Tavus (sin gastar minutos)</button>}
           {!conversationUrl && <button type="button" disabled={pending} onClick={startLiveCall} style={{ padding:"12px 18px", borderRadius:12, background:"#317868", color:"#fff" }}>Iniciar avatar en vivo</button>}
           <button type="button" onClick={finish} style={{ padding:"12px 18px", borderRadius:12, background:"#c84046", color:"#fff" }}><PhoneOff aria-hidden="true" /> Terminar</button>
         </div>
         {conversationUrl && <p role="timer" style={{ textAlign:"center", fontWeight:700 }}>Tiempo restante: {String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:{String(remainingSeconds % 60).padStart(2, "0")} · máximo 4 minutos</p>}
+        {verification && <p role="status" style={{ color:"#b5f4d7" }}>{verification}</p>}
         {error && <p role="alert" style={{ color:"#ffc4c4" }}>{error}</p>}
         <p style={{ fontSize:13, color:"#bdcdd1", marginBottom:0 }}>El avatar en vivo utiliza un proveedor externo solo cuando pulsas Iniciar. Debes contar con autorización y aceptar la transmisión audiovisual al proveedor. El piloto todavía no conserva la memoria ni la evaluación automática de Escucha Viva; la simulación clínica habitual se mantiene por separado.</p>
       </section>
