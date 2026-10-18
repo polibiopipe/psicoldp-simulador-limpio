@@ -1033,12 +1033,12 @@ export default function App() {
       const prior = evidenceBySessionRef.current.get(id) || activeSessionRecordSnapshot?.feedback?.decisionEvidence || [];
       const next = [...prior.filter(item => item.id !== event.id), event];
       evidenceBySessionRef.current.set(id, next);
-      const result = await persistSessionProgress(history);
+      const result = await persistSessionProgress(history, { requireConfirmation: true });
       if (!isSessionSaveConfirmed(result)) throw new Error("No se confirmó el registro. Conserva el texto y reintenta.");
     } finally { evidenceSavingRef.current = false; setEvidenceSaving(false); }
   }
 
-  async function persistSessionProgress(nextHistory, { recordId = "", appointment = null } = {}) {
+  async function persistSessionProgress(nextHistory, { recordId = "", appointment = null, requireConfirmation = false } = {}) {
     const nextRecordId = recordId || getOrCreateActiveSessionRecordId();
     const liveReport = buildEducationalReport(nextHistory, selectedCase);
     const sessionRecord = buildSessionHistoryRecord({
@@ -1057,6 +1057,7 @@ export default function App() {
 
     const saveResult = await saveSessionHistory(sessionRecord, { userId: authSession?.user?.id || "local" });
     if (activeSessionRecordIdRef.current !== nextRecordId || (isSupabaseConfigured && authIdentityRef.current !== authSession?.user?.id)) return { cloudSaved: false, error: "La sesión cambió durante el guardado." };
+    if (requireConfirmation && !isSessionSaveConfirmed(saveResult)) return saveResult;
     updateActiveSessionRecordId(nextRecordId, sessionRecord);
     setSessionRecords((current) => mergeSessionRecordList(current, sessionRecord));
     if (!saveResult.cloudSaved && saveResult.error) {

@@ -159,6 +159,7 @@ try {
   const evidence = { id: 'evidence-initial', version: 'decision-evidence-v1', stage: 'initial', decision: 'Explorar postergación', rationale: 'Necesito contrastar antecedentes', turnCount: 1, evidenceTurnIds: [chat().props.history[0].id], createdAt: new Date().toISOString(), source: 'structured_prompt', assistance: 'none_declared' };
   writeFailure = true;
   await act(async () => { await assert.rejects(ui.root.findByType(s.DecisionEvidence).props.onSave(evidence), /No se confirmó/); });
+  assert.equal(ui.root.findByType(s.DecisionEvidence).props.events.length, 0, 'failed journal write is not displayed as saved');
   writeFailure = false;
   await act(async () => { await ui.root.findByType(s.DecisionEvidence).props.onSave(evidence); });
   assert.equal(tables.simulation_sessions[0].feedback.decisionEvidence.length, 1, 'retry is idempotent');
