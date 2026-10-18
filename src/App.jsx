@@ -88,6 +88,7 @@ const screens = {
 
 export default function App() {
   const [screen, setScreen] = useState(screens.home);
+  const [simulationView, setSimulationView] = useState("interview");
   const [consentBusy, setConsentBusy] = useState(false);
   const consentBusyRef = useRef(false);
   const handleConsentBusy = useCallback((value) => { consentBusyRef.current = value; setConsentBusy(value); }, []);
@@ -657,6 +658,7 @@ export default function App() {
     setSaveStatus(null);
     setClosureSaveState("idle");
     clearSessionEndTracking();
+    setSimulationView("interview");
     setScreen(screens.simulation);
     return true;
   }
@@ -739,6 +741,7 @@ export default function App() {
       setScreen(screens.results);
       return true;
     }
+    setSimulationView("interview");
     setScreen(screens.simulation);
     return true;
   }
@@ -799,6 +802,7 @@ export default function App() {
     updateActiveSessionRecordId("");
     updateActiveAppointmentId("");
     clearSessionEndTracking();
+    setSimulationView("interview");
     setScreen(screens.simulation);
   }
 
@@ -1099,6 +1103,7 @@ export default function App() {
     clearSessionEndTracking();
     setSaveStatus(null);
     setClosureSaveState("idle");
+    setSimulationView("interview");
     setScreen(screens.simulation);
   }
 
@@ -1514,8 +1519,15 @@ export default function App() {
       )}
 
       {screen === screens.simulation && (
-        <>
+        <section className="simulation-workspace">
+        <nav className="simulation-view-nav" aria-label="Herramientas de la sesión">
+          <button type="button" aria-pressed={simulationView === "interview"} aria-controls="interview-workspace" onClick={() => setSimulationView("interview")}>Entrevista <span>Conversar con el paciente</span></button>
+          <button type="button" aria-pressed={simulationView === "journal"} aria-controls="journal-workspace" onClick={() => setSimulationView("journal")}>Bitácora <span>Registrar mi razonamiento</span></button>
+        </nav>
+        <div id="journal-workspace" hidden={simulationView !== "journal"}>
         <DecisionEvidence key={`${userId}-${selectedCase.id}-${sessionNumber}-${activeAppointmentId}`} history={history} events={activeSessionRecordForUsage?.feedback?.decisionEvidence || []} onSave={saveDecisionEvidence} disabled={interviewBusy || navigationSaving || openingPractice} />
+        </div>
+        <div id="interview-workspace" hidden={simulationView !== "interview"}>
         <SimulationChat
           externallyBusy={evidenceSaving}
           caseItem={selectedCase}
@@ -1537,7 +1549,8 @@ export default function App() {
           onOpenTrust={() => requestExitFromResults(screens.trustCenter)}
           onBusyChange={handleInterviewBusy}
         />
-        </>
+        </div>
+        </section>
       )}
 
       {screen === screens.results && (

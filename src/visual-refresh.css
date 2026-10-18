@@ -254,3 +254,29 @@
   .visual-auth-screen *, .visual-case-selector * { animation: none !important; transition: none !important; }
   .visual-case-selector .case-card:hover { transform: none; }
 }
+
+/* Full-width clinical workspace and calm, separated session tools. */
+.app-shell.authenticated-shell{width:100%;max-width:none;margin:0;padding:0;min-width:0}
+.authenticated-shell .workspace-main,.authenticated-shell .workspace-content{min-width:0;width:100%;max-width:none}
+.authenticated-shell .workspace-content{padding:24px clamp(16px,2.5vw,48px) 40px}
+.authenticated-shell .screen,.authenticated-shell.simulation-mode .screen.chat-screen{width:100%;max-width:none;margin-inline:0}
+.authenticated-shell .authenticated-workspace{grid-template-columns:232px minmax(0,1fr)}
+.authenticated-shell.simulation-mode .authenticated-workspace{grid-template-columns:180px minmax(0,1fr)}
+.authenticated-shell.simulation-mode .workspace-nav button{font-size:.92rem;justify-content:flex-start;gap:10px;padding:10px 12px;min-height:48px}
+.authenticated-shell.simulation-mode .workspace-nav svg{width:20px;height:20px}
+.simulation-workspace{width:100%;min-width:0}
+.simulation-view-nav{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0 24px;padding-bottom:20px;border-bottom:1px solid #d5e2df}
+.simulation-view-nav button{display:grid;gap:5px;min-height:68px;min-width:220px;padding:14px 22px;border:1px solid #bdceca;border-radius:14px;text-align:left;background:#fff;color:#22443e;font:inherit;font-weight:750;box-shadow:none}
+.simulation-view-nav button span{font-size:.88rem;font-weight:400;color:#4e6862}
+.simulation-view-nav button[aria-pressed=true]{background:#e6f4ee;border-color:#267764;box-shadow:inset 0 0 0 1px #267764}
+.simulation-view-nav button:focus-visible{outline:3px solid #147c78;outline-offset:4px}
+.simulation-workspace [hidden]{display:none!important}
+.authenticated-shell.simulation-mode .screen.chat-screen{grid-template-columns:minmax(200px,250px) minmax(0,1fr);gap:24px;min-height:0}
+.authenticated-shell.simulation-mode .chat-panel{min-width:0}
+.authenticated-shell.simulation-mode .message{font-size:1rem;line-height:1.7}
+.authenticated-shell .decision-evidence{margin:0;box-shadow:0 12px 35px #173c3010}
+@media(min-width:1700px){.authenticated-shell.simulation-mode .screen.chat-screen{grid-template-columns:280px minmax(0,1fr);gap:36px}.authenticated-shell .dashboard-grid{gap:28px}}
+@media(max-width:1100px){.authenticated-shell .authenticated-workspace,.authenticated-shell.simulation-mode .authenticated-workspace{grid-template-columns:180px minmax(0,1fr)}.authenticated-shell.simulation-mode .screen.chat-screen{grid-template-columns:1fr}.authenticated-shell.simulation-mode .chat-sidebar{display:grid;grid-template-columns:1fr 1fr;gap:16px}}
+@media(max-width:900px){.authenticated-shell .authenticated-workspace,.authenticated-shell.simulation-mode .authenticated-workspace{display:block}.authenticated-shell.simulation-mode .workspace-nav button{font-size:.85rem;justify-content:center;min-width:110px}.authenticated-shell .workspace-content,.authenticated-shell.simulation-mode .workspace-content{padding:16px}.simulation-view-nav{gap:10px;margin:10px 0 18px}.simulation-view-nav button{flex:1 1 160px;min-width:0;padding:12px}.simulation-view-nav button span{font-size:.8rem}.authenticated-shell .workspace-topbar{position:static}}
+
+@media(max-width:600px){.authenticated-shell.simulation-mode .chat-sidebar{grid-template-columns:1fr}.authenticated-shell.simulation-mode .chat-sidebar .patient-portrait{max-height:180px;object-fit:contain}}
