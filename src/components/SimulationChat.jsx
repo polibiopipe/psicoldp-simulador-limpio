@@ -26,6 +26,7 @@ export function SimulationChat({
   sessionSummary,
   history,
   sessionUsage = null,
+  externallyBusy = false,
   onAsk,
   onFinish,
   onRestart,
@@ -129,6 +130,7 @@ export function SimulationChat({
       setValidationFeedback(validation.suggestion);
       return;
     }
+    if (externallyBusy) { setValidationFeedback("Espera a que termine el guardado de la bitácora."); return; }
     if (usageBlocked) {
       setValidationFeedback(
         timeExpired
@@ -227,7 +229,7 @@ export function SimulationChat({
   }
 
   function finishSimulation(requestedReason = "") {
-    if (sendingRef.current || avatarState === "closed") return;
+    if (externallyBusy || sendingRef.current || avatarState === "closed") return;
     const explicitReason = typeof requestedReason === "string" ? requestedReason : "";
     const endReason = explicitReason || (
       timeExpired ? "maximum_time" : technicalTurnLimitReached ? "technical_turn_limit" : "voluntary_closure"
@@ -311,7 +313,7 @@ export function SimulationChat({
               <MonitorPlay aria-hidden="true" />
               {showVideoSession ? "Ocultar vista" : "Vista simulada"}
             </button>
-            <button className="secondary-action" type="button" onClick={onChangeCase} disabled={avatarState === "thinking" || avatarState === "closed"}>
+            <button className="secondary-action" type="button" onClick={onChangeCase} disabled={externallyBusy || avatarState === "thinking" || avatarState === "closed"}>
               <Users aria-hidden="true" />
               Guardar y salir
             </button>
@@ -319,7 +321,7 @@ export function SimulationChat({
               className="primary-action"
               type="button"
               onClick={finishSimulation}
-              disabled={avatarState === "thinking" || avatarState === "closed"}
+              disabled={externallyBusy || avatarState === "thinking" || avatarState === "closed"}
             >
               <SquareCheckBig aria-hidden="true" />
               Ir al cierre
@@ -430,11 +432,11 @@ export function SimulationChat({
                     className="primary-action"
                     type="button"
                     onClick={() => finishSimulation(timeExpired ? "maximum_time" : "technical_turn_limit")}
-                    disabled={avatarState === "thinking" || avatarState === "closed"}
+                    disabled={externallyBusy || avatarState === "thinking" || avatarState === "closed"}
                   >
                     Continuar al cierre
                   </button>
-                  <button className="secondary-action" type="button" onClick={startNewPractice} disabled={avatarState === "thinking" || avatarState === "closed"}>
+                  <button className="secondary-action" type="button" onClick={startNewPractice} disabled={externallyBusy || avatarState === "thinking" || avatarState === "closed"}>
                     Iniciar una nueva práctica
                   </button>
                 </div>
@@ -458,7 +460,7 @@ export function SimulationChat({
             <select
               id="intervention-type"
               value={selectedInterventionType}
-              disabled={avatarState === "thinking" || avatarState === "closed" || usageBlocked}
+              disabled={externallyBusy || avatarState === "thinking" || avatarState === "closed" || usageBlocked}
               onChange={(event) => {
                 setSelectedInterventionType(event.target.value);
                 setShowStageSuggestions(false);
@@ -494,14 +496,14 @@ export function SimulationChat({
           <div className="input-row">
             <textarea
               id="student-question"
-              disabled={avatarState === "thinking" || avatarState === "closed" || usageBlocked}
+              disabled={externallyBusy || avatarState === "thinking" || avatarState === "closed" || usageBlocked}
               value={question}
               onChange={(event) => updateQuestion(event.target.value)}
               placeholder="Ej.: Antes de comenzar, quisiera explicarte el objetivo de esta entrevista. ¿Qué te gustaría que entienda de lo que estás viviendo?"
               rows={3}
             />
             <VoiceDictationButton
-              disabled={avatarState === "thinking" || avatarState === "closed" || usageBlocked}
+              disabled={externallyBusy || avatarState === "thinking" || avatarState === "closed" || usageBlocked}
               onTranscript={appendDictatedText}
               onStatusChange={setValidationFeedback}
             />
@@ -509,7 +511,7 @@ export function SimulationChat({
               className="icon-action"
               type="submit"
               aria-label="Enviar intervención"
-              disabled={avatarState === "thinking" || avatarState === "closed" || usageBlocked}
+              disabled={externallyBusy || avatarState === "thinking" || avatarState === "closed" || usageBlocked}
             >
               <Send aria-hidden="true" />
             </button>

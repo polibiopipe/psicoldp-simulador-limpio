@@ -48,6 +48,8 @@ import {
   getCompletedSessionCount,
   getProcessSessionTotal
 } from "./engine/sessionPlanUtils.js";
+import { DecisionEvidence } from "./components/DecisionEvidence.jsx";
+import { EvidenceDashboard } from "./components/EvidenceDashboard.jsx";
 import { CaseSelector } from "./components/CaseSelector.jsx";
 import { CaseBrief } from "./components/CaseBrief.jsx";
 import { SimulationChat } from "./components/SimulationChat.jsx";
@@ -73,6 +75,7 @@ import { getClinicalStorageOwner, setClinicalStorageOwner } from "./engine/clini
 setClinicalStorageOwner(isSupabaseConfigured ? "" : "local");
 
 const screens = {
+  evidence: "evidence",
   home: "home",
   select: "select",
   brief: "brief",
@@ -131,6 +134,9 @@ export default function App() {
   const interviewBusyRef = useRef(false);
   const navigationSavingRef = useRef(false);
   const openingPracticeRef = useRef(false);
+  const evidenceBySessionRef = useRef(new Map());
+  const [evidenceSaving, setEvidenceSaving] = useState(false);
+  const evidenceSavingRef = useRef(false);
   const closureDraftRef = useRef(null);
   const mediationDraftRef = useRef(null);
   const [interviewBusy, setInterviewBusy] = useState(false);
@@ -160,6 +166,7 @@ export default function App() {
   );
 
   function updateActiveSessionRecordId(nextId = "", record = null) {
+    if (record?.feedback?.decisionEvidence && !evidenceBySessionRef.current.has(nextId)) evidenceBySessionRef.current.set(nextId, record.feedback.decisionEvidence);
     if (activeSessionRecordIdRef.current !== nextId) mediationDraftRef.current = null;
     activeSessionRecordIdRef.current = nextId;
     setActiveSessionRecordId(nextId);
@@ -260,6 +267,7 @@ export default function App() {
         setSessionSummary(null);
         setSessionRecords([]);
         setAppointmentRecords([]);
+        evidenceBySessionRef.current.clear();
         updateActiveSessionRecordId("");
         updateActiveAppointmentId("");
         clearSessionEndTracking();
@@ -818,6 +826,7 @@ export default function App() {
   }
 
   async function handleAsk(question, selectedInterventionType = "", conversationContext = {}) {
+    if (evidenceSavingRef.current) throw new Error("Espera a que termine el guardado de la bitácora.");
     const turnId = conversationContext.interventionId || crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const sessionRecordId = getOrCreateActiveSessionRecordId();
@@ -1016,6 +1025,19 @@ export default function App() {
     throw new Error("No se pudo preparar la cita de esta sesion. Revisa la agenda antes de iniciar.");
   }
 
+  async function saveDecisionEvidence(event) {
+    if (evidenceSavingRef.current || interviewBusyRef.current) throw new Error("Espera a que termine la operación actual.");
+    evidenceSavingRef.current = true; setEvidenceSaving(true);
+    try {
+      const id = getOrCreateActiveSessionRecordId();
+      const prior = evidenceBySessionRef.current.get(id) || activeSessionRecordSnapshot?.feedback?.decisionEvidence || [];
+      const next = [...prior.filter(item => item.id !== event.id), event];
+      evidenceBySessionRef.current.set(id, next);
+      const result = await persistSessionProgress(history);
+      if (!isSessionSaveConfirmed(result)) throw new Error("No se confirmó el registro. Conserva el texto y reintenta.");
+    } finally { evidenceSavingRef.current = false; setEvidenceSaving(false); }
+  }
+
   async function persistSessionProgress(nextHistory, { recordId = "", appointment = null } = {}) {
     const nextRecordId = recordId || getOrCreateActiveSessionRecordId();
     const liveReport = buildEducationalReport(nextHistory, selectedCase);
@@ -1024,11 +1046,12 @@ export default function App() {
       caseItem: selectedCase,
       history: nextHistory,
       report: liveReport,
+      decisionEvidence: evidenceBySessionRef.current.get(nextRecordId) || [],
       sessionNumber,
       preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
       appointmentId: appointment?.id || activeAppointmentIdRef.current || "",
-      startedAt: appointment?.startedAt || "",
-      endsAt: appointment?.endsAt || "",
+      startedAt: appointment?.startedAt || getCurrentAppointmentForSession({ includeExpired: true })?.startedAt || "",
+      endsAt: appointment?.endsAt || getCurrentAppointmentForSession({ includeExpired: true })?.endsAt || "",
       status: "in_progress"
     });
 
@@ -1045,7 +1068,7 @@ export default function App() {
   }
 
   async function finishSession(requestedReason = "") {
-    if (interviewBusyRef.current || closureSavingRef.current) return;
+    if (evidenceSavingRef.current || interviewBusyRef.current || closureSavingRef.current) return;
     closureDraftRef.current = null;
     const endedAt = new Date();
     const appointment = getCurrentAppointmentForSession({ includeExpired: true });
@@ -1106,6 +1129,7 @@ export default function App() {
         caseItem: selectedCase,
         history,
         report,
+        decisionEvidence: evidenceBySessionRef.current.get(activeSessionRecordIdRef.current) || [],
         sessionNumber,
         preSessionPlan: normalizePreSessionPlan(preSessionPlan, { caseItem: selectedCase, sessionNumber }),
         appointmentId: activeAppointmentIdRef.current || "",
@@ -1219,7 +1243,7 @@ export default function App() {
   }
 
   async function requestExitFromResults(destination = screens.home, exitAction = null) {
-    if (consentBusyRef.current || interviewBusyRef.current || closureSavingRef.current || navigationSavingRef.current || openingPracticeRef.current) {
+    if (evidenceSavingRef.current || consentBusyRef.current || interviewBusyRef.current || closureSavingRef.current || navigationSavingRef.current || openingPracticeRef.current) {
       setConnectionNotice("Espera a que termine la respuesta o el guardado antes de cambiar de pantalla.");
       return false;
     }
@@ -1347,7 +1371,7 @@ export default function App() {
           error={approvalState.error}
           onRetry={refreshApproval}
           onSignOut={() => requestExitFromResults(screens.home, handleSignOut)}
-        navigationBusy={consentBusy || interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
+        navigationBusy={evidenceSaving || consentBusy || interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
         />
         <AppFooter onOpenTrust={openTrustCenter} />
       </main>
@@ -1391,7 +1415,7 @@ export default function App() {
         hasEvaluation={history.length > 0}
         onNavigate={navigateWorkspace}
         onSignOut={() => requestExitFromResults(screens.home, handleSignOut)}
-        navigationBusy={consentBusy || interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
+        navigationBusy={evidenceSaving || consentBusy || interviewBusy || navigationSaving || openingPractice || saveStatus?.type === "saving"}
       >
 
       {(navigationSaving || openingPractice) && <div className="connection-status-banner" role="status">
@@ -1423,6 +1447,8 @@ export default function App() {
           onStartSession={(caseId, targetSession) => openCaseFromAgenda(caseId, targetSession, screens.simulation)}
         />
       )}
+
+      {screen === screens.evidence && <EvidenceDashboard records={sessionRecords} />}
 
       {screen === screens.trustCenter && (
         <TrustCenter key={userId || "local"} userId={userId} onBack={goHome} onBusyChange={handleConsentBusy} />
@@ -1487,7 +1513,10 @@ export default function App() {
       )}
 
       {screen === screens.simulation && (
+        <>
+        <DecisionEvidence key={`${userId}-${selectedCase.id}-${sessionNumber}-${activeAppointmentId}`} history={history} events={activeSessionRecordForUsage?.feedback?.decisionEvidence || []} onSave={saveDecisionEvidence} disabled={interviewBusy || navigationSaving || openingPractice} />
         <SimulationChat
+          externallyBusy={evidenceSaving}
           caseItem={selectedCase}
           difficulty={difficulty}
           sessionNumber={sessionNumber}
@@ -1507,6 +1536,7 @@ export default function App() {
           onOpenTrust={() => requestExitFromResults(screens.trustCenter)}
           onBusyChange={handleInterviewBusy}
         />
+        </>
       )}
 
       {screen === screens.results && (

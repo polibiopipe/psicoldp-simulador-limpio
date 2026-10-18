@@ -13,6 +13,7 @@ const navItems = [
   { id: "home", label: "Inicio", icon: LayoutDashboard },
   { id: "select", label: "Pacientes", icon: UsersRound },
   { id: "clinicalAgenda", label: "Agenda", icon: CalendarClock },
+  { id: "evidence", label: "Mis evidencias", icon: ClipboardCheck },
   { id: "savedSessions", label: "Sesiones", icon: FileText },
   { id: "results", label: "Cierre y evaluación", icon: ClipboardCheck },
   { id: "trustCenter", label: "Consentimiento", icon: ShieldCheck }

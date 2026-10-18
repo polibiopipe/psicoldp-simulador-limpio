@@ -25,6 +25,7 @@ export function buildSessionHistoryRecord({
   clinicalDecision = null,
   clinicalPlanEvaluation = null,
   feedbackPractice = null,
+  decisionEvidence = [],
   appointmentId = "",
   startedAt = "",
   endsAt = "",
@@ -118,6 +119,7 @@ export function buildSessionHistoryRecord({
     },
     feedback: {
       feedbackPractice,
+      decisionEvidence,
       sessionPrelude: history.filter(entry => entry?.isSessionPrelude).map(entry => ({ isSessionPrelude: true, answer: entry.answer || "" })),
       generalScore: report.generalScore,
       sessionFeedback,

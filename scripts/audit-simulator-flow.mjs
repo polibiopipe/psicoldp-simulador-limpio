@@ -81,6 +81,8 @@ try {
     export { ClinicalDashboard } from './src/components/ClinicalDashboard.jsx';
     export { AuthenticatedLayout } from './src/components/AuthenticatedLayout.jsx';
     export { CaseBrief } from './src/components/CaseBrief.jsx';
+    export { DecisionEvidence } from './src/components/DecisionEvidence.jsx';
+    export { EvidenceDashboard } from './src/components/EvidenceDashboard.jsx';
     export { SimulationChat } from './src/components/SimulationChat.jsx';
     export { SessionClosure } from './src/components/SessionClosure.jsx';
     export { SessionResults } from './src/components/SessionResults.jsx';
@@ -136,7 +138,7 @@ try {
   appointmentFailure = false;
   // Drive the real composer, including its delayed request and double-click protection.
   await act(async () => { ui.root.findByProps({ id: 'student-question' }).props.onChange({ target: { value: '¿Qué te trae por acá?' } }); });
-  await act(async () => { ui.root.findByType('form').props.onSubmit({ preventDefault() {} }); });
+  await act(async () => { chat().findByType('form').props.onSubmit({ preventDefault() {} }); });
   assert.equal(ui.root.findByType(s.AuthenticatedLayout).props.navigationBusy, true);
   assert.equal(button('Ir al cierre').props.disabled, true);
   await act(async () => {
@@ -154,6 +156,14 @@ try {
   assert.equal(ui.root.findByType(s.AuthenticatedLayout).props.navigationBusy, false);
   const sessionId = tables.simulation_sessions[0].id;
   const originalStartedAt = tables.simulation_appointments[0].started_at;
+  const evidence = { id: 'evidence-initial', version: 'decision-evidence-v1', stage: 'initial', decision: 'Explorar postergación', rationale: 'Necesito contrastar antecedentes', turnCount: 1, evidenceTurnIds: [chat().props.history[0].id], createdAt: new Date().toISOString(), source: 'structured_prompt', assistance: 'none_declared' };
+  writeFailure = true;
+  await act(async () => { await assert.rejects(ui.root.findByType(s.DecisionEvidence).props.onSave(evidence), /No se confirmó/); });
+  writeFailure = false;
+  await act(async () => { await ui.root.findByType(s.DecisionEvidence).props.onSave(evidence); });
+  assert.equal(tables.simulation_sessions[0].feedback.decisionEvidence.length, 1, 'retry is idempotent');
+  assert.equal(tables.simulation_sessions[0].feedback.decisionEvidence[0].rationale, evidence.rationale);
+
 
   // Pause fails closed when storage is unavailable, and resumes the same record on retry.
   writeFailure = true;
@@ -167,6 +177,7 @@ try {
   assert.equal(metrics[1].findByType('strong').children[0], '1', 'la misma sesión no aparece duplicada');
   await act(async () => { await home().props.onStartSession('claudio', 1); });
   assert.equal(chat().props.history.length, 1);
+  assert.equal(ui.root.findByType(s.DecisionEvidence).props.events.length, 1, 'resume restores journal');
   assert.equal(tables.simulation_appointments[0].started_at, originalStartedAt, 'retomar no reinicia el reloj');
   await act(async () => { await chat().props.onFinish(); });
   assert.equal(ui.root.findByType(s.AuthenticatedLayout).props.currentScreen, 'results');
@@ -202,6 +213,9 @@ try {
   await act(async () => { await ui.root.findByType(s.AuthenticatedLayout).props.onNavigate('home'); });
   assert.ok(button('Guardar cambios y salir'));
   await act(async () => { await button('Guardar cambios y salir').props.onClick(); });
+  assert.equal(tables.simulation_sessions[0].feedback.decisionEvidence.length, 1, 'closure preserves journal');
+  await act(async () => { await ui.root.findByType(s.AuthenticatedLayout).props.onNavigate('evidence'); });
+  assert.equal(ui.root.findByType(s.EvidenceDashboard).props.records[0].feedback.decisionEvidence.length, 1);
   assert.equal(tables.simulation_sessions[0].status, 'completed', 'editar y salir no hace retroceder un cierre completado');
   assert.equal(tables.simulation_sessions[0].id, sessionId);
   const caseItem = s.cases.find((c) => c.id === 'claudio');

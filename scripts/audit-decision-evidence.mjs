@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { createDecisionEvidence, evidenceRows, evidenceCounts } from '../src/engine/decisionEvidence.js';
+const draft = { stage: 'initial', decision: 'Explorar primero', rationale: 'Hay antecedentes insuficientes' };
+const history = [{ id: 'prelude', isSessionPrelude: true, question: 'x', answer: 'x' }, { id: 't1', question: 'Pregunta', answer: 'Respuesta' }, { id: 'pending', isPendingResponse: true, question: 'Pendiente', answer: '...' }];
+const event = createDecisionEvidence(draft, { history, now: '2026-10-18T23:00:00Z', id: 'e1' });
+assert.equal(event.turnCount, 1); assert.deepEqual(event.evidenceTurnIds, ['t1']);
+assert.equal(event.source, 'structured_prompt'); assert.equal(event.interpretation, 'self_report_not_validated_score');
+assert.throws(() => createDecisionEvidence({ ...draft, stage: 'made-up' }));
+assert.throws(() => createDecisionEvidence({ ...draft, rationale: ' ' }));
+assert.equal(evidenceRows([{ id: 'old', feedback: {} }]).length, 0);
+const rows = evidenceRows([{ id: 's1', caseId: 'c1', feedback: { decisionEvidence: [event] } }]);
+assert.equal(rows[0].sessionId, 's1'); assert.equal(evidenceCounts(rows)[0].count, 1);
+assert.equal(evidenceCounts(rows)[3].count, 0);
+console.log('PASS decision evidence: context, validation, legacy records and descriptive counts');
