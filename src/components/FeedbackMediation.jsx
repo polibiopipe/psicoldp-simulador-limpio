@@ -2,7 +2,7 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import { mediationPracticeText, validateMediationResult } from "../engine/feedbackMediation.js";
 import { downloadTextFile } from "../data/researchConsent.js";
 
-export function FeedbackMediation({ actions, authSession, sessionRecordId, initialPractice, onDraftChange, onSavePractice, reviewEndpoint = "/api/feedback-mediation", reviewContext = {} }) {
+export function FeedbackMediation({ actions, authSession, sessionRecordId, initialPractice, onDraftChange, onSavePractice, reviewEndpoint = "/api/feedback-mediation", reviewContext = {}, onResearchExposure }) {
   const usableActions = actions.filter(action => action.patientAnswer);
   const first = usableActions.find(action => action.evidenceStatus === "review") || usableActions[0];
   const initial = usableActions.find(action => action.index === initialPractice?.turnIndex && action.quote === initialPractice?.quote);
@@ -34,6 +34,7 @@ export function FeedbackMediation({ actions, authSession, sessionRecordId, initi
       if (!mounted.current) return;
       if (!saved?.cloudSaved && !saved?.pilotSaved) throw new Error("No se confirmó el guardado. Conserva esta pantalla y vuelve a intentarlo.");
       timeout = setTimeout(() => controller.abort(), 25000);
+      onResearchExposure?.('tutor_request','feedback_mediation');
       const response = await fetch(reviewEndpoint, {
         method: "POST", signal: controller.signal,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${authSession.access_token}` },

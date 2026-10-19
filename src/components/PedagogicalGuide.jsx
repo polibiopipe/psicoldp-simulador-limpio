@@ -28,7 +28,7 @@ export function PedagogicalGuide({
   }
 
   return (
-    <div className={`pedagogical-guide-shell ${compact ? "compact" : ""} ${className}`.trim()}>
+    <div data-guide-id={guideId} className={`pedagogical-guide-shell ${compact ? "compact" : ""} ${className}`.trim()}>
       <button
         className="guide-trigger"
         type="button"

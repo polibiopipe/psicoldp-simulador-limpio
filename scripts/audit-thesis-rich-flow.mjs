@@ -15,7 +15,7 @@ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{clipboard
 const session={user:{id:'pilot-user',email:'pilot@example.invalid'},access_token:'pilot-test'};
 globalThis.__thesisClient={auth:{getSession:async()=>({data:{session}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),signOut:async()=>({})}};
 const originalFetch=globalThis.fetch;const requests=[];
-globalThis.fetch=async(url,options)=>{requests.push(url);assert.equal(url,'/api/thesis-tomas');assert.equal(JSON.parse(options.body).action,'status');return{ok:true,json:async()=>({settings:{collection_enabled:false},entry:null,sessions:[]})};};
+globalThis.fetch=async(url,options)=>{requests.push(url);assert.ok(['/api/thesis-tomas','/api/thesis-research'].includes(url));assert.ok(['status','participant_state'].includes(JSON.parse(options.body).action));if(url==='/api/thesis-research')return{ok:true,json:async()=>({roles:[],assessments:[],enrollment:null,collectionEnabled:false})};return{ok:true,json:async()=>({settings:{collection_enabled:false},entry:null,sessions:[]})};};
 let ui;
 try{
  const outfile=join(temp,'test.mjs');
@@ -45,6 +45,6 @@ try{
  assert.equal(ui.root.findByType(s.FeedbackPanel).props.mediationProps.reviewContext.pilot,true);
  assert.ok(!ui.root.findAllByType('button').some(node=>node.children.filter(x=>typeof x==='string').join('').includes('Agendar sesión')),'no agenda action');
  assert.ok([...cache.keys()].every(key=>!key.includes('simuladorClinicoLdp.sessions')),'no ordinary process cache');
- assert.ok(requests.every(url=>url==='/api/thesis-tomas'),'technical trial does not submit clinical conversations');
+ assert.ok(requests.every(url=>['/api/thesis-tomas','/api/thesis-research'].includes(url)),'technical trial does not submit clinical conversations');
  console.log('PASS complete Tomás pilot: full planning, interview, artifacts, closure, feedback, scoped mediation and no agenda');
 }finally{if(ui)await act(async()=>ui.unmount());globalThis.fetch=originalFetch;await rm(temp,{recursive:true,force:true});}

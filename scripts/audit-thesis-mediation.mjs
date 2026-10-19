@@ -31,6 +31,7 @@ process.env.SUPABASE_URL = "https://fixture.invalid"; process.env.SUPABASE_SERVI
 let authenticated = true, approved = true, assigned = true, consent = true, owner = "owner", status = "completed", providerMode = "ok", calls = 0, sent;
 const original = JSON.stringify(conversation);
 const client = {
+  rpc:async()=>({data:true,error:null}),
   auth: { getUser: async () => ({ data: { user: authenticated ? { id: "owner" } : null } }) },
   from(table) {
     return { select() { return this; }, eq() { return this; }, async maybeSingle() {

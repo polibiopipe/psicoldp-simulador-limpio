@@ -24,11 +24,14 @@ export const studyMessages = {
  STUDY_NOT_OPEN: 'La recogida de datos todavía no está habilitada. Puedes explorar el ensayo técnico sin guardar datos del estudio.',
  RESEARCH_CONSENT_REQUIRED: 'Debes revisar y aceptar el consentimiento vigente del estudio antes de participar.',
  STUDY_FULL: 'Los 50 cupos están asignados. Contacta al equipo del estudio.',
- PROCESS_COMPLETE: 'Completaste las cuatro sesiones del recorrido.',
+ PROCESS_COMPLETE: 'Completaste los encuentros formativos. Continúa con las evaluaciones del estudio.',
  VERSION_CONFLICT: 'La sesión cambió en otra ventana. Actualiza antes de continuar; tu texto se conserva.',
  SESSION_LIMIT: 'Finalizó el tiempo o el límite de intervenciones. Registra tu razonamiento y completa el cierre.',
  ACCESS_PENDING: 'Tu cuenta todavía no está habilitada. El equipo debe revisar tu acceso.',
  SESSION_CLOSED: 'Esta sesión ya está cerrada.',
+ ELIGIBILITY_REQUIRED: 'Completa la verificación de requisitos en Evaluaciones.',
+ PRE_REQUIRED: 'Completa la evaluación inicial con el equipo antes de practicar con Tomás.',
+ STUDY_AI_UNAVAILABLE: 'La conversación no está disponible temporalmente. Tu intervención no se guardó; puedes reintentar.',
  SESSION_NOT_FOUND: 'No pudimos encontrar esta sesión en tu cuenta.'
 };
 

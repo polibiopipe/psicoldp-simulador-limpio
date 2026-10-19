@@ -35,6 +35,7 @@ export function createThesisMediationHandler({ clientFactory = createClient, pro
       const access = await readAccessConsent(client, userId);
       if (!access.receipt) return send(403, "CONSENT_REQUIRED", "Actualiza el simulador y revisa las condiciones de ingreso.");
       const pilot = body.pilot === true;
+      if(!pilot){const research=await client.rpc('thesis_research_consent_ok',{p_user:userId});if(research.error)return send(503,'CONSENT_LOOKUP_FAILED','No pudimos verificar el consentimiento.');if(research.data!==true)return send(403,'RESEARCH_CONSENT_REQUIRED','El consentimiento del estudio no está vigente.');}
       const record = pilot ? { data: { user_id: userId, status: "completed", conversation: body.pilotConversation, closure: {} }, error: null }
         : await client.from("thesis_tomas_sessions").select("id,user_id,status,conversation,closure").eq("id", sessionRecordId).eq("user_id", userId).maybeSingle();
       if (record.error) return send(503, "SESSION_LOOKUP_FAILED", "No pudimos recuperar la entrevista guardada. Reintenta.");

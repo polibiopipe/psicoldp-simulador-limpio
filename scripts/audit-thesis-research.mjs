@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import { RESEARCH_PROTOCOL,CLINICAL_RUBRIC,validateHumanRating,weightedKappa } from '../src/thesis/researchProtocol.js';
+import { buildJointDisplay } from '../server/researchData.js';
+import { blindTask,validateEpisode,validateResponse,createResearchHandler } from '../api/thesis-research.js';
+import { generateStudyPatientReply,STUDY_PATIENT_ENGINE } from '../server/studyPatientReply.js';
+assert.equal(RESEARCH_PROTOCOL.trainingSessions,2);assert.equal(RESEARCH_PROTOCOL.targetCompletePairs,34);assert.equal(RESEARCH_PROTOCOL.recruitmentTarget,43);
+const transcript='Necesito conocer desde cuándo ocurre y en qué momentos cambia; aún no puedo concluir una causa única.';
+const criteria=Object.fromEntries(CLINICAL_RUBRIC.map(c=>[c.id,{score:2,quote:'aún no puedo concluir una causa única',reason:'Señala un límite vinculado a antecedentes del caso.'}]));
+const rating=validateHumanRating({criteria},{response:{transcript}});assert.equal(rating.criteria.evidence.score,2);
+assert.throws(()=>validateHumanRating({criteria:{...criteria,evidence:{...criteria.evidence,quote:'cita inventada'}}},{response:{transcript}}),/cita exacta/);
+assert.throws(()=>validateHumanRating({criteria:{...criteria,evidence:{score:null}}},{response:{transcript}}),/Justifica/);
+assert.equal(validateHumanRating({criteria:{...criteria,evidence:{score:null,reason:'Registro inaudible.'}}},{response:{transcript}}).criteria.evidence.score,null);
+assert.equal(weightedKappa([[0,0],[1,1],[2,2],[3,3]]).kappa,1);assert.equal(weightedKappa([[2,2],[2,2]]).kappa,null);assert.equal(weightedKappa([]).n,0);
+const task=blindTask({id:'assignment',blind_code:'blind'}, {user_id:'private',stage:'post',slot:5,response:{transcript}},null);
+assert.deepEqual(Object.keys(task).sort(),['assignmentId','code','ownRating','transcript'].sort());assert.ok(!JSON.stringify(task).includes('private'));assert.ok(!JSON.stringify(task).includes('post'));
+const session={id:'session',conversation:[{id:'turn',question:transcript,answer:'El paciente responde.'}],events:[{id:'event',decision:'Explorar',source:'structured_prompt'}]};
+assert.equal(validateEpisode({code:'limits',anchorId:'turn',quote:'aún no puedo concluir',source:'indeterminate',notes:'Señala límites.'},session).source,'indeterminate');
+assert.throws(()=>validateEpisode({code:'limits',anchorId:'turn',quote:'El paciente responde.',source:'spontaneous',notes:'X'},session),/cita/);
+assert.throws(()=>validateEpisode({code:'limits',anchorId:'event',quote:'Explorar',source:'spontaneous',notes:'X'},session),/inducida/);
+assert.throws(()=>validateResponse({transcript,declaration:false},'pre'),/Confirma/);
+const rows=[{id:'pre',slot:1,stage:'pre',quality:'valid',status:'submitted'},{id:'post',slot:1,stage:'post',quality:'valid',status:'submitted'}];const assignments=rows.map(a=>({id:a.id,assessment_id:a.id,is_primary:true}));const ratings=rows.map(a=>({id:a.id,assignment_id:a.id,version:1,criteria}));
+let joint=buildJointDisplay({slots:[{slot:1,participant_code:'EVT-001'}],assessments:rows,assignments,ratings});assert.equal(joint.completePairs,1);assert.equal(joint.aggregationEnabled,false);
+joint=buildJointDisplay({slots:[{slot:1,participant_code:'EVT-001'}],assessments:[rows[0],{...rows[1],quality:'invalid'}],assignments,ratings});assert.equal(joint.completePairs,0);assert.ok(joint.pairs.every(r=>r.delta===null));
+const oldKey=process.env.GEMINI_API_KEY;process.env.GEMINI_API_KEY='test-only';
+try{
+ const answer=await generateStudyPatientReply({studentMessage:'¿Cómo te has sentido?',history:Array.from({length:5},()=>({question:'Pregunta',answer:'Respuesta'}))},{providerFetch:async()=>({ok:true,json:async()=>({modelVersion:'test',candidates:[{finishReason:'STOP',content:{parts:[{text:'Me cuesta estar con otros.'}]}}]})})});
+ assert.equal(answer.engineVersion,STUDY_PATIENT_ENGINE);assert.equal(answer.opportunity.id,'tomas-ev1-context');
+ await assert.rejects(generateStudyPatientReply({studentMessage:'Hola'},{providerFetch:async()=>({ok:false})}),/STUDY_AI_UNAVAILABLE/);
+ delete process.env.GEMINI_API_KEY;await assert.rejects(generateStudyPatientReply({studentMessage:'Hola'}),/STUDY_AI_UNAVAILABLE/);
+}finally{if(oldKey===undefined)delete process.env.GEMINI_API_KEY;else process.env.GEMINI_API_KEY=oldKey;}
+const handler=createResearchHandler();let status;await handler({method:'POST',headers:{},body:{action:'workbench'}},{setHeader(){},status(n){status=n;return this},json(){}});assert.equal(status,401);
+console.log('PASS research: protocol 34/43/50, evidence-backed human ratings, null scores, quadratic kappa, blinded assignments, induced vs spontaneous codes, quality exclusions, strict AI and unauthenticated access');

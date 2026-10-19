@@ -1,5 +1,7 @@
 # Espacio independiente del estudio: Tomás
 
+**Actualización operativa vigente:** ver [tesis-tomas-investigacion-operativa.md](tesis-tomas-investigacion-operativa.md). El documento que sigue conserva el historial de construcción. Desde v3 el recorrido formal incorpora dos encuentros, motor generativo con versión por turno, evaluaciones A/B/C, rúbrica humana y panel del equipo. Las referencias inferiores a cuatro encuentros formales y funcionalidades pendientes describen la versión anterior; cuatro encuentros permanecen únicamente en el ensayo técnico.
+
 Ruta: `/tesis-tomas`. No sustituye el simulador habitual.
 
 ## Recorrido

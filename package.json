@@ -36,7 +36,9 @@
     "audit:decision-evidence": "node scripts/audit-decision-evidence.mjs",
     "audit:thesis-tomas": "node scripts/audit-thesis-tomas.mjs",
     "audit:thesis-rich-flow": "node scripts/audit-thesis-rich-flow.mjs",
-    "audit:thesis-mediation": "node scripts/audit-thesis-mediation.mjs"
+    "audit:thesis-mediation": "node scripts/audit-thesis-mediation.mjs",
+    "audit:thesis-research": "node scripts/audit-thesis-research.mjs",
+    "audit:thesis-research-access": "node scripts/audit-thesis-research-access.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",

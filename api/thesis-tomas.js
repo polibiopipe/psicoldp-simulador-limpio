@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { readAccessConsent } from '../src/engine/accessConsentPolicy.js';
-import { generateLocalPatientResponse } from '../src/engine/localMiniAI.js';
+import { generateStudyPatientReply } from '../server/studyPatientReply.js';
 import { createDecisionEvidence } from '../src/engine/decisionEvidence.js';
 import { validateStudyCommand, STUDY_ENGINE_VERSION, studyMessages, normalizeStudyPreparation, buildStudyClosure } from '../src/thesis/studyModel.js';
 
-export function createStudyHandler({ clientFactory = createClient, respond = generateLocalPatientResponse } = {}) {
+export function createStudyHandler({ clientFactory = createClient, respond = generateStudyPatientReply } = {}) {
  return async function handler(req, res) {
   res.setHeader('Cache-Control','no-store');
   const send=(status,data)=>res.status(status).json(data);
@@ -25,7 +25,7 @@ export function createStudyHandler({ clientFactory = createClient, respond = gen
    if(!access.receipt)return send(403,{error:'ACCESS_CONSENT_REQUIRED',message:'Revisa las condiciones de acceso antes de ingresar.'});
    if(body.action==='status'){
     const results=await Promise.all([
-     db.from('thesis_tomas_settings').select('collection_enabled,protocol_version').eq('id',true).single(),
+     db.from('thesis_tomas_settings').select('collection_enabled,protocol_version,training_sessions,research_protocol').eq('id',true).single(),
      db.from('thesis_tomas_slots').select('participant_code,slot').eq('user_id',user.id).maybeSingle(),
      db.from('thesis_tomas_sessions').select('*').eq('user_id',user.id).order('session_number')
     ]);
@@ -39,6 +39,12 @@ export function createStudyHandler({ clientFactory = createClient, respond = gen
     if(!current.data)throw new Error('SESSION_NOT_FOUND');
     const session=current.data;
     if(body.action==='turn'){
+     const consent=await db.rpc('thesis_research_consent_ok',{p_user:user.id});
+     if(consent.error)throw new Error('CONSENT_LOOKUP_FAILED');
+     if(consent.data!==true)throw new Error('RESEARCH_CONSENT_REQUIRED');
+     const settings=await db.from('thesis_tomas_settings').select('collection_enabled').eq('id',true).single();
+     if(settings.error)throw new Error('STUDY_LOOKUP_FAILED');
+     if(!settings.data?.collection_enabled)throw new Error('STUDY_NOT_OPEN');
      const question=String(body.question||'').trim(),id=String(body.turnId||'');
      if(!question||question.length>3000||!/^[\da-f-]{36}$/i.test(id))throw new Error('INVALID_TURN');
      const existing=session.conversation.find(turn=>turn.id===id);
@@ -50,9 +56,9 @@ export function createStudyHandler({ clientFactory = createClient, respond = gen
      if(previous?.error)throw new Error('SESSION_LOOKUP_FAILED');
      const selectedInterventionType=String(body.selectedInterventionType||'').slice(0,150);
      const conversationStage=body.conversationStage&&JSON.stringify(body.conversationStage).length<4000?body.conversationStage:null;
-     const result=respond({caseId:'tomas',studentMessage:question,history:session.conversation,difficulty:'intermedio',sessionNumber:session.session_number,selectedInterventionType,conversationStage,previousSessionSummary:previous?.data?.closure?.summary});
+     const result=await respond({caseId:'tomas',studentMessage:question,history:session.conversation,difficulty:'intermedio',sessionNumber:session.session_number,selectedInterventionType,conversationStage,previousSessionSummary:previous?.data?.closure?.summary});
      if(!result?.responseText)throw new Error('RESPONSE_UNAVAILABLE');
-     payload.turn={id,question,answer:result.responseText,createdAt:new Date().toISOString(),engineVersion:STUDY_ENGINE_VERSION,interventionType:selectedInterventionType};
+     payload.turn={id,question,answer:result.responseText,createdAt:new Date().toISOString(),engineVersion:result.engineVersion||STUDY_ENGINE_VERSION,model:result.model||null,providerModelVersion:result.providerModelVersion||null,opportunity:result.opportunity||null,interventionType:selectedInterventionType};
     }
     if(body.action==='event' && !['initial','monitoring','revision'].includes(body.event?.stage))throw new Error('INVALID_ACTION');
     if(body.action==='event'){
