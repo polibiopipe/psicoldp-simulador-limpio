@@ -20,4 +20,4 @@ try:m.infer(d);raise AssertionError('Wrong primary criterion should be blocked')
 except ValueError:pass
 print('PASS paired inference: frozen primary plan, real rating reconstruction, missing/invalid exclusion, mean change, CI95, dz and two-sided p')
 `;
-const result=spawnSync('python3',['-c',code],{encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);process.stdout.write(result.stdout);
+const result=spawnSync('python3',['-B','-c',code],{encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);process.stdout.write(result.stdout);

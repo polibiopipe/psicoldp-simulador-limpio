@@ -1,0 +1,3 @@
+# Python 3.12; wheels only, installed before the offline boundary.
+numpy==2.2.6
+scipy==1.15.3

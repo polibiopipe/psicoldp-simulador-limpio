@@ -37,6 +37,16 @@ const suites = [
   ['access-consent', 'scripts/audit-access-consent.mjs'],
   ['feedback-academic', 'scripts/audit-feedback-academic.mjs'],
   ['feedback-mediation', 'scripts/audit-feedback-mediation.mjs'],
+  ['decision-evidence', 'scripts/audit-decision-evidence.mjs'],
+  ['thesis-tomas', 'scripts/audit-thesis-tomas.mjs'],
+  ['thesis-rich-flow', 'scripts/audit-thesis-rich-flow.mjs'],
+  ['thesis-mediation', 'scripts/audit-thesis-mediation.mjs'],
+  ['thesis-research', 'scripts/audit-thesis-research.mjs'],
+  ['thesis-research-access', 'scripts/audit-thesis-research-access.mjs'],
+  ['thesis-exploration', 'scripts/audit-thesis-exploration.mjs'],
+  ['thesis-framework', 'scripts/audit-thesis-framework.mjs'],
+  ['thesis-inference', 'scripts/audit-thesis-inference.mjs'],
+  ['thesis-guide-exposure', 'scripts/audit-thesis-guide-exposure.mjs'],
   ['simulator-enrollment', 'scripts/test-simulator-enrollment.mjs'],
   ['seminar-team', 'scripts/audit-seminar-team.mjs'],
   ['seminar-learning', 'scripts/audit-seminar-learning.mjs'],
@@ -44,7 +54,14 @@ const suites = [
 const reviewed = new Set(suites.map(([, path]) => `node ${path}`));
 const unknown = Object.entries(pkg.scripts).filter(([name, command]) =>
   name !== 'audit:all' && (name.startsWith('audit:') || name === 'basicInterviewSmokeTest') && !reviewed.has(command));
-if (unknown.length) { console.error('BLOCKED: unreviewed audit entries:', unknown.map(([name]) => name).join(', ')); process.exit(2); }
+if (unknown.length) {
+  const reason = `Unreviewed audit entries: ${unknown.map(([name]) => name).join(', ')}`;
+  writeFileSync(join(destination, 'report.json'), JSON.stringify({ schemaVersion: 1,
+    offlineStatus: 'BLOCKED', startedAt: new Date().toISOString(), reason }, null, 2) + '\n');
+  writeFileSync(join(destination, 'report.md'), `# Verificación local\n\nEstado: **BLOCKED**.\n\n${reason}\n`);
+  console.error(`BLOCKED: unreviewed audit entries: ${unknown.map(([name]) => name).join(', ')}`);
+  process.exit(2);
+}
 
 function git(args) {
   const result = spawnSync('git', args, { encoding: 'utf8', timeout: 5000 });
