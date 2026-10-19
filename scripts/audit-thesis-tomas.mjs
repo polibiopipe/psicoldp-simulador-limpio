@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createStudyHandler} from '../api/thesis-tomas.js';
-import {participantCodes,validateStudyCommand,toEvidenceRecord} from '../src/thesis/studyModel.js';
+import {participantCodes,validateStudyCommand,toEvidenceRecord,normalizeStudyPreparation} from '../src/thesis/studyModel.js';
+assert.equal(normalizeStudyPreparation({caseId:'claudio',sessionNumber:99},2).caseId,'tomas');
+assert.equal(normalizeStudyPreparation({caseId:'claudio',sessionNumber:99},2).sessionNumber,2);
 const codes=participantCodes();assert.equal(codes.length,50);assert.equal(new Set(codes).size,50);assert.equal(codes[0],'EVT-001');assert.equal(codes[49],'EVT-050');
 assert.throws(()=>validateStudyCommand({action:'turn',caseId:'claudio'}),/CASE_NOT_ALLOWED/);
-assert.throws(()=>validateStudyCommand({action:'start',user_id:'x',question:'x'.repeat(46000)}),/REQUEST_TOO_LARGE/);
+assert.throws(()=>validateStudyCommand({action:'start',user_id:'x',question:'x'.repeat(251000)}),/REQUEST_TOO_LARGE/);
 assert.equal(toEvidenceRecord({id:'s1',session_number:1,events:[]}).caseId,'tomas');
 const reads=[],writes=[];
 let approved=true, consent=true,rpcError=null;

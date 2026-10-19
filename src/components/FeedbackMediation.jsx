@@ -2,7 +2,7 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import { mediationPracticeText, validateMediationResult } from "../engine/feedbackMediation.js";
 import { downloadTextFile } from "../data/researchConsent.js";
 
-export function FeedbackMediation({ actions, authSession, sessionRecordId, initialPractice, onDraftChange, onSavePractice }) {
+export function FeedbackMediation({ actions, authSession, sessionRecordId, initialPractice, onDraftChange, onSavePractice, reviewEndpoint = "/api/feedback-mediation", reviewContext = {} }) {
   const usableActions = actions.filter(action => action.patientAnswer);
   const first = usableActions.find(action => action.evidenceStatus === "review") || usableActions[0];
   const initial = usableActions.find(action => action.index === initialPractice?.turnIndex && action.quote === initialPractice?.quote);
@@ -32,12 +32,12 @@ export function FeedbackMediation({ actions, authSession, sessionRecordId, initi
     try {
       const saved = await onSavePractice();
       if (!mounted.current) return;
-      if (!saved?.cloudSaved) throw new Error("No se confirmó el guardado. Conserva esta pantalla y vuelve a intentarlo.");
+      if (!saved?.cloudSaved && !saved?.pilotSaved) throw new Error("No se confirmó el guardado. Conserva esta pantalla y vuelve a intentarlo.");
       timeout = setTimeout(() => controller.abort(), 25000);
-      const response = await fetch("/api/feedback-mediation", {
+      const response = await fetch(reviewEndpoint, {
         method: "POST", signal: controller.signal,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${authSession.access_token}` },
-        body: JSON.stringify({ sessionRecordId, turnIndex: action.index, reflection: practice.reflection, rewrite: practice.rewrite })
+        body: JSON.stringify({ ...reviewContext, sessionRecordId, turnIndex: action.index, reflection: practice.reflection, rewrite: practice.rewrite })
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.message || "La mediación no está disponible. Tu ejercicio se conserva.");

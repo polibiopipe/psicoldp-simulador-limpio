@@ -3,7 +3,7 @@ create table public.thesis_tomas_settings (
  id boolean primary key default true check(id),
  collection_enabled boolean not null default false,
  study_key text not null default 'escucha-viva-estudiantes',
- protocol_version text not null default 'tomas-protocol-draft-v1'
+ protocol_version text not null default 'tomas-protocol-draft-v2'
 );
 insert into public.thesis_tomas_settings(id) values(true);
 create table public.thesis_tomas_slots (
@@ -67,7 +67,7 @@ begin
    if sess.id is not null then return to_jsonb(sess)-'user_id'; end if;
    select coalesce(max(session_number),0)+1 into n from public.thesis_tomas_sessions where user_id=p_user;
    if n>4 then raise exception 'PROCESS_COMPLETE'; end if;
-   insert into public.thesis_tomas_sessions(user_id,slot,session_number,protocol_version,consent_event_id,study_id,preparation) values(p_user,seat.slot,n,cfg.protocol_version,decision.id,decision.study_id,coalesce(p_payload->'preparation','{}'::jsonb)) returning * into sess;
+   insert into public.thesis_tomas_sessions(user_id,slot,session_number,protocol_version,consent_event_id,study_id,preparation) values(p_user,seat.slot,n,cfg.protocol_version,decision.id,decision.study_id,coalesce(p_payload->'preparation','{}'::jsonb)||jsonb_build_object('caseId','tomas','sessionNumber',n)) returning * into sess;
    return to_jsonb(sess)-'user_id';
  end if;
  select * into sess from public.thesis_tomas_sessions where id=(p_payload->>'sessionId')::uuid and user_id=p_user for update;
@@ -75,7 +75,7 @@ begin
  if (p_payload->>'version')::integer is distinct from sess.version then raise exception 'VERSION_CONFLICT'; end if;
  -- Replays of an already accepted event are safe, including requests retried after lost responses.
  if p_action='event' and exists(select 1 from jsonb_array_elements(sess.events) e where e->>'id'=p_payload->'event'->>'id') then return to_jsonb(sess)-'user_id'; end if;
- if sess.status<>'in_progress' then raise exception 'SESSION_CLOSED'; end if;
+ if sess.status<>'in_progress' and p_action not in ('close','practice') then raise exception 'SESSION_CLOSED'; end if;
  if p_action='turn' then
    if now()>sess.started_at+interval '20 minutes' or jsonb_array_length(sess.conversation)>=25 then raise exception 'SESSION_LIMIT'; end if;
    if exists(select 1 from jsonb_array_elements(sess.conversation) t where t->>'id'=p_payload->'turn'->>'id') then return to_jsonb(sess)-'user_id'; end if;
@@ -84,8 +84,11 @@ begin
    if jsonb_array_length(sess.events)>=100 then raise exception 'EVENT_LIMIT'; end if;
    evt=(p_payload->'event') || jsonb_build_object('createdAt',now(),'turnCount',jsonb_array_length(sess.conversation));
    update public.thesis_tomas_sessions set events=events||jsonb_build_array(evt),version=version+1 where id=sess.id returning * into sess;
+ elsif p_action='practice' then
+   if sess.status<>'completed' then raise exception 'SESSION_CLOSED'; end if;
+   update public.thesis_tomas_sessions set closure=jsonb_set(closure,'{feedbackPractice}',p_payload->'practice'),version=version+1 where id=sess.id returning * into sess;
  elsif p_action='close' then
-   update public.thesis_tomas_sessions set status='completed',ended_at=now(),closure=p_payload->'closure',version=version+1 where id=sess.id returning * into sess;
+   update public.thesis_tomas_sessions set status='completed',ended_at=now(),closure=(p_payload->'closure') || jsonb_build_object('revisions',coalesce(sess.closure->'revisions','[]'::jsonb) || case when sess.closure is null then '[]'::jsonb else jsonb_build_array(sess.closure-'revisions') end),version=version+1 where id=sess.id returning * into sess;
  else raise exception 'INVALID_ACTION'; end if;
  return to_jsonb(sess)-'user_id';
 end; $$;

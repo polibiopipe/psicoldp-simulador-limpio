@@ -74,7 +74,8 @@ export function SessionClosure({
   onDraftSnapshot,
   onViewFeedback,
   initialClinicalDecision = null,
-  initialClinicalArtifacts = null
+  initialClinicalArtifacts = null,
+  isolatedProcess = false
 }) {
   const savingRef = useRef(false);
   const justificationRef = useRef(null);
@@ -158,10 +159,11 @@ export function SessionClosure({
     ...previousSessionSummaries.map((summary) => Number(summary?.sessionNumber) || 0)
   );
   const planBelowCompletedSessions = normalizedClinicalDecision.proposedSessions < completedSessionCount;
-  const plannedSessionTotal = Math.max(
+  const proposedSessionTotal = Math.max(
     normalizedClinicalDecision.proposedSessions || totalSessions,
     completedSessionCount
   );
+  const plannedSessionTotal = isolatedProcess ? Math.min(totalSessions, proposedSessionTotal) : proposedSessionTotal;
   const nextSessionNumber = getNextSessionNumber(sessionNumber, plannedSessionTotal);
   const closureTitle = getSessionClosureTitle(sessionNumber, plannedSessionTotal);
   const nextSessionStage = nextSessionNumber ? getSessionStage(nextSessionNumber, plannedSessionTotal) : null;
@@ -476,7 +478,7 @@ export function SessionClosure({
         savedSignatureRef.current = closureSignature;
         setHasSavedSessionRecord(true);
       }
-      saveSessionSummary(summary, userId || "local");
+      if (!isolatedProcess) saveSessionSummary(summary, userId || "local");
       scrollPersistenceDisabledRef.current = true;
       clearClinicalDraft(decisionDraftKey);
       clearClinicalDraft(artifactsDraftKey);
@@ -793,7 +795,7 @@ export function SessionClosure({
           <h2>{canContinueInSimulator && hasSavedContinuityAgreement ? "Continuidad registrada" : closureAction.title}</h2>
           <p>
             {canContinueInSimulator && hasSavedContinuityAgreement
-              ? `La continuidad dentro del simulador quedó registrada. Puedes revisar la retroalimentación o agendar la sesión ${nextSessionNumber}.`
+              ? `La continuidad dentro del simulador quedó registrada. Puedes revisar la retroalimentación o ${isolatedProcess ? "preparar" : "agendar"} la sesión ${nextSessionNumber}.`
               : closureAction.description}
           </p>
         </div>
@@ -818,7 +820,7 @@ export function SessionClosure({
               </button>
               <button className="secondary-action" type="button" onClick={scheduleNextSession}>
                 <ArrowRight aria-hidden="true" />
-                Agendar sesión {nextSessionNumber}
+                {isolatedProcess ? "Preparar" : "Agendar"} sesión {nextSessionNumber}
               </button>
             </>
           ) : null}

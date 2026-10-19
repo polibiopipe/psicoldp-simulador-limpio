@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readAccessConsent } from '../src/engine/accessConsentPolicy.js';
 import { generateLocalPatientResponse } from '../src/engine/localMiniAI.js';
 import { createDecisionEvidence } from '../src/engine/decisionEvidence.js';
-import { validateStudyCommand, STUDY_ENGINE_VERSION, studyMessages } from '../src/thesis/studyModel.js';
+import { validateStudyCommand, STUDY_ENGINE_VERSION, studyMessages, normalizeStudyPreparation, buildStudyClosure } from '../src/thesis/studyModel.js';
 
 export function createStudyHandler({ clientFactory = createClient, respond = generateLocalPatientResponse } = {}) {
  return async function handler(req, res) {
@@ -33,7 +33,7 @@ export function createStudyHandler({ clientFactory = createClient, respond = gen
     return send(200,{settings:results[0].data,entry:results[1].data,sessions:(results[2].data||[]).map(({user_id,...row})=>row),capacity:50});
    }
    let payload={...body}; delete payload.action; delete payload.caseId;
-   if(['turn','event','close'].includes(body.action)){
+   if(['turn','event','close','practice'].includes(body.action)){
     const current=await db.from('thesis_tomas_sessions').select('*').eq('id',body.sessionId).eq('user_id',user.id).maybeSingle();
     if(current.error)throw new Error('SESSION_LOOKUP_FAILED');
     if(!current.data)throw new Error('SESSION_NOT_FOUND');
@@ -46,9 +46,13 @@ export function createStudyHandler({ clientFactory = createClient, respond = gen
      if(session.status!=='in_progress')throw new Error('SESSION_CLOSED');
      if(session.version!==body.version)throw new Error('VERSION_CONFLICT');
      if(Date.now()>new Date(session.started_at).getTime()+20*60000||session.conversation.length>=25)throw new Error('SESSION_LIMIT');
-     const result=respond({caseId:'tomas',studentMessage:question,history:session.conversation,difficulty:'intermedio',sessionNumber:session.session_number});
+     const previous=session.session_number>1?await db.from('thesis_tomas_sessions').select('closure').eq('user_id',user.id).eq('session_number',session.session_number-1).maybeSingle():null;
+     if(previous?.error)throw new Error('SESSION_LOOKUP_FAILED');
+     const selectedInterventionType=String(body.selectedInterventionType||'').slice(0,150);
+     const conversationStage=body.conversationStage&&JSON.stringify(body.conversationStage).length<4000?body.conversationStage:null;
+     const result=respond({caseId:'tomas',studentMessage:question,history:session.conversation,difficulty:'intermedio',sessionNumber:session.session_number,selectedInterventionType,conversationStage,previousSessionSummary:previous?.data?.closure?.summary});
      if(!result?.responseText)throw new Error('RESPONSE_UNAVAILABLE');
-     payload.turn={id,question,answer:result.responseText,createdAt:new Date().toISOString(),engineVersion:STUDY_ENGINE_VERSION};
+     payload.turn={id,question,answer:result.responseText,createdAt:new Date().toISOString(),engineVersion:STUDY_ENGINE_VERSION,interventionType:selectedInterventionType};
     }
     if(body.action==='event' && !['initial','monitoring','revision'].includes(body.event?.stage))throw new Error('INVALID_ACTION');
     if(body.action==='event'){
@@ -58,15 +62,20 @@ export function createStudyHandler({ clientFactory = createClient, respond = gen
      payload.event=createDecisionEvidence(body.event||{}, {history:session.conversation,id:body.event.id});
     }
     if(body.action==='close'){
-     const decision=String(body.closure?.decision||'').trim(),rationale=String(body.closure?.rationale||'').trim();
-     if(!decision||!rationale||decision.length>6000||rationale.length>6000)throw new Error('CLOSURE_REQUIRED');
-     payload.closure={decision,rationale,createdAt:new Date().toISOString()};
+     const next=buildStudyClosure(session,body.closure||{});
+     if(!next.rationale?.trim())throw new Error('CLOSURE_REQUIRED');
+     payload.closure=next;
+    }
+    if(body.action==='practice'){
+     if(session.status!=='completed')throw new Error('SESSION_CLOSED');
+     if(!body.practice || typeof body.practice!=='object' || JSON.stringify(body.practice).length>200000)throw new Error('INVALID_ACTION');
+     payload.practice=body.practice;
     }
    }
    if(body.action==='start'){
-    const objective=String(body.preparation?.objective||'').trim(),plan=String(body.preparation?.plan||'').trim();
-    if(!objective||!plan||objective.length>6000||plan.length>6000)throw new Error('PREPARATION_REQUIRED');
-    payload.preparation={objective,plan,engineVersion:STUDY_ENGINE_VERSION};
+    const plan=normalizeStudyPreparation(body.preparation);
+    if(!plan.evaluationObjective.trim()||!plan.processObjectives.trim())throw new Error('PREPARATION_REQUIRED');
+    payload.preparation=plan;
    }
    const result=await db.rpc('thesis_tomas_command',{p_user:user.id,p_action:body.action,p_payload:payload});
    if(result.error)throw new Error(result.error.message);
