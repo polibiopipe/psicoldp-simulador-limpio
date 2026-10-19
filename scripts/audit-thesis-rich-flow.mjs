@@ -35,7 +35,7 @@ try{
  await act(async()=>ui.root.findByType(s.SimulationChat).props.onFinish());
  const field=part=>ui.root.findAllByType('textarea').find(node=>node.props.placeholder?.includes(part));
  await act(async()=>field('motivo aun').props.onChange({target:{value:'Necesito contrastar el relato con el contexto familiar.'}}));
- await act(async()=>field('el malestar parece').props.onChange({target:{value:'El aislamiento requiere exploración contextual.'}}));
+ await act(async()=>field('El aislamiento podría').props.onChange({target:{value:'El aislamiento requiere exploración contextual.'}}));
  await act(async()=>button('Registrar continuidad').props.onClick());
  assert.equal(ui.root.findByType(s.SessionClosure).props.initialClinicalArtifacts.clinicalHypothesis,'El aislamiento requiere exploración contextual.');
  assert.equal(ui.root.findByType(s.SessionClosure).props.initialClinicalDecision.justification,'Necesito contrastar el relato con el contexto familiar.');

@@ -75,7 +75,8 @@ export function SessionClosure({
   onViewFeedback,
   initialClinicalDecision = null,
   initialClinicalArtifacts = null,
-  isolatedProcess = false
+  isolatedProcess = false,
+  clinicalExamples = {}
 }) {
   const savingRef = useRef(false);
   const justificationRef = useRef(null);
@@ -1014,7 +1015,7 @@ export function SessionClosure({
             <textarea
               value={clinicalArtifacts.clinicalHypothesis}
               onChange={(event) => updateArtifacts({ clinicalHypothesis: event.target.value })}
-              placeholder="Ej.: el malestar parece vincular cansancio, autoexigencia y dificultad para pedir ayuda."
+              placeholder={clinicalExamples.hypothesis || "Ej.: el malestar parece vincular cansancio, autoexigencia y dificultad para pedir ayuda."}
               rows={3}
             />
           </label>
@@ -1024,7 +1025,7 @@ export function SessionClosure({
             <textarea
               value={clinicalArtifacts.supportingData}
               onChange={(event) => updateArtifacts({ supportingData: event.target.value })}
-              placeholder="Ej.: irritabilidad en casa, culpa posterior, sobrecarga laboral y baja red de apoyo."
+              placeholder={clinicalExamples.supportingData || "Ej.: irritabilidad en casa, culpa posterior, sobrecarga laboral y baja red de apoyo."}
               rows={3}
             />
           </label>
@@ -1034,7 +1035,7 @@ export function SessionClosure({
             <textarea
               value={clinicalArtifacts.missingData}
               onChange={(event) => updateArtifacts({ missingData: event.target.value })}
-              placeholder="Ej.: duracion, sueno, consumo, riesgo, antecedentes medicos y salud mental previa."
+              placeholder={clinicalExamples.missingData || "Ej.: duracion, sueno, consumo, riesgo, antecedentes medicos y salud mental previa."}
               rows={3}
             />
           </label>

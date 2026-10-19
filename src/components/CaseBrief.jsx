@@ -86,7 +86,8 @@ export function CaseBrief({
   onBack,
   onBegin,
   onSelectSession,
-  onPreSessionPlanChange
+  onPreSessionPlanChange,
+  examples = {}
 }) {
   const [assistantVisible, setAssistantVisible] = useState(false);
   const [showWeakPreparationWarning, setShowWeakPreparationWarning] = useState(false);
@@ -506,7 +507,7 @@ export function CaseBrief({
             <textarea
               value={preSessionPlan.evaluationObjective}
               onChange={(event) => updatePlan({ evaluationObjective: event.target.value })}
-              placeholder={`Ej.: Comprender cómo el estrés laboral está afectando el funcionamiento emocional, familiar y cotidiano de ${caseItem.name}.`}
+              placeholder={examples.objective || `Ej.: Comprender cómo el estrés laboral está afectando el funcionamiento emocional, familiar y cotidiano de ${caseItem.name}.`}
               rows={3}
             />
           </label>
