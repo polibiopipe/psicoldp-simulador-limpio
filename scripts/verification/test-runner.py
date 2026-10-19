@@ -46,6 +46,7 @@ with tempfile.TemporaryDirectory(prefix="ev-verification-guards-") as temporary:
     result = run(unknown)
     assert result.returncode == 2 and "unreviewed audit" in result.stderr
     assert not (unknown / "UNEXPECTED").exists()
+    assert json.loads((unknown / ".audit-verification/report.json").read_text())["offlineStatus"] == "BLOCKED"
     print("PASS: unknown audit is not executed.")
 
     clean = base / "clean"

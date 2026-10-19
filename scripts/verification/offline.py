@@ -93,7 +93,7 @@ def main():
     temp = output / "tmp"
     temp.mkdir(exist_ok=True)
     # No inherited tokens, proxy settings, NODE_OPTIONS, VITE_* or service keys.
-    environment = {"PATH": str(Path(node).parent) + ":/usr/bin:/bin", "LANG": "C.UTF-8",
+    environment = {"PATH": str(Path(node).parent) + ":" + str(Path(sys.executable).parent) + ":/usr/bin:/bin", "LANG": "C.UTF-8",
                    "TZ": "UTC", "TMPDIR": str(temp), "EV_NETWORK_RESTRICTED": "seccomp-v1"}
     os.closerange(3, 65536)
     os.execve(node, [node, str(root / "scripts/verification/run.mjs")], environment)
