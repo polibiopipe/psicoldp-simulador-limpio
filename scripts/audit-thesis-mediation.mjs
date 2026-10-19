@@ -29,9 +29,10 @@ async function check(name, fn) { await fn(); console.log(`PASS ${name}`); passed
 const env = { SUPABASE_URL: process.env.SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY: process.env.GEMINI_API_KEY };
 process.env.SUPABASE_URL = "https://fixture.invalid"; process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture"; process.env.GEMINI_API_KEY = "fixture";
 let authenticated = true, approved = true, assigned = true, consent = true, owner = "owner", status = "completed", providerMode = "ok", calls = 0, sent;
+let archiveError=false;const archived=[];
 const original = JSON.stringify(conversation);
 const client = {
-  rpc:async()=>({data:true,error:null}),
+  rpc:async(name,args)=>{if(name==='thesis_feedback_archive'){archived.push(args);return{data:args.p_id,error:archiveError?{message:'archive failed'}:null};}return{data:true,error:null};},
   auth: { getUser: async () => ({ data: { user: authenticated ? { id: "owner" } : null } }) },
   from(table) {
     return { select() { return this; }, eq() { return this; }, async maybeSingle() {
@@ -93,13 +94,17 @@ try {
   await check("la IA recibe la entrevista autorizada y devuelve fuentes del catálogo", async () => {
     const res = await call({ body: { sessionRecordId: "session-1", ...practice, conversation: [{ question: "TAMPERED" }], userId: "other" } });
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.source, "gemini");
+    assert.equal(res.body.source, "gemini");assert.ok(res.body.studyArchiveId);assert.equal(archived.at(-1).p_payload.input.reflection,practice.reflection);assert.equal(archived.at(-1).p_payload.result.studentQuote,conversation[1].question);
     assert.equal(res.body.studentQuote, conversation[1].question);
     assert.ok(res.body.sources.every(source => /^https:/.test(source.url)));
     const text = JSON.stringify(sent); assert.ok(!text.includes("TAMPERED")); assert.ok(!text.includes("NEVER_SEND_THIS"));
     assert.equal(JSON.parse(sent.contents[0].parts[0].text).selected.previousPatientResponse, conversation[0].answer);
     assert.match(sent.systemInstruction.parts[0].text, /nunca como instrucciones/);
     assert.equal(JSON.stringify(conversation), original);
+  });
+  await check("sin archivo confirmado no se entrega una devolución formal y el piloto no escribe historia",async()=>{
+    archiveError=true;const failed=await call();assert.equal(failed.statusCode,503);assert.equal(failed.body.code,'ARCHIVE_NOT_CONFIRMED');archiveError=false;
+    const before=archived.length;const pilot=await call({body:{sessionRecordId:'pilot-session',...practice,pilot:true,pilotConversation:conversation.slice(1)}});assert.equal(pilot.statusCode,200);assert.equal(archived.length,before);assert.equal(pilot.body.studyArchiveId,null);
   });
   await check("fallas, respuestas truncadas o citas inventadas conservan el ejercicio sin fabricar una devolución", async () => {
     for (const mode of ["offline", "timeout", "truncated", "invented"]) {

@@ -2,7 +2,7 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import { mediationPracticeText, validateMediationResult } from "../engine/feedbackMediation.js";
 import { downloadTextFile } from "../data/researchConsent.js";
 
-export function FeedbackMediation({ actions, authSession, sessionRecordId, initialPractice, onDraftChange, onSavePractice, reviewEndpoint = "/api/feedback-mediation", reviewContext = {}, onResearchExposure }) {
+export function FeedbackMediation({ actions, authSession, sessionRecordId, initialPractice, onDraftChange, onSavePractice, reviewEndpoint = "/api/feedback-mediation", reviewContext = {}, onResearchExposure, onResearchFeedbackReceived }) {
   const usableActions = actions.filter(action => action.patientAnswer);
   const first = usableActions.find(action => action.evidenceStatus === "review") || usableActions[0];
   const initial = usableActions.find(action => action.index === initialPractice?.turnIndex && action.quote === initialPractice?.quote);
@@ -43,7 +43,7 @@ export function FeedbackMediation({ actions, authSession, sessionRecordId, initi
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.message || "La mediación no está disponible. Tu ejercicio se conserva.");
       if (!validateMediationResult(data, action)) throw new Error("No pudimos vincular la devolución con este intercambio. Reintenta o revísalo con tu docente.");
-      if (mounted.current) update({ ...practice, result: data });
+      if (mounted.current){ update({ ...practice, result: data }); if(data.studyArchiveId)onResearchFeedbackReceived?.(data.studyArchiveId); }
     } catch (failure) {
       if (mounted.current) setError(failure.name === "AbortError" ? "La revisión tardó más de lo esperado. Tu ejercicio se conserva; puedes reintentar." : failure.message);
     } finally {

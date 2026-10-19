@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, HelpCircle, Lightbulb, X } from "lucide-react";
-import { getPedagogicalGuide } from "../data/pedagogicalGuides.js";
+import { LearningExposureContext } from './LearningExposureContext.jsx';
+import { getPedagogicalGuide, PEDAGOGICAL_GUIDES_VERSION } from "../data/pedagogicalGuides.js";
 
 export function PedagogicalGuide({
   guideId,
@@ -8,6 +9,8 @@ export function PedagogicalGuide({
   compact = false,
   className = ""
 }) {
+  const onExposure=useContext(LearningExposureContext);
+  const shell=useRef(null);
   const guide = useMemo(() => getPedagogicalGuide(guideId), [guideId]);
   const storageKey = `escucha-viva-guide-hidden:${guideId}`;
   const [isOpen, setIsOpen] = useState(() => autoOpen && !readSuppressed(storageKey));
@@ -17,6 +20,13 @@ export function PedagogicalGuide({
     setDoNotShowAgain(false);
     setIsOpen(autoOpen && !readSuppressed(storageKey));
   }, [autoOpen, storageKey]);
+
+  useEffect(()=>{
+    if(!isOpen||!onExposure||typeof IntersectionObserver==='undefined')return;
+    const card=shell.current?.querySelector('aside');if(!card)return;
+    const observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting&&entry.intersectionRatio>=0.1)onExposure('guide_shown',`${guideId}@${PEDAGOGICAL_GUIDES_VERSION}`);},{threshold:0.1});
+    observer.observe(card);return()=>observer.disconnect();
+  },[isOpen,onExposure,guideId]);
 
   function closeGuide() {
     if (doNotShowAgain) writeSuppressed(storageKey);
@@ -28,7 +38,7 @@ export function PedagogicalGuide({
   }
 
   return (
-    <div data-guide-id={guideId} className={`pedagogical-guide-shell ${compact ? "compact" : ""} ${className}`.trim()}>
+    <div ref={shell} data-guide-id={guideId} className={`pedagogical-guide-shell ${compact ? "compact" : ""} ${className}`.trim()}>
       <button
         className="guide-trigger"
         type="button"

@@ -1,3 +1,5 @@
+import { buildSessionFeedback } from '../engine/sessionFeedback.js';
+import { FEEDBACK_BASIS_VERSION } from '../data/feedbackAcademicBasis.js';
 import { cases } from '../data/cases.js';
 import { normalizePreSessionPlan } from '../engine/clinicalPreparation.js';
 import { normalizeClinicalArtifacts } from '../engine/clinicalArtifacts.js';
@@ -40,7 +42,7 @@ export function normalizeStudyPreparation(input = {}, sessionNumber = 1) {
  const caseItem = cases.find(item => item.id === 'tomas');
  return { ...normalizePreSessionPlan({ ...input, caseId: 'tomas', sessionNumber, evaluationObjective: input.evaluationObjective || input.objective || '', processObjectives: input.processObjectives || input.plan || '' }, { caseItem, sessionNumber }), engineVersion: STUDY_ENGINE_VERSION };
 }
-export function buildStudyClosure(session, input = {}) {
+export function buildStudyClosure(session, input = {}, {buildCommit=null} = {}) {
  const caseItem = cases.find(item => item.id === 'tomas');
  const plan = normalizeStudyPreparation(session.preparation, session.session_number);
  const decision = normalizeClinicalDecision(input.clinicalDecision || { action: 'continue_evaluation', justification: input.rationale || '' }, getClinicalSessionPlan(caseItem), session.session_number, plan);
@@ -48,5 +50,6 @@ export function buildStudyClosure(session, input = {}) {
  const report = buildEducationalReport(session.conversation || [], caseItem);
  const clinicalPlanEvaluation = evaluateClinicalPlanDecision({ decision, sessionPlan: getClinicalSessionPlan(caseItem), report, history: session.conversation || [], sessionNumber: session.session_number, preSessionPlan: plan, completedSessionCount: session.session_number });
  const summary = buildSessionSummary({ caseItem, clinicalPlanEvaluation, history: session.conversation || [], report, sessionNumber: session.session_number, preSessionPlan: plan, clinicalDecision: decision, clinicalArtifacts: artifacts });
- return { decision: input.decision || decision.action, rationale: decision.justification, clinicalDecision: decision, clinicalArtifacts: artifacts, clinicalPlanEvaluation, summary, feedbackPractice: session.closure?.feedbackPractice || null, createdAt: new Date().toISOString() };
+ const formativeSnapshot={id:crypto.randomUUID(),buildCommit,version:'study-feedback-snapshot-v1',basisVersion:FEEDBACK_BASIS_VERSION,generatedAt:new Date().toISOString(),report,feedback:buildSessionFeedback({sessionNumber:session.session_number,selectedCase:caseItem,conversation:session.conversation||[],report,selectedApproach:report.therapeuticApproach})};
+ return { formativeSnapshot, decision: input.decision || decision.action, rationale: decision.justification, clinicalDecision: decision, clinicalArtifacts: artifacts, clinicalPlanEvaluation, summary, feedbackPractice: session.closure?.feedbackPractice || null, createdAt: new Date().toISOString() };
 }

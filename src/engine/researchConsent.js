@@ -47,7 +47,7 @@ export async function exportOwnSimulatorData(userId) {
     ["simulation_appointments", "user_id"], ["simulation_student_availability", "user_id"],
     ["simulation_interventions", "user_id"], ["simulation_access_consents", "user_id"],
     ["thesis_tomas_slots", "user_id"], ["thesis_tomas_sessions", "user_id"],
-    ["thesis_research_enrollment", "user_id"], ["thesis_research_assessments", "user_id"], ["thesis_research_exposures", "user_id"],
+    ["thesis_research_enrollment", "user_id"], ["thesis_research_assessments", "user_id"], ["thesis_research_exposures", "user_id"], ["thesis_feedback_history", "user_id"],
     ["simulation_research_consent_events", "user_id"]
   ]) {
     const rows = [];

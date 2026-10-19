@@ -58,7 +58,7 @@ export function createStudyHandler({ clientFactory = createClient, respond = gen
      const conversationStage=body.conversationStage&&JSON.stringify(body.conversationStage).length<4000?body.conversationStage:null;
      const result=await respond({caseId:'tomas',studentMessage:question,history:session.conversation,difficulty:'intermedio',sessionNumber:session.session_number,selectedInterventionType,conversationStage,previousSessionSummary:previous?.data?.closure?.summary});
      if(!result?.responseText)throw new Error('RESPONSE_UNAVAILABLE');
-     payload.turn={id,question,answer:result.responseText,createdAt:new Date().toISOString(),engineVersion:result.engineVersion||STUDY_ENGINE_VERSION,model:result.model||null,providerModelVersion:result.providerModelVersion||null,opportunity:result.opportunity||null,interventionType:selectedInterventionType};
+     payload.turn={id,question,answer:result.responseText,createdAt:new Date().toISOString(),buildCommit:process.env.VERCEL_GIT_COMMIT_SHA||null,engineVersion:result.engineVersion||STUDY_ENGINE_VERSION,model:result.model||null,providerModelVersion:result.providerModelVersion||null,opportunity:result.opportunity||null,interventionType:selectedInterventionType};
     }
     if(body.action==='event' && !['initial','monitoring','revision'].includes(body.event?.stage))throw new Error('INVALID_ACTION');
     if(body.action==='event'){
@@ -68,7 +68,7 @@ export function createStudyHandler({ clientFactory = createClient, respond = gen
      payload.event=createDecisionEvidence(body.event||{}, {history:session.conversation,id:body.event.id});
     }
     if(body.action==='close'){
-     const next=buildStudyClosure(session,body.closure||{});
+     const next=buildStudyClosure(session,body.closure||{},{buildCommit:process.env.VERCEL_GIT_COMMIT_SHA||null});
      if(!next.rationale?.trim())throw new Error('CLOSURE_REQUIRED');
      payload.closure=next;
     }

@@ -1,3 +1,4 @@
+export const PEDAGOGICAL_GUIDES_VERSION='pedagogical-guides-2026-10-19';
 export const pedagogicalGuides = {
   preparacion_sesion: {
     title: "Preparacion de la sesion",

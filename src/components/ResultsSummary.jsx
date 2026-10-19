@@ -2,7 +2,7 @@ import React from "react";
 import { CheckCircle2, Clock, GraduationCap, TrendingUp } from "lucide-react";
 import { buildSessionFeedback } from "../engine/sessionFeedback.js";
 
-export function ResultsSummary({ report, caseItem, history, sessionNumber = 1 }) {
+export function ResultsSummary({ report, caseItem, history, sessionNumber = 1, savedFeedback }) {
   const review = report.criteria.filter((criterion) => criterion.level === "needsWork").length;
   const partial = report.criteria.filter((criterion) => criterion.level === "partial").length;
   const interviewTurns = history.filter((entry) => !entry.isSessionPrelude);
@@ -40,7 +40,7 @@ export function ResultsSummary({ report, caseItem, history, sessionNumber = 1 })
     );
   }
 
-  const sessionFeedback = buildSessionFeedback({
+  const sessionFeedback = savedFeedback || buildSessionFeedback({
     sessionNumber,
     selectedCase: caseItem,
     conversation: history,

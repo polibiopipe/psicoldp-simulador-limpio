@@ -6,6 +6,7 @@ import { FeedbackMediation } from "./FeedbackMediation.jsx";
 
 export function FeedbackPanel({
   report,
+  savedFeedback,
   caseItem,
   history,
   sessionNumber = 1,
@@ -72,7 +73,7 @@ export function FeedbackPanel({
     );
   }
 
-  const sessionFeedback = buildSessionFeedback({
+  const sessionFeedback = savedFeedback || buildSessionFeedback({
     sessionNumber,
     selectedCase: caseItem,
     conversation: history,

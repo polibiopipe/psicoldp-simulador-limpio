@@ -1,3 +1,6 @@
+import { pedagogicalGuides,PEDAGOGICAL_GUIDES_VERSION } from '../src/data/pedagogicalGuides.js';
+import { randomUUID,createHash } from 'node:crypto';
+import { FRAMEWORK_VERSION,frameworkSources,frameworkMatrix,validateFrameworkEntry } from '../src/thesis/frameworkModel.js';
 import { createClient } from '@supabase/supabase-js';
 import { readAccessConsent } from '../src/engine/accessConsentPolicy.js';
 import { RESEARCH_PROTOCOL, CLINICAL_RUBRIC, PROCESS_CODES, INTERVIEW_QUESTIONS, validateHumanRating } from '../src/thesis/researchProtocol.js';
@@ -45,7 +48,34 @@ export function createResearchHandler({clientFactory=createClient}={}){return as
   const protocol=await checked(db.from('thesis_research_protocols').select('*').eq('version',settings.research_protocol).maybeSingle());
   const command=async(name,payload)=>checked(db.rpc('thesis_research_command',{p_user:user.id,p_action:name,p_payload:payload}));
   const consent=async(id)=>{if(!await checked(db.rpc('thesis_research_consent_ok',{p_user:id})))fail('El consentimiento de investigación no está vigente.',409);};
-  async function all(table){let rows=[];for(let offset=0;;offset+=1000){const batch=await checked(db.from(table).select('*').range(offset,offset+999));rows.push(...batch);if(batch.length<1000)break;}return rows;}
+  async function all(table){let rows=[];for(let offset=0;;offset+=1000){const batch=await checked(db.from(table).select('*').order(['thesis_tomas_slots','thesis_research_enrollment'].includes(table)?'slot':'id').range(offset,offset+999));rows.push(...batch);if(batch.length<1000)break;}return rows;}
+  async function frameworkDataset(){
+   const active=new Set(await checked(db.rpc('thesis_research_active_users'))||[]);
+   const [categories,rawEntries,rawFeedback,rawSessions,rawAssessments,rawSlots,rawExposures]=await Promise.all(['thesis_framework_categories','thesis_framework_entries','thesis_feedback_history','thesis_tomas_sessions','thesis_research_assessments','thesis_tomas_slots','thesis_research_exposures'].map(all));
+   const strip=({user_id,...row})=>row;
+   const entries=rawEntries.filter(e=>e.entry_type==='analysis_plan'||active.has(e.user_id)).map(strip),feedback=rawFeedback.filter(e=>active.has(e.user_id)).map(strip),sessions=rawSessions.filter(e=>active.has(e.user_id)),assessments=rawAssessments.filter(e=>active.has(e.user_id)),slots=rawSlots.filter(e=>active.has(e.user_id)).map(strip);
+   return {version:FRAMEWORK_VERSION,categories,entries,feedback,slots,exposures:rawExposures.filter(e=>active.has(e.user_id)).map(strip),sources:frameworkSources({sessions,assessments,entries,feedback}).filter(source=>body.slot?source.slot===Number(body.slot):action!=='framework_data'),matrix:frameworkMatrix(slots,categories,entries)};
+  }
+  if(action==='own_feedback')return send(200,{records:await checked(db.from('thesis_feedback_history').select('id,session_id,turn_index,input,result,generated_at,received_at,reviewed_at,feedback_version').eq('user_id',user.id).order('generated_at'))});
+  if(action==='feedback_ack'){
+   if(!uuid(body.id)||!['received','reviewed'].includes(body.kind))fail('Constancia inválida.');await consent(user.id);
+   return send(200,await checked(db.rpc('thesis_feedback_ack',{p_user:user.id,p_id:body.id,p_kind:body.kind})));
+  }
+  if(action==='framework_data'){requireRole('coordinator','coder');return send(200,{...await frameworkDataset(),roles,protocol:protocol?{version:protocol.version,status:protocol.status,primary_criterion:protocol.primary_criterion}:null});}
+  if(action==='framework_category'||action==='framework_entry'){
+   requireRole('coordinator','coder');let payload;
+   if(action==='framework_category'){
+    if(!/^[a-z][a-z0-9_]{2,70}$/.test(body.key||'')||bounded(body.label,150).length<3||bounded(body.definition).length<20||bounded(body.inclusion).length<10||bounded(body.exclusion).length<10||bounded(body.changeReason).length<10||!['deductive','emergent'].includes(body.origin)||!['proposed','active','retired'].includes(body.status)||!Number.isInteger(body.expectedVersion)||body.expectedVersion<0)fail('Completa nombre, definición, inclusión, exclusión y fundamento de la versión. Usa una clave sin espacios.');
+    payload={id:body.requestId||randomUUID(),key:body.key,label:bounded(body.label,150),definition:bounded(body.definition),inclusion:bounded(body.inclusion),exclusion:bounded(body.exclusion),changeReason:bounded(body.changeReason),origin:body.origin,status:body.status,expectedVersion:body.expectedVersion};
+   }else{
+    const dataset=await frameworkDataset();try{payload=validateFrameworkEntry(body,dataset);}catch(error){fail(error.message);}
+    if(payload.entry_type==='analysis_plan')requireRole('coordinator');
+    payload.id=body.requestId||randomUUID();
+    if(payload.payload.references)payload.payload.references=payload.payload.references.map(ref=>{const {text,patientAnswer,...metadata}=ref;const start=text.indexOf(ref.quote);return {...metadata,context:text.slice(Math.max(0,start-250),start+ref.quote.length+250),sourceHash:createHash('sha256').update(text).digest('hex')};});
+   }
+   if(!uuid(payload.id))fail('Identificador de registro inválido.');
+   return send(200,{saved:true,result:await checked(db.rpc('thesis_framework_command',{p_user:user.id,p_action:action==='framework_category'?'category':'entry',p_payload:payload}))});
+  }
   if(action==='participant_state'){
    const [enrollment,assessments]=await Promise.all([checked(db.from('thesis_research_enrollment').select('slot,status,reason').eq('user_id',user.id).maybeSingle()),checked(db.from('thesis_research_assessments').select('id,stage,status,response,created_at,submitted_at').eq('user_id',user.id).order('created_at'))]);
    return send(200,{roles,enrollment,assessments,protocol:{...RESEARCH_PROTOCOL,status:protocol?.status||'draft'},collectionEnabled:settings.collection_enabled,trainingSessions:settings.training_sessions});
@@ -53,7 +83,8 @@ export function createResearchHandler({clientFactory=createClient}={}){return as
   if(action==='workbench'||action==='export'){
    requireRole('coordinator','evaluator','coder','expert');
    const active=new Set(await checked(db.rpc('thesis_research_active_users'))||[]);
-   const result={roles,protocol,rubric:CLINICAL_RUBRIC,codebook:PROCESS_CODES};
+   const visibleProtocol=has('coordinator')||has('expert')?protocol:protocol?{version:protocol.version,status:protocol.status,primary_criterion:protocol.primary_criterion}:null;
+   const result={roles,protocol:visibleProtocol,rubric:CLINICAL_RUBRIC,codebook:PROCESS_CODES};
    if(has('coordinator')||has('coder')||has('evaluator')){
     const assessments=(await all('thesis_research_assessments')).filter(r=>active.has(r.user_id));const ids=new Set(assessments.map(r=>r.id));
     const assignments=(await all('thesis_research_assignments')).filter(r=>ids.has(r.assessment_id)&&(has('coordinator')||r.reviewer_id===user.id));const assignmentIds=new Set(assignments.map(r=>r.id));
@@ -70,6 +101,10 @@ export function createResearchHandler({clientFactory=createClient}={}){return as
       result.assessments=assessments.map(({user_id,...r})=>r);result.assignments=assignments;result.ratings=ratings;
       result.integrations=(await all('thesis_research_integrations')).filter(r=>slotIds.has(r.slot));
       result.joint=buildJointDisplay({slots,assessments,assignments,ratings,sessions,codes,exposures});
+      const [frameworkCategories,frameworkEntries]=await Promise.all([all('thesis_framework_categories'),all('thesis_framework_entries')]);
+      const activeFramework=frameworkEntries.filter(e=>active.has(e.user_id));
+      result.frameworkMatrix=frameworkMatrix(slots,frameworkCategories,activeFramework);
+      result.joint.rows=result.joint.rows.map(row=>({...row,frameworkEpisodeCount:activeFramework.filter(e=>e.slot===row.slot&&e.entry_type==='episode').length,frameworkCodingCount:activeFramework.filter(e=>e.slot===row.slot&&e.entry_type==='coding').length}));
       result.flow={capacity:50,assigned:(await all('thesis_tomas_slots')).filter(r=>r.user_id).length,activeConsent:slots.length,targetRecruitment:43,targetPairs:34};
       result.staff=await checked(db.from('thesis_research_staff').select('user_id,roles'));
       result.audit=await checked(db.from('thesis_research_audit').select('id,action,record_id,created_at').order('id',{ascending:false}).limit(100));
@@ -77,7 +112,7 @@ export function createResearchHandler({clientFactory=createClient}={}){return as
     }
    }
    if(has('expert')||has('coordinator')){result.cases=ACTOR_CASES;result.opportunities=STANDARD_INFORMATION;result.reviews=await all('thesis_research_reviews');}
-   if(action==='export'){requireRole('coordinator');await checked(db.from('thesis_research_audit').insert({actor_id:user.id,action:'export',details:{protocol:settings.research_protocol}}));delete result.staff;delete result.audit;delete result.cases;delete result.reviews;delete result.roles;delete result.tasks;}
+   if(action==='export'){requireRole('coordinator');result.framework=await frameworkDataset();await checked(db.from('thesis_research_audit').insert({actor_id:user.id,action:'export',details:{protocol:settings.research_protocol}}));delete result.staff;delete result.audit;delete result.cases;delete result.reviews;delete result.roles;delete result.tasks;if(result.protocol?.document){const {cases,...document}=result.protocol.document;result.protocol={...result.protocol,document};}}
    return send(200,result);
   }
   let payload={};
@@ -94,14 +129,16 @@ export function createResearchHandler({clientFactory=createClient}={}){return as
    payload={assessmentId:assessment.id,response:validateResponse(body.response,assessment.stage)};
   }else if(action==='exposures'){
    if(!Array.isArray(body.events)||!body.events.length||body.events.length>20)fail('Lote inválido.');
-   payload.events=body.events.map(e=>{if(!['help_open','section_open','feedback_open','tutor_request'].includes(e.kind)||e.sessionId&&!uuid(e.sessionId))fail('Evento inválido.');if(!uuid(e.id))fail('Identificador de evento inválido.');return{id:e.id,kind:e.kind,resource:bounded(e.resource,160),clientTime:bounded(e.clientTime,40),sessionId:e.sessionId||null};});
+   payload.events=body.events.map(e=>{if(!['help_open','guide_shown','section_open','feedback_open','tutor_request'].includes(e.kind)||e.sessionId&&!uuid(e.sessionId))fail('Evento inválido.');if(!uuid(e.id))fail('Identificador de evento inválido.');return{id:e.id,kind:e.kind,resource:bounded(e.resource,160),clientTime:bounded(e.clientTime,40),sessionId:e.sessionId||null};});
   }else if(action==='rate'){
    requireRole('evaluator');if(!uuid(body.assignmentId))fail('Asignación inválida.');
    const assignment=await checked(db.from('thesis_research_assignments').select('*').eq('id',body.assignmentId).eq('reviewer_id',user.id).maybeSingle());if(!assignment)fail('Asignación no disponible.',404);
    const assessment=await checked(db.from('thesis_research_assessments').select('*').eq('id',assignment.assessment_id).single());await consent(assessment.user_id);
    try{payload={assignmentId:assignment.id,...validateHumanRating(body,assessment)};}catch(error){fail(error.message);}
   }else if(action==='code'){
-   requireRole('coder','coordinator');if(!uuid(body.sessionId))fail('Sesión inválida.');const session=await checked(db.from('thesis_tomas_sessions').select('*').eq('id',body.sessionId).single());await consent(session.user_id);payload=validateEpisode(body,session);
+   requireRole('coder','coordinator');
+   if(protocol?.document?.methodology?.qualitative?.includes('Framework Method'))fail('Esta versión utiliza Análisis cualitativo y el marco analítico con versiones. Registra allí la codificación.',409);
+   if(!uuid(body.sessionId))fail('Sesión inválida.');const session=await checked(db.from('thesis_tomas_sessions').select('*').eq('id',body.sessionId).single());await consent(session.user_id);payload=validateEpisode(body,session);
   }else if(action==='integration'){
    requireRole('coordinator','coder');const seat=await checked(db.from('thesis_tomas_slots').select('user_id').eq('slot',Number(body.slot)).single());await consent(seat.user_id);
    if(!CLINICAL_RUBRIC.some(c=>c.id===body.criterion)||!['convergence','divergence','insufficient'].includes(body.status)||bounded(body.note).length<20)fail('Selecciona criterio, relación y fundamento con referencias a los registros.');
@@ -119,7 +156,7 @@ export function createResearchHandler({clientFactory=createClient}={}){return as
   }else if(action==='assign'){
    requireRole('coordinator');if(!uuid(body.assessmentId)||!uuid(body.reviewerId))fail('Selecciona registro y evaluador.');payload={assessmentId:body.assessmentId,reviewerId:body.reviewerId,primary:body.primary===true};
   }else if(action==='freeze'){
-   requireRole('coordinator');payload={approvalReference:bounded(body.approvalReference,1000),pilotReference:bounded(body.pilotReference,1000),primaryCriterion:body.primaryCriterion,document:{...RESEARCH_PROTOCOL,rubric:CLINICAL_RUBRIC,codebook:PROCESS_CODES,cases:ACTOR_CASES,opportunities:STANDARD_INFORMATION}};
+   requireRole('coordinator');payload={approvalReference:bounded(body.approvalReference,1000),pilotReference:bounded(body.pilotReference,1000),primaryCriterion:body.primaryCriterion,document:{...RESEARCH_PROTOCOL,buildCommit:process.env.VERCEL_GIT_COMMIT_SHA||null,rubric:CLINICAL_RUBRIC,codebook:PROCESS_CODES,cases:ACTOR_CASES,opportunities:STANDARD_INFORMATION,learningMaterials:{version:PEDAGOGICAL_GUIDES_VERSION,guides:pedagogicalGuides}}};
   }else fail('Operación desconocida.');
   return send(200,{saved:true,result:await command(action,payload)});
  }catch(error){const known=/REQUIRED|NOT_OPEN|NOT_FOUND|NOT_AVAILABLE|LOCKED|FROZEN|INCOMPLETE|FORBIDDEN|ALREADY|COMPLETE/.test(error.message);return send(error.status|| (known?409:503),{message:error.status?error.message:known?'La operación requiere completar las condiciones previas del protocolo. Revisa la etapa, los permisos y el consentimiento.':'No se confirmó el registro. Conserva tu texto y vuelve a intentarlo.'});}

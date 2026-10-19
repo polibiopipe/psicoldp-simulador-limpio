@@ -1,7 +1,8 @@
 export const RESEARCH_PROTOCOL = {
- version:'ev-tomas-research-draft-v3', status:'draft', source:'Protocolo_Operativo_Tesis_Escucha_Viva_34_43_v1',
+ version:'ev-tomas-research-draft-v4', status:'draft', source:'Protocolo_Operativo_Tesis_Escucha_Viva_34_43_v1',
  targetCompletePairs:34, recruitmentTarget:43, capacity:50, trainingSessions:2,
  primaryAggregationEnabled:false, rubricVersion:'clinical-reasoning-draft-v1', codebookVersion:'metacognition-draft-v1',
+ methodology:{design:'Mixto convergente de orientación predominantemente comprensiva',quantitative:'Un grupo con mediciones pareadas pre–post',qualitative:'Framework Method con categorías deductivas y emergentes',integration:'Matrices conjuntas por participante y criterio',source:'Texto pegado(9).txt',sourceSha256:'765d67c3a6299184af5705c43604f40d2e86164cdc08660703f35f28e2b3a711'},
  validation:'Revisión experta, pilotaje y autorizaciones pendientes',
  phases:[
   {id:'eligibility',label:'Ingreso y elegibilidad'}, {id:'pre',label:'Evaluación inicial con actor'},

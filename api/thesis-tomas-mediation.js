@@ -1,9 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { createClient } from "@supabase/supabase-js";
 import { readAccessConsent } from "../src/engine/accessConsentPolicy.js";
 import { buildMediationContext, mediationInstruction, mediationSchema, validateMediationResult } from "../src/engine/feedbackMediation.js";
 
-// Independent, read-only tutoring endpoint. Never calls the patient engine,
-// updates session scores, reserves interventions, or changes the closure.
+// Independent tutoring endpoint. Archives each grounded formal response before delivery;
+// never changes patient turns, session scores, interventions or the closure.
 export function createThesisMediationHandler({ clientFactory = createClient, providerFetch = fetch } = {}) {
   const recentRequests = new Map();
   return async function handler(req, res) {
@@ -74,7 +75,13 @@ export function createThesisMediationHandler({ clientFactory = createClient, pro
       try { value = JSON.parse(candidate?.content?.parts?.filter(part => !part.thought).map(part => part.text || "").join("") || ""); } catch { /* reject malformed output */ }
       const result = candidate?.finishReason === "STOP" && validateMediationResult(value, context.selected);
       if (!result) return send(502, "UNGROUNDED_RESPONSE", "La devolución no pudo vincularse de forma fiable con tu intercambio. Conservamos el informe y tu ejercicio para que puedas reintentar o revisarlos con tu docente.");
-      return res.status(200).json({ ...result, scope: pilot ? "technical_pilot" : "thesis_tomas", source: "gemini", model, turnIndex, generatedAt: new Date().toISOString() });
+      let studyArchiveId=null;
+      if(!pilot){
+        studyArchiveId=randomUUID();
+        const archived=await client.rpc('thesis_feedback_archive',{p_user:userId,p_session:sessionRecordId,p_id:studyArchiveId,p_payload:{turnIndex,feedbackVersion:result.mediationVersion,input:{reflection:reflection.trim(),rewrite:rewrite.trim(),studentQuote:context.selected.quote,patientQuote:context.selected.patientAnswer},result:{...result,buildCommit:process.env.VERCEL_GIT_COMMIT_SHA||null},model,providerModelVersion:generated.modelVersion||null}});
+        if(archived.error)return send(503,'ARCHIVE_NOT_CONFIRMED','No se confirmó el archivo de esta devolución. Tu ejercicio se conserva; reintenta.');
+      }
+      return res.status(200).json({ ...result, scope: pilot ? "technical_pilot" : "thesis_tomas", source: "gemini", model, turnIndex, studyArchiveId, generatedAt: new Date().toISOString() });
     } catch (error) {
       return send(503, "MEDIATION_UNAVAILABLE", error?.name === "AbortError" ? "La revisión tardó más de lo esperado. Tu ejercicio se conserva; puedes reintentar." : "No pudimos completar la mediación. Conserva tu ejercicio y vuelve a intentarlo.");
     }
