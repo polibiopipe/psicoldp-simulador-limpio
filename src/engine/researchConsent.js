@@ -46,11 +46,12 @@ export async function exportOwnSimulatorData(userId) {
     ["user_profiles", "id"], ["simulation_sessions", "user_id"],
     ["simulation_appointments", "user_id"], ["simulation_student_availability", "user_id"],
     ["simulation_interventions", "user_id"], ["simulation_access_consents", "user_id"],
+    ["thesis_tomas_slots", "user_id"], ["thesis_tomas_sessions", "user_id"],
     ["simulation_research_consent_events", "user_id"]
   ]) {
     const rows = [];
     for (let offset = 0; ; offset += 500) {
-      const result = await client.from(table).select("*").eq(ownerColumn, userId).order("id").range(offset, offset + 499);
+      const result = await client.from(table).select("*").eq(ownerColumn, userId).order(table === "thesis_tomas_slots" ? "slot" : "id").range(offset, offset + 499);
       if (result.error) throw new Error("No pudimos completar la descarga. No se generó una copia parcial; reintenta o solicita tus datos al contacto de privacidad.");
       rows.push(...result.data);
       if (result.data.length < 500) break;

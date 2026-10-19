@@ -1,5 +1,16 @@
 {
   "rewrites": [
-    { "source": "/ruta-seminario", "destination": "/index.html" }
+    {
+      "source": "/ruta-seminario",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/tesis-tomas",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/tesis-tomas/",
+      "destination": "/index.html"
+    }
   ]
 }

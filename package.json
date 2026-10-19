@@ -33,7 +33,8 @@
     "audit:access-consent": "node scripts/audit-access-consent.mjs",
     "audit:feedback-academic": "node scripts/audit-feedback-academic.mjs",
     "audit:feedback-mediation": "node scripts/audit-feedback-mediation.mjs",
-    "audit:decision-evidence": "node scripts/audit-decision-evidence.mjs"
+    "audit:decision-evidence": "node scripts/audit-decision-evidence.mjs",
+    "audit:thesis-tomas": "node scripts/audit-thesis-tomas.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",
